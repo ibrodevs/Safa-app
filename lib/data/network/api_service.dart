@@ -263,7 +263,21 @@ final class ApiService {
   Future<void> postWhatsappCode({required String phoneNumber}) async {
     try {
       await _dio.post(
-        'users/whatsapp-code',
+        'users/whatsapp-code/',
+        data: {
+          'phone': phoneNumber,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось отправить код в WhatsApp');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<void> postDebugWhatsappCode({required String phoneNumber}) async {
+    try {
+      await _dio.post(
+        'users/debug-code/',
         data: {
           'phone': phoneNumber,
         },
@@ -280,19 +294,30 @@ final class ApiService {
     required String code,
   }) async {
     try {
-      await _dio.post(
+      final resp = await _dio.post(
         'users/verify/',
         data: {
           'phone': phone,
           'code': code,
         },
       );
+      final map = _asMap(resp.data);
+      final access = map['access']?.toString() ?? '';
+      final refresh = map['refresh']?.toString() ?? '';
+
+      if (access.isEmpty || refresh.isEmpty) {
+        throw ApiException('Некорректный ответ сервера');
+      }
+
+      await _storage.saveTokens(access: access, refresh: refresh);
+      await setBearer(access);
     } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Неверный код подтверждения');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
 
   Future<void> postToken({
     required String phoneNumber,
@@ -343,6 +368,93 @@ final class ApiService {
       return false;
     }
   }
+
+  Future<void> postSelfie({
+    required String selfiePath,
+    required String phone,
+  }) async {
+    try {
+      if (selfiePath.isEmpty) {
+        throw ApiException('Путь к файлу не задан');
+      }
+      if (phone.isEmpty) {
+        throw ApiException('Номер телефона не задан');
+      }
+
+      final formData = FormData.fromMap({
+        'phone': phone,
+      });
+
+      formData.files.add(
+        MapEntry(
+          'selfie_id_card',
+          await MultipartFile.fromFile(
+            selfiePath,
+            filename: 'selfie.jpg',
+          ),
+        ),
+      );
+
+      await _dio.post(
+        'users/selfie/',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось загрузить селфи');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<int> postCarrierWait({required String phone}) async {
+    try {
+      if (phone.isEmpty) {
+        throw ApiException('Номер телефона не задан');
+      }
+
+      final resp = await _dio.post(
+        'users/carrier-wait/',
+        data: {
+          'phone': phone,
+        },
+        options: Options(
+          validateStatus: (code) => code != null && code >= 200 && code < 500,
+        ),
+      );
+
+      final status = resp.statusCode ?? 0;
+      if (status == 0) {
+        throw ApiException('Некорректный ответ сервера');
+      }
+
+      if (status == 200) {
+        try {
+          final map = _asMap(resp.data);
+          final access = map['access']?.toString() ?? '';
+          final refresh = map['refresh']?.toString() ?? '';
+
+          if (access.isNotEmpty && refresh.isNotEmpty) {
+            await _storage.saveTokens(access: access, refresh: refresh);
+            await setBearer(access);
+          }
+        } catch (_) {
+        }
+      }
+
+      return status;
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось отправить запрос на ожидание',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+
+
 
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();

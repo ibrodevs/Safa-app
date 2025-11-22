@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../data/network/model/api_exeptions_model.dart';
 import '../data/models/register_request_model.dart';
@@ -62,6 +63,10 @@ class AuthProvider extends ChangeNotifier {
       _pendingPhone = phoneNumber;
       _pendingPassword = password;
       _loggedIn = false;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pending_phone', phoneNumber);
+
       _loading = false;
       notifyListeners();
       return true;
@@ -78,6 +83,10 @@ class AuthProvider extends ChangeNotifier {
           _pendingPassword = password;
           _loggedIn = true;
           _error = null;
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('pending_phone', phoneNumber);
+
           _loading = false;
           notifyListeners();
           return true;
@@ -121,10 +130,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> verifyCodeAndLogin({required String code}) async {
     final phone = _pendingPhone;
-    final password = _pendingPassword;
 
-    if (phone == null || phone.isEmpty || password == null || password.isEmpty) {
-      _error = 'Нет данных для входа';
+    if (phone == null || phone.isEmpty) {
+      _error = 'Нет номера телефона для подтверждения';
       notifyListeners();
       return false;
     }
@@ -135,10 +143,41 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       await _repo.verifyCode(phone: phone, code: code);
-      if (!_loggedIn) {
-        await _repo.login(phoneNumber: phone, password: password);
-        _loggedIn = true;
-      }
+
+      _loggedIn = true;
+      _loading = false;
+      notifyListeners();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_logged_in', true);
+      await prefs.setString('pending_phone', phone);
+
+      return true;
+    } on ApiException catch (e) {
+      _loading = false;
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> uploadSelfie(String path) async {
+    final phone = _pendingPhone;
+    if (phone == null || phone.isEmpty) {
+      _error = 'Нет номера телефона для селфи';
+      notifyListeners();
+      return false;
+    }
+
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repo.uploadSelfie(
+        selfiePath: path,
+        phone: phone,
+      );
       _loading = false;
       notifyListeners();
       return true;
@@ -147,6 +186,33 @@ class AuthProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<int?> carrierWait() async {
+    var phone = _pendingPhone;
+
+    if (phone == null || phone.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      phone = prefs.getString('pending_phone');
+      _pendingPhone = phone;
+    }
+
+    if (phone == null || phone.isEmpty) {
+      _error = 'Нет номера телефона для подтверждения';
+      notifyListeners();
+      return null;
+    }
+
+    try {
+      final status = await _repo.carrierWait(phone: phone);
+      _error = null;
+      notifyListeners();
+      return status;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
     }
   }
 }

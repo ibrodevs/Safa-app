@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,9 +48,25 @@ class _SplashScreenState extends State<SplashScreen>
       () => _textCtrl.forward(),
     );
 
-    _navTimer = Timer(const Duration(milliseconds: 2900), () {
-      if (mounted) context.go('/second_splash');
-    });
+    _navTimer = Timer(const Duration(milliseconds: 2900), _navigateNext);
+  }
+
+  Future<void> _navigateNext() async {
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+    final carrierPending = prefs.getBool('carrier_pending') ?? false;
+
+    if (!mounted) return;
+
+    if (isLoggedIn) {
+      context.go('/home');
+    } else if (carrierPending) {
+      context.go('/selfie-waiting');
+    } else {
+      context.go('/second_splash');
+    }
   }
 
   @override

@@ -40,16 +40,16 @@ class _ClientRegisterStep1ScreenState extends State<ClientRegisterStep1Screen> {
     final pass2 = _pass2.text;
 
     if (firstName.isEmpty || phone.isEmpty || pass.isEmpty || pass2.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните все поля')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Заполните все поля')));
       return;
     }
 
     if (pass != pass2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пароли не совпадают')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
       return;
     }
 
@@ -68,14 +68,12 @@ class _ClientRegisterStep1ScreenState extends State<ClientRegisterStep1Screen> {
     if (ok) {
       context.push('/register/confirm/whatsapp');
     } else {
-      final message =
-          provider.error ?? 'Не удалось завершить регистрацию';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      final message = provider.error ?? 'Не удалось завершить регистрацию';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +91,9 @@ class _ClientRegisterStep1ScreenState extends State<ClientRegisterStep1Screen> {
             children: [
               const _TitleBlock(),
               const SizedBox(height: 18),
-              _ShadowField(child: _AppTextField(controller: _name, hint: 'Имя')),
+              _ShadowField(
+                child: _AppTextField(controller: _name, hint: 'Имя'),
+              ),
               const SizedBox(height: 14),
               _ShadowField(
                 child: _AppTextField(
@@ -194,8 +194,9 @@ class _ClientRegisterStep2ScreenState extends State<ClientRegisterStep2Screen> {
     );
     if (type == null) return;
 
-    final source =
-    type == _ImageSourceType.camera ? ImageSource.camera : ImageSource.gallery;
+    final source = type == _ImageSourceType.camera
+        ? ImageSource.camera
+        : ImageSource.gallery;
 
     final file = await _picker.pickImage(
       source: source,
@@ -221,16 +222,16 @@ class _ClientRegisterStep2ScreenState extends State<ClientRegisterStep2Screen> {
     final pass2 = _pass2.text;
 
     if (firstName.isEmpty || phone.isEmpty || pass.isEmpty || pass2.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните все поля')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Заполните все поля')));
       return;
     }
 
     if (pass != pass2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пароли не совпадают')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
       return;
     }
 
@@ -258,9 +259,9 @@ class _ClientRegisterStep2ScreenState extends State<ClientRegisterStep2Screen> {
       context.push('/register/confirm');
     } else {
       final message = provider.error ?? 'Не удалось завершить регистрацию';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -281,10 +282,7 @@ class _ClientRegisterStep2ScreenState extends State<ClientRegisterStep2Screen> {
               const _TitleBlock(),
               const SizedBox(height: 18),
               _ShadowField(
-                child: _AppTextField(
-                  controller: _name,
-                  hint: 'Имя',
-                ),
+                child: _AppTextField(controller: _name, hint: 'Имя'),
               ),
               const SizedBox(height: 14),
               _ShadowField(
@@ -389,6 +387,7 @@ class _TitleBlock extends StatelessWidget {
 
 class _ShadowField extends StatelessWidget {
   const _ShadowField({required this.child});
+
   final Widget child;
 
   @override
@@ -398,9 +397,15 @@ class _ShadowField extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x14000000), blurRadius: 20, offset: Offset(0, 12)),
+            color: Color(0x14000000),
+            blurRadius: 20,
+            offset: Offset(0, 12),
+          ),
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 12, offset: Offset(0, 4)),
+            color: Color(0x08000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: child,
@@ -440,14 +445,22 @@ class _AppTextField extends StatelessWidget {
         isDense: true,
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
         border: OutlineInputBorder(
-            borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8)),
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(8),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8)),
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(8),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide.none, borderRadius: BorderRadius.circular(8)),
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
       style: const TextStyle(
         fontSize: 18,
@@ -461,6 +474,7 @@ class _AppTextField extends StatelessWidget {
 
 class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({required this.text, required this.onPressed});
+
   final String text;
   final VoidCallback? onPressed;
 
@@ -475,7 +489,8 @@ class _PrimaryButton extends StatelessWidget {
           backgroundColor: const WidgetStatePropertyAll(Color(0xFFE67E22)),
           foregroundColor: const WidgetStatePropertyAll(Colors.white),
           shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
           elevation: const WidgetStatePropertyAll(0),
           textStyle: const WidgetStatePropertyAll(
             TextStyle(fontSize: 18, fontWeight: FontWeight.w800, height: 1.0),
@@ -488,11 +503,7 @@ class _PrimaryButton extends StatelessWidget {
 }
 
 class _UploadTile extends StatelessWidget {
-  const _UploadTile({
-    required this.title,
-    required this.onTap,
-    this.imagePath,
-  });
+  const _UploadTile({required this.title, required this.onTap, this.imagePath});
 
   final String title;
   final VoidCallback onTap;
@@ -516,7 +527,10 @@ class _UploadTile extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE6E9EF), width: 1),
             boxShadow: const [
               BoxShadow(
-                  color: Color(0x0F000000), blurRadius: 24, offset: Offset(0, 10)),
+                color: Color(0x0F000000),
+                blurRadius: 24,
+                offset: Offset(0, 10),
+              ),
             ],
           ),
           padding: hasImage
@@ -524,80 +538,84 @@ class _UploadTile extends StatelessWidget {
               : const EdgeInsets.fromLTRB(22, 22, 22, 20),
           child: hasImage
               ? ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(
-                  File(imagePath!),
-                  fit: BoxFit.cover,
-                ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.edit_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                            color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.file(File(imagePath!), fit: BoxFit.cover),
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.45),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.edit_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines:
+                                      1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          )
+                )
               : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E9EF),
-                  borderRadius: BorderRadius.circular(6),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E9EF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.badge,
+                        size: 22,
+                        color: Color(0xFF8F97A3),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.badge,
-                  size: 22,
-                  color: Color(0xFF8F97A3),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -627,9 +645,15 @@ class _IdCardBlock extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x14000000), blurRadius: 30, offset: Offset(0, 12)),
+            color: Color(0x14000000),
+            blurRadius: 30,
+            offset: Offset(0, 12),
+          ),
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 16, offset: Offset(0, 4)),
+            color: Color(0x08000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -795,11 +819,7 @@ class _ImageSourceTile extends StatelessWidget {
                   color: const Color(0xFFE5E9EF),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: const Color(0xFF8F97A3),
-                ),
+                child: Icon(icon, size: 22, color: const Color(0xFF8F97A3)),
               ),
               const SizedBox(width: 14),
               Expanded(

@@ -1,4 +1,4 @@
-// lib/features/auth_module/register/confirm_selfie_screen.dart
+import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -34,7 +34,7 @@ class ConfirmSelfieScreen extends StatelessWidget {
               const SizedBox(height: 28),
               _PrimaryButton(
                 text: 'Далее',
-                onPressed: () => context.pop(),
+                onPressed: () => context.push(SelfieCaptureScreen.routePath),
               ),
               const SizedBox(height: 18),
               Center(
@@ -101,11 +101,13 @@ class _CaptureBox extends StatelessWidget {
         children: [
           Align(
             alignment: const Alignment(0, 0.35),
-            child: Icon(
-              Icons.badge,
-              size: 140,
-              color: const Color(0xFF97A0AA),
+            child: Image.asset(
+              'assets/images/img_id_card.png',
+              width: 140,
+              height: 140,
+              fit: BoxFit.contain,
             ),
+
           ),
         ],
       ),

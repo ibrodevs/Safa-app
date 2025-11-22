@@ -1,18 +1,20 @@
 // lib/core/router/app_router.dart
 import 'package:dogo/features/auth_module/register/view/client_register_screens.dart';
+import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
+import 'package:dogo/features/auth_module/register/view/components/selfie_waiting_screen.dart';
 import 'package:dogo/features/auth_module/select_role/select_role_screen.dart';
 import 'package:dogo/features/main_module/history/components/history_detail_data.dart';
 import 'package:dogo/features/main_module/history/history_screen.dart';
 import 'package:dogo/features/main_module/map/map_screen.dart';
 import 'package:dogo/features/main_module/profile/profile_screen.dart';
-import 'package:dogo/features/main_module/splash/second_splash_screen.dart';
+import 'package:dogo/features/auth_module/splash/second_splash_screen.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth_module/register/view/components/confirm_selfie_screen.dart';
 import '../../features/auth_module/register/view/components/confirm_whatsapp_code_screen.dart';
 import '../../features/main_module/bottom_bar/bottom_tab_bar.dart';
 import '../../features/main_module/home/home_screen.dart';
-import '../../features/main_module/splash/splash_screen.dart';
+import '../../features/auth_module/splash/splash_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -51,6 +53,16 @@ class AppRouter {
         path: '/history/detail',
         builder: (_, state) =>
             HistoryDetailsScreen(data: state.extra as HistoryDetailsData),
+      ),
+      GoRoute(
+        path: '/selfie-capture',
+        builder: (_, state) =>
+            SelfieCaptureScreen(),
+      ),
+      GoRoute(
+        path: '/selfie-waiting',
+        builder: (_, state) =>
+            SelfieWaitingScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navShell) =>
