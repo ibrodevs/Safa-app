@@ -54,10 +54,11 @@ class _ClientRegisterStep1ScreenState extends State<ClientRegisterStep1Screen> {
     }
 
     final provider = context.read<AuthProvider>();
+
     final ok = await provider.register(
       phoneNumber: phone,
       firstName: firstName,
-      lastName: '',
+      lastName: '-',
       password: pass,
       passwordConfirm: pass2,
     );
@@ -67,12 +68,14 @@ class _ClientRegisterStep1ScreenState extends State<ClientRegisterStep1Screen> {
     if (ok) {
       context.push('/register/confirm/whatsapp');
     } else {
-      final message = provider.error ?? 'Не удалось завершить регистрацию';
+      final message =
+          provider.error ?? 'Не удалось завершить регистрацию';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +245,7 @@ class _ClientRegisterStep2ScreenState extends State<ClientRegisterStep2Screen> {
     final ok = await provider.register(
       phoneNumber: phone,
       firstName: firstName,
-      lastName: '',
+      lastName: '-',
       password: pass,
       passwordConfirm: pass2,
       idFront: _idFrontPath,

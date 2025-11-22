@@ -1,12 +1,15 @@
-// lib/core/network/api_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
+import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
 
 final class ApiService {
@@ -15,10 +18,26 @@ final class ApiService {
 
   static const String _baseUrl = 'http://164.92.182.171/api/';
 
+  final SecureStorageService _storage = SecureStorageService();
   late final Dio _dio;
+  late final Dio _authDio;
+
+  bool _refreshing = false;
+  Completer<bool>? _refreshCompleter;
 
   ApiService._internal() {
     _dio = Dio(
+      BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: const {
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    _authDio = Dio(
       BaseOptions(
         baseUrl: _baseUrl,
         connectTimeout: const Duration(seconds: 15),
@@ -64,7 +83,62 @@ final class ApiService {
               ),
             );
           }
+
+          if (_isAuthEndpoint(options)) {
+            options.headers.remove('Authorization');
+          } else {
+            final access = await _storage.getAccessToken();
+            if (access?.isNotEmpty == true) {
+              options.headers['Authorization'] = 'Bearer $access';
+            } else {
+              options.headers.remove('Authorization');
+            }
+          }
+
           handler.next(options);
+        },
+        onError: (e, handler) async {
+          final is403 = e.response?.statusCode == 403;
+          final retried = e.requestOptions.extra['__retried__'] == true;
+
+          if (!is403 || retried || _isAuthEndpoint(e.requestOptions)) {
+            return handler.next(e);
+          }
+
+          final refresh = await _storage.getRefreshToken();
+          if (refresh == null || refresh.isEmpty) {
+            return handler.next(e);
+          }
+
+          try {
+            if (_refreshing) {
+              final ok =
+              await (_refreshCompleter?.future ?? Future.value(false));
+              if (!ok) return handler.next(e);
+            } else {
+              _refreshing = true;
+              _refreshCompleter = Completer<bool>();
+              try {
+                final ok = await _refreshTokens(refresh);
+                _refreshCompleter?.complete(ok);
+              } catch (_) {
+                _refreshCompleter?.complete(false);
+                rethrow;
+              } finally {
+                _refreshing = false;
+              }
+            }
+
+            final newAccess = await _storage.getAccessToken();
+            final req = _cloneForRetry(e.requestOptions, newAccess);
+            req.extra['__retried__'] = true;
+            final cloned = await _dio.fetch<dynamic>(req);
+            return handler.resolve(cloned);
+          } catch (_) {
+            await _storage.resetAll();
+            await setBearer(null);
+            return handler.next(e);
+          }
         },
       ),
     );
@@ -72,9 +146,67 @@ final class ApiService {
 
   Dio get dio => _dio;
 
+  bool _isAuthEndpoint(RequestOptions o) {
+    final p = o.path;
+    return p.startsWith('users/token/') ||
+        p.startsWith('users/register/') ||
+        p.startsWith('users/verify/') ||
+        p.startsWith('users/whatsapp-code/');
+  }
+
   Future<bool> _hasInternet() async {
     final r = await Connectivity().checkConnectivity();
     return r != ConnectivityResult.none;
+  }
+
+  Future<void> setBearer(String? accessToken) async {
+    if (accessToken?.isNotEmpty != true) {
+      _dio.options.headers.remove('Authorization');
+      return;
+    }
+    _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+  }
+
+  RequestOptions _cloneForRetry(
+      RequestOptions original,
+      String? accessToken,
+      ) {
+    final headers = Map<String, dynamic>.from(original.headers);
+    if (accessToken?.isNotEmpty == true) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    } else {
+      headers.remove('Authorization');
+    }
+    headers.remove(HttpHeaders.contentLengthHeader);
+
+    dynamic data = original.data;
+    if (data is FormData) {
+      final newForm = FormData();
+      for (final f in data.fields) {
+        newForm.fields.add(MapEntry(f.key, f.value));
+      }
+      for (final f in data.files) {
+        newForm.files.add(MapEntry(f.key, f.value));
+      }
+      data = newForm;
+    }
+
+    return RequestOptions(
+      path: original.path,
+      method: original.method,
+      baseUrl: original.baseUrl,
+      data: data,
+      queryParameters: Map<String, dynamic>.from(original.queryParameters),
+      sendTimeout: original.sendTimeout,
+      receiveTimeout: original.receiveTimeout,
+      extra: Map<String, dynamic>.from(original.extra),
+      headers: headers,
+      responseType: original.responseType,
+      contentType: original.contentType,
+      followRedirects: original.followRedirects,
+      persistentConnection: original.persistentConnection,
+      validateStatus: original.validateStatus,
+    );
   }
 
   Map<String, dynamic> _asMap(dynamic data) {
@@ -86,7 +218,10 @@ final class ApiService {
     throw ApiException('Некорректный формат ответа сервера');
   }
 
-  ApiException _mapDioError(DioException e, {String fallback = 'Ошибка сети'}) {
+  ApiException _mapDioError(
+      DioException e, {
+        String fallback = 'Ошибка сети',
+      }) {
     String message = fallback;
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
@@ -123,5 +258,95 @@ final class ApiService {
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
+  }
+
+  Future<void> postWhatsappCode({required String phoneNumber}) async {
+    try {
+      await _dio.post(
+        'users/whatsapp-code',
+        data: {
+          'phone': phoneNumber,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось отправить код в WhatsApp');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<void> postVerifyCode({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      await _dio.post(
+        'users/verify/',
+        data: {
+          'phone': phone,
+          'code': code,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Неверный код подтверждения');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<void> postToken({
+    required String phoneNumber,
+    required String password,
+  }) async {
+    try {
+      final resp = await _authDio.post(
+        'users/token/',
+        data: {
+          'phone_number': phoneNumber,
+          'password': password,
+        },
+      );
+      final map = _asMap(resp.data);
+      final access = map['access']?.toString() ?? '';
+      final refresh = map['refresh']?.toString() ?? '';
+      if (access.isEmpty || refresh.isEmpty) {
+        throw ApiException('Некорректный ответ сервера');
+      }
+      await _storage.saveTokens(access: access, refresh: refresh);
+      await setBearer(access);
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Ошибка авторизации');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<bool> _refreshTokens(String refreshToken) async {
+    try {
+      final resp = await _authDio.post(
+        'users/token/refresh/',
+        data: {
+          'refresh': refreshToken,
+        },
+      );
+      if (resp.statusCode != 200 && resp.statusCode != 201) {
+        return false;
+      }
+      final map = _asMap(resp.data);
+      final access = map['access']?.toString() ?? '';
+      final refresh = (map['refresh'] ?? refreshToken).toString();
+      if (access.isEmpty) return false;
+      await _storage.saveTokens(access: access, refresh: refresh);
+      await setBearer(access);
+      return true;
+    } on DioException {
+      return false;
+    }
+  }
+
+  String? get currentAccessToken {
+    final raw = _dio.options.headers['Authorization']?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    return raw.startsWith('Bearer ') ? raw.substring(7) : raw;
   }
 }

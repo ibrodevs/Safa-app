@@ -1,6 +1,7 @@
-// lib/features/auth_module/register/confirm_whatsapp_code_screen.dart
+import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 class ConfirmWhatsappCodeScreen extends StatefulWidget {
   const ConfirmWhatsappCodeScreen({super.key});
@@ -10,15 +11,64 @@ class ConfirmWhatsappCodeScreen extends StatefulWidget {
       _ConfirmWhatsappCodeScreenState();
 }
 
-class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
+class _ConfirmWhatsappCodeScreenState
+    extends State<ConfirmWhatsappCodeScreen> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleWhatsappCode();
+    });
+  }
 
   @override
   void dispose() {
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  void _scheduleWhatsappCode() {
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      final provider = context.read<AuthProvider>();
+      final ok = await provider.sendWhatsappCode();
+      if (!mounted) return;
+      if (!ok) {
+        final msg =
+            provider.error ?? 'Не удалось отправить код в WhatsApp';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+      }
+    });
+  }
+
+  Future<void> _onNext() async {
+    final code = _ctrl.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Введите код из WhatsApp')),
+      );
+      return;
+    }
+
+    final provider = context.read<AuthProvider>();
+    final ok = await provider.verifyCodeAndLogin(code: code);
+
+    if (!mounted) return;
+
+    if (ok) {
+      context.go('/home');
+    } else {
+      final msg = provider.error ?? 'Неверный код из WhatsApp';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    }
   }
 
   @override
@@ -29,6 +79,8 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
     const hintColor = Color(0xFFC9CCD3);
     const buttonColor = Color(0xFFE47F26);
     const cancelColor = Color(0xFFB8BAC2);
+
+    final loading = context.watch<AuthProvider>().loading;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -62,7 +114,6 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                   ),
                 ),
                 const SizedBox(height: 26),
-
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -106,9 +157,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
                 SizedBox(
                   width: double.infinity,
                   height: 64,
@@ -120,14 +169,11 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: () {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      context.go('/home');
-                    },
-                    child: const Text(
-                      'Далее',
+                    onPressed: loading ? null : _onNext,
+                    child: Text(
+                      loading ? 'Проверка...' : 'Далее',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 17,
                         height: 1.1,
@@ -137,9 +183,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
                 Center(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,

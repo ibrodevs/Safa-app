@@ -2,7 +2,6 @@ import '../../../../../data/network/api_service.dart';
 import '../models/register_request_model.dart';
 import '../models/register_response_model.dart';
 
-
 class AuthRepository {
   final ApiService api;
 
@@ -10,5 +9,23 @@ class AuthRepository {
 
   Future<RegisterResponse> register(RegisterRequest body) {
     return api.postRegister(body);
+  }
+
+  Future<void> sendWhatsappCode(String phoneNumber) {
+    return api.postWhatsappCode(phoneNumber: phoneNumber);
+  }
+
+  Future<void> verifyCode({
+    required String phone,
+    required String code,
+  }) {
+    return api.postVerifyCode(phone: phone, code: code);
+  }
+
+  Future<void> login({
+    required String phoneNumber,
+    required String password,
+  }) {
+    return api.postToken(phoneNumber: phoneNumber, password: password);
   }
 }
