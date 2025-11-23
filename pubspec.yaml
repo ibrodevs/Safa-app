@@ -10,17 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UI & Assets
   flutter_svg: ^2.0.9
   infinite_carousel: ^1.1.1
   lottie: ^3.3.1
   shimmer: ^3.0.0
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.0
-  #Navigation
+
   go_router: ^14.0.2
 
-  #Network
   path_provider: ^2.1.4
   intl: ^0.20.2
   logger: ^2.6.0
@@ -32,13 +30,12 @@ dependencies:
   dio: ^5.9.0
   url_launcher: ^6.3.0
   app_links: ^6.3.2
-  # Persistence
+
   shared_preferences: ^2.4.0
   flutter_secure_storage: ^9.2.4
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  #Map&FCM
   permission_handler: ^11.3.1
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
@@ -46,12 +43,16 @@ dependencies:
   firebase_core: 3.15.2
   firebase_auth: ^5.2.0
   flutter_localization: ^0.3.3
-  yandex_mapkit: ^3.4.0
+
   geolocator: 14.0.2
   connectivity_plus: ^6.0.3
   internet_connection_checker: ^3.0.1
   pretty_dio_logger: ^1.4.0
   share_plus: ^12.0.1
+
+  yandex_maps_mapkit_lite:
+    version: ^4.25.0-beta
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -83,8 +84,8 @@ flutter:
           weight: 600
         - asset: assets/fonts/SFProText-Bold.ttf
           weight: 700
+
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/icons/app_icon.jpg
-

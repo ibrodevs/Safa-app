@@ -152,6 +152,10 @@ class AuthProvider extends ChangeNotifier {
       await prefs.setBool('is_logged_in', true);
       await prefs.setString('pending_phone', phone);
 
+      final role = _role ?? UserRole.client;
+      final roleCode = role == UserRole.carrier ? 'carrier' : 'client';
+      await prefs.setString('user_role', roleCode);
+
       return true;
     } on ApiException catch (e) {
       _loading = false;
@@ -160,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
 
   Future<bool> uploadSelfie(String path) async {
     final phone = _pendingPhone;

@@ -2,26 +2,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// lib/features/main_module/history/components/history_detail_data.dart
+// lib/features/main_module/history/components/carrier_history_detail_data.dart
 import 'package:flutter/foundation.dart';
 
-class ChipData {
+class CarrierChipData {
   final String asset;
   final String text;
-  const ChipData(this.asset, this.text);
+  const CarrierChipData(this.asset, this.text);
 }
 
-class HistoryDetailsData {
+class CarrierHistoryDetailsData {
   final String titleNumber;
   final String productTitle;
-  final List<ChipData> chips;
+  final List<CarrierChipData> chips;
   final DateTime registeredAt;
   final String routeText;
   final String compositionText;
   final String flightNumber;
   final String statusText;
 
-  const HistoryDetailsData({
+  const CarrierHistoryDetailsData({
     required this.titleNumber,
     required this.productTitle,
     required this.chips,
@@ -34,10 +34,10 @@ class HistoryDetailsData {
 }
 
 
-class HistoryDetailsScreen extends StatelessWidget {
-  const HistoryDetailsScreen({super.key, required this.data});
+class CarrierHistoryDetailsScreen extends StatelessWidget {
+  const CarrierHistoryDetailsScreen({super.key, required this.data});
 
-  final HistoryDetailsData data;
+  final CarrierHistoryDetailsData data;
 
   static const _accent = Color(0xFFFF8A00);
   static const _greyText = Color(0xFF9FA4AD);

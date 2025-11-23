@@ -62,11 +62,13 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_logged_in', true);
       await prefs.setBool('carrier_pending', false);
+      await prefs.setString('user_role', 'carrier');
 
       _timer?.cancel();
       if (!mounted) return;
-      context.go('/home');
-    } else if (status == 403) {
+      context.go('/home-carrier');
+    }
+    else if (status == 403) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Профиль на проверке'),
@@ -143,7 +145,6 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
               SizedBox(
                 height: 64,
                 child: ElevatedButton(
-                  // ручная проверка статуса по нажатию
                   onPressed: _checkStatus,
                   style: ButtonStyle(
                     backgroundColor:

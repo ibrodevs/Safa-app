@@ -9,6 +9,8 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
+import '../../features/main_module/history/data/model/shipment_history_models.dart';
+import '../../features/main_module/profile/data/model/profile_model.dart';
 import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
 
@@ -429,16 +431,13 @@ final class ApiService {
       }
 
       if (status == 200) {
-        try {
-          final map = _asMap(resp.data);
-          final access = map['access']?.toString() ?? '';
-          final refresh = map['refresh']?.toString() ?? '';
+        final map = _asMap(resp.data);
+        final access = map['access']?.toString() ?? '';
+        final refresh = map['refresh']?.toString() ?? '';
 
-          if (access.isNotEmpty && refresh.isNotEmpty) {
-            await _storage.saveTokens(access: access, refresh: refresh);
-            await setBearer(access);
-          }
-        } catch (_) {
+        if (access.isNotEmpty && refresh.isNotEmpty) {
+          await _storage.saveTokens(access: access, refresh: refresh);
+          await setBearer(access);
         }
       }
 
@@ -455,6 +454,43 @@ final class ApiService {
 
 
 
+  Future<ProfileModel> getProfile() async {
+    try {
+      final resp = await _dio.get('users/profile/');
+      final map = _asMap(resp.data);
+      return ProfileModel.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить профиль',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<ShipmentHistoryPage> getShipmentHistory({
+    required int page,
+    required int pageSize,
+  }) async {
+    try {
+      final resp = await _dio.get(
+        'delivery/shipments/history/',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+        },
+      );
+      final map = _asMap(resp.data);
+      return ShipmentHistoryPage.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить историю доставок',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
 
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();

@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
-class BottomTabBar extends StatefulWidget {
-  const BottomTabBar({super.key, required this.navigationShell});
+class BottomCarrierTabBar extends StatefulWidget {
+  const BottomCarrierTabBar({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
   @override
-  State<BottomTabBar> createState() => _BottomTabBarState();
+  State<BottomCarrierTabBar> createState() => _BottomCarrierTabBarState();
 }
 
-class _BottomTabBarState extends State<BottomTabBar> {
+class _BottomCarrierTabBarState extends State<BottomCarrierTabBar> {
   static const _accent = Color(0xFFE67E22);
   static const _bg      = Color(0xFFF7F8FA);
   static const _border  = Color(0xFFE9EDF2);
@@ -55,11 +55,6 @@ class _BottomTabBarState extends State<BottomTabBar> {
                 icon: _SvgNavIcon('assets/icons/ic_home.svg', color: _grey),
                 activeIcon: _SvgNavIcon('assets/icons/ic_home_grey.svg', color: _accent),
                 label: 'Главное',
-              ),
-              BottomNavigationBarItem(
-                icon: _SvgNavIcon('assets/icons/ic_map.svg', color: _grey),
-                activeIcon: _SvgNavIcon('assets/icons/ic_map.svg', color: _accent),
-                label: 'Карта',
               ),
               BottomNavigationBarItem(
                 icon: _SvgNavIcon('assets/icons/ic_history.svg', color: _grey),

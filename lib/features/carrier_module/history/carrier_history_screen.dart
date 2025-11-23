@@ -1,12 +1,12 @@
-// lib/features/history/history_screen.dart
+// lib/features/history/carrier_history_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 
-import 'components/history_detail_data.dart';
+import 'components/carrier_history_detail_data.dart';
 
-class HistoryScreen extends StatelessWidget {
-  const HistoryScreen({super.key});
+class CarrierHistoryScreen extends StatelessWidget {
+  const CarrierHistoryScreen({super.key});
 
   static const _accent = Color(0xFFE67E22);
   static const _greyText = Color(0xFF9FA4AD);
@@ -44,12 +44,12 @@ class HistoryScreen extends StatelessWidget {
                   _HistoryChip(asset: 'assets/icons/ic_warning.svg', text: 'Хрупкая посылка'),
                 ],
                 onDetails: () {
-                  final data = HistoryDetailsData(
+                  final data = CarrierHistoryDetailsData(
                     titleNumber: 'Посылка №1',
                     productTitle: 'Sony playstation 5',
                     chips: const [
-                      ChipData('assets/icons/ic_box.svg', 'Большие коробки'),
-                      ChipData('assets/icons/ic_weight.svg', '6 коробок'),
+                      CarrierChipData('assets/icons/ic_box.svg', 'Большие коробки'),
+                      CarrierChipData('assets/icons/ic_weight.svg', '6 коробок'),
                     ],
                     registeredAt: DateTime(2025, 9, 21, 14, 7, 27),
                     routeText: 'Контейнер 74, 8 проход /\nКонтейнер 78, 1 проход /\nКонтейнер 91, 6 проход',
@@ -71,12 +71,12 @@ class HistoryScreen extends StatelessWidget {
                   _HistoryChip(asset: 'assets/icons/ic_weight.svg', text: '6 коробок'),
                 ],
                 onDetails: () {
-                  final data = HistoryDetailsData(
+                  final data = CarrierHistoryDetailsData(
                     titleNumber: 'Посылка №1',
                     productTitle: 'Sony playstation 5',
                     chips: const [
-                      ChipData('assets/icons/ic_box.svg', 'Большие коробки'),
-                      ChipData('assets/icons/ic_weight.svg', '6 коробок'),
+                      CarrierChipData('assets/icons/ic_box.svg', 'Большие коробки'),
+                      CarrierChipData('assets/icons/ic_weight.svg', '6 коробок'),
                     ],
                     registeredAt: DateTime(2025, 9, 21, 14, 7, 27),
                     routeText: 'Контейнер 74, 8 проход /\nКонтейнер 78, 1 проход /\nКонтейнер 91, 6 проход',

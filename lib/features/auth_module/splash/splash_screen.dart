@@ -1,6 +1,6 @@
+// lib/features/auth_module/splash/splash_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     Future.delayed(
       const Duration(milliseconds: 1050),
-      () => _textCtrl.forward(),
+          () => _textCtrl.forward(),
     );
 
     _navTimer = Timer(const Duration(milliseconds: 2900), _navigateNext);
@@ -57,11 +57,16 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
     final carrierPending = prefs.getBool('carrier_pending') ?? false;
+    final userRole = prefs.getString('user_role');
 
     if (!mounted) return;
 
     if (isLoggedIn) {
-      context.go('/home');
+      if (userRole == 'carrier') {
+        context.go('/home-carrier');
+      } else {
+        context.go('/home');
+      }
     } else if (carrierPending) {
       context.go('/selfie-waiting');
     } else {
@@ -91,12 +96,7 @@ class _SplashScreenState extends State<SplashScreen>
                   opacity: _logoOpacity,
                   child: Image.asset(
                     'assets/images/img_splash.png',
-                  ) /*SvgPicture.asset(
-                    'assets/icons/ic_logo.svg',
-                    width: 120,
-                    height: 120,
-                    fit: BoxFit.contain,
-                  ),*/,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FadeTransition(

@@ -17,7 +17,6 @@ class RoleSelectScreen extends StatelessWidget {
 
   static const _sidePadding = 24.0;
 
-  static const _bgColor = Color(0xFFF5F3F2);
   static const _orange = Color(0xFFFF8A00);
   static const _greyText = Color(0xFF9FA4AD);
 
@@ -56,7 +55,7 @@ class RoleSelectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           const _TopPattern(),
@@ -78,26 +77,26 @@ class RoleSelectScreen extends StatelessWidget {
                         const _Header(),
                         const SizedBox(height: 56),
                         _RoleCard(
-                          imageAsset: 'assets/images/img_role_client.png',
+                          imageAsset: 'assets/images/img_client.jpg',
                           title: 'Я являюсь клиентом',
                           subtitle:
                           'Узнайте размер и вес посылки\nдля расчета прайса',
                           onTap: onTapClient ??
                                   () {
                                 context.read<AuthProvider>().setRole(UserRole.client);
-                                context.push('/register');
+                                context.push('/register-client');
                               },
                         ),
                         const SizedBox(height: 20),
                         _RoleCard(
-                          imageAsset: 'assets/images/img_role_specialist.png',
+                          imageAsset: 'assets/images/img_spec.jpg',
                           title: 'Я являюсь специалистом',
                           subtitle:
                           'Узнайте размер и вес посылки\nдля расчета прайса',
                           onTap: onTapCarrier ??
                                   () {
                                 context.read<AuthProvider>().setRole(UserRole.carrier);
-                                context.push('/register/id');
+                                context.push('/register-carrier');
                               },
                         ),
                       ],
@@ -105,8 +104,6 @@ class RoleSelectScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                const _PagerIndicator(),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -236,51 +233,3 @@ class _TopPattern extends StatelessWidget {
   }
 }
 
-class _PagerIndicator extends StatelessWidget {
-  const _PagerIndicator();
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            _Dot(active: true),
-            SizedBox(width: 12),
-            _Dot(active: false),
-            SizedBox(width: 12),
-            _Dot(active: false),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Container(
-          width: 180,
-          height: 4,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.active});
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? RoleSelectScreen._orange : const Color(0xFFD5DAE0),
-      ),
-    );
-  }
-}

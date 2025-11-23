@@ -12,21 +12,15 @@ class AuthRepository {
   }
 
   Future<void> sendWhatsappCode(String phoneNumber) {
-    return api.postDebugWhatsappCode(phoneNumber: phoneNumber);
-//    return api.postWhatsappCode(phoneNumber: phoneNumber);
+    //return api.postDebugWhatsappCode(phoneNumber: phoneNumber);
+    return api.postWhatsappCode(phoneNumber: phoneNumber);
   }
 
-  Future<void> verifyCode({
-    required String phone,
-    required String code,
-  }) {
+  Future<void> verifyCode({required String phone, required String code}) {
     return api.postVerifyCode(phone: phone, code: code);
   }
 
-  Future<void> login({
-    required String phoneNumber,
-    required String password,
-  }) {
+  Future<void> login({required String phoneNumber, required String password}) {
     return api.postToken(phoneNumber: phoneNumber, password: password);
   }
 
@@ -36,7 +30,6 @@ class AuthRepository {
   }) {
     return api.postSelfie(selfiePath: selfiePath, phone: phone);
   }
-
 
   Future<int> carrierWait({required String phone}) {
     return api.postCarrierWait(phone: phone);

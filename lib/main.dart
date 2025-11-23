@@ -1,8 +1,7 @@
-// lib/main.dart
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
+import 'package:yandex_maps_mapkit_lite/init.dart' as init;
+
 import 'data/network/api_service.dart';
 import 'features/auth_module/register/data/repo/auth_repo.dart';
 import 'features/auth_module/register/provider/auth_provider.dart';
@@ -11,9 +10,9 @@ import 'core/router/app_router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (defaultTargetPlatform == TargetPlatform.android) {
-    AndroidYandexMap.useAndroidViewSurface = false;
-  }
+  await init.initMapkit(
+    apiKey: 'de9b5506-7d81-40ae-8c6b-c4a34f2386a9',
+  );
 
   final api = ApiService();
   final authRepo = AuthRepository(api);

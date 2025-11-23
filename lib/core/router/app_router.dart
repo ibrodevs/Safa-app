@@ -1,17 +1,22 @@
 // lib/core/router/app_router.dart
+import 'package:dogo/features/auth_module/register/view/carrier_register_screen.dart';
 import 'package:dogo/features/auth_module/register/view/client_register_screens.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_waiting_screen.dart';
 import 'package:dogo/features/auth_module/select_role/select_role_screen.dart';
-import 'package:dogo/features/main_module/history/components/history_detail_data.dart';
-import 'package:dogo/features/main_module/history/history_screen.dart';
+import 'package:dogo/features/main_module/history/view/components/history_detail_data.dart';
+import 'package:dogo/features/main_module/history/view/history_screen.dart';
 import 'package:dogo/features/main_module/map/map_screen.dart';
-import 'package:dogo/features/main_module/profile/profile_screen.dart';
+import 'package:dogo/features/main_module/profile/view/profile_screen.dart';
 import 'package:dogo/features/auth_module/splash/second_splash_screen.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth_module/register/view/components/confirm_selfie_screen.dart';
 import '../../features/auth_module/register/view/components/confirm_whatsapp_code_screen.dart';
+import '../../features/carrier_module/bottom_bar/bottom_tab_bar.dart';
+import '../../features/carrier_module/history/carrier_history_screen.dart';
+import '../../features/carrier_module/home/carrier_home_screen.dart';
+import '../../features/carrier_module/profile/carrier_profile_screen.dart';
 import '../../features/main_module/bottom_bar/bottom_tab_bar.dart';
 import '../../features/main_module/home/home_screen.dart';
 import '../../features/auth_module/splash/splash_screen.dart';
@@ -20,6 +25,46 @@ class AppRouter {
   AppRouter._();
 
   static final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+
+  static CustomTransitionPage<T> _buildPage<T>({
+    required GoRouterState state,
+    required Widget child,
+  }) {
+    return CustomTransitionPage<T>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 260),
+      reverseTransitionDuration: const Duration(milliseconds: 240),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final inAnimation = animation.drive(
+          Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          ),
+        );
+
+        final outAnimation = secondaryAnimation.drive(
+          Tween<Offset>(
+            begin: Offset.zero,
+            end: const Offset(-0.15, 0.0),
+          ).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          ),
+        );
+
+        return SlideTransition(
+          position: inAnimation,
+          child: SlideTransition(
+            position: outAnimation,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: '/',
     navigatorKey: _navKey,
@@ -34,12 +79,12 @@ class AppRouter {
         builder: (_, __) => const RoleSelectScreen(),
       ),
       GoRoute(
-        path: '/register',
-        builder: (_, __) => const ClientRegisterStep1Screen(),
+        path: '/register-client',
+        builder: (_, __) => const ClientRegisterScreen(),
       ),
       GoRoute(
-        path: '/register/id',
-        builder: (_, __) => const ClientRegisterStep2Screen(),
+        path: '/register-carrier',
+        builder: (_, __) => const CarrierRegisterScreen(),
       ),
       GoRoute(
         path: '/register/confirm',
@@ -91,6 +136,33 @@ class AppRouter {
               GoRoute(
                 path: '/profile',
                 builder: (_, __) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navShell) =>
+            BottomCarrierTabBar(navigationShell: navShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/home-carrier', builder: (_, __) => const CarrierHomeScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/history-carrier',
+                builder: (_, __) => const CarrierHistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile-carrier',
+                builder: (_, __) => const CarrierProfileScreen(),
               ),
             ],
           ),

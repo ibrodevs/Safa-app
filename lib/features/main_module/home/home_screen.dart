@@ -1,96 +1,155 @@
-// lib/features/main_module/home/home_screen.dart
+import 'package:dogo/features/main_module/profile/provider/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent =  Color(0xFFFF8A00);
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ProfileProvider()..loadProfile(),
+      child: const _HomeBody(),
+    );
+  }
+}
+
+class _HomeBody extends StatelessWidget {
+  const _HomeBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<ProfileProvider>();
+    final profile = state.profile;
+
+    String name = 'друг';
+    if (profile != null) {
+      final topFirst = profile.firstName.trim();
+      final userFirst = profile.user.firstName.trim();
+      if (topFirst.isNotEmpty) {
+        name = topFirst;
+      } else if (userFirst.isNotEmpty) {
+        name = userFirst;
+      }
+    }
+
+    final greeting = 'Добрый день, $name';
+    final avatarUrl = profile?.avatar;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _HeaderRow(),
-              const SizedBox(height: 24),
-
-              const Text(
-                'Основное',
-                style: TextStyle(
-                  fontSize: 21,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black,
+        child: RefreshIndicator(
+          color: HomeScreen._accent,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.4,
+          displacement: 32,
+          onRefresh: () => context.read<ProfileProvider>().loadProfile(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HeaderRow(
+                  avatarUrl: avatarUrl,
+                  title: greeting,
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Отслеживайте и узнавайте адреса\n'
-                    'актуальных складов для доставки товаров',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.3,
-                  fontWeight: FontWeight.w500,
-                  color: _greyText,
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Основное',
+                  style: TextStyle(
+                    fontSize: 21,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
+                const SizedBox(height: 6),
+                const Text(
+                  'Отслеживайте и узнавайте адреса\n'
+                      'актуальных складов для доставки товаров',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.3,
+                    fontWeight: FontWeight.w500,
+                    color: HomeScreen._greyText,
+                  ),
+                ),
+                const SizedBox(height: 18),
 
-              _BigFeatureCard(
-                title: 'Доставка грузов',
-                subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
-                tagText: 'Внутри Дордоя',
-                imageAsset: 'assets/images/img_home_boxes.png',
-                onTap: () {},
-              ),
-              const SizedBox(height: 18),
+                _BigFeatureCard(
+                  title: 'Доставка грузов',
+                  subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                  tagText: 'Внутри Дордоя',
+                  imageAsset: 'assets/images/img_home_boxes.png',
+                  onTap: () {},
+                ),
+                const SizedBox(height: 18),
 
-              _BigFeatureCard(
-                title: 'Такси',
-                subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
-                tagText: 'Внутри Дордоя',
-                imageAsset: 'assets/images/img_home_car.png',
-                onTap: () => context.go('/map'),
-              ),
-              const SizedBox(height: 18),
+                _BigFeatureCard(
+                  title: 'Такси',
+                  subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                  tagText: 'Внутри Дордоя',
+                  imageAsset: 'assets/images/img_home_car.png',
+                  onTap: () => context.go('/map'),
+                ),
+                const SizedBox(height: 18),
 
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _SmallFeatureCard(
-                        title: 'Аманат',
-                        subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
-                        tagText: 'По всему КР',
-                        imageAsset: 'assets/images/img_home_amanat.png',
-                        onTap: () {},
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _SmallFeatureCard(
+                          title: 'Аманат',
+                          subtitle:
+                          'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          tagText: 'По всему КР',
+                          imageAsset:
+                          'assets/images/img_home_amanat.png',
+                          onTap: () {},
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: _SmallFeatureCard(
-                        title: 'Специалисты',
-                        subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
-                        tagText: 'Внутри Дордоя',
-                        imageAsset: 'assets/images/img_home_specialists.png',
-                        onTap: () {},
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: _SmallFeatureCard(
+                          title: 'Специалисты',
+                          subtitle:
+                          'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          tagText: 'Внутри Дордоя',
+                          imageAsset:
+                          'assets/images/img_home_specialists.png',
+                          onTap: () {},
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+
+                if (state.error != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    state.error!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -99,28 +158,26 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow();
+  const _HeaderRow({
+    required this.title,
+    this.avatarUrl,
+  });
+
+  final String title;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            'https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=256',
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-          ),
-        ),
+        _Avatar(avatarUrl: avatarUrl),
         const SizedBox(width: 14),
-        const Expanded(
+        Expanded(
           child: Text(
-            'Добрый день, Арслан',
+            title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 24,
               height: 1.15,
               fontWeight: FontWeight.w900,
@@ -220,6 +277,7 @@ class _BigFeatureCard extends StatelessWidget {
     );
   }
 }
+
 class _SmallFeatureCard extends StatelessWidget {
   const _SmallFeatureCard({
     required this.title,
@@ -300,10 +358,7 @@ class _SmallFeatureCard extends StatelessWidget {
 }
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({
-    required this.text,
-    this.compact = false,
-  });
+  const _TagChip({required this.text, this.compact = false});
 
   final String text;
   final bool compact;
@@ -357,6 +412,38 @@ class _TagChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({this.avatarUrl});
+
+  final String? avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          url,
+          width: 76,
+          height: 76,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.asset(
+        'assets/images/img_placeholder.png',
+        width: 76,
+        height: 76,
+        fit: BoxFit.cover,
       ),
     );
   }

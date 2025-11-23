@@ -1,150 +1,49 @@
-// lib/features/main_module/map/order_map_screen.dart
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
+import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
+import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
+import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
 
 class OrderMapScreen extends StatefulWidget {
   const OrderMapScreen({super.key});
+
   @override
   State<OrderMapScreen> createState() => _OrderMapScreenState();
 }
 
 class _OrderMapScreenState extends State<OrderMapScreen> {
   static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _chev = Color(0xFFC7CFD9);
 
-  final MapObjectId _meId = const MapObjectId('me');
-  YandexMapController? _controller;
+  final ykit.Point _bishkekCenter = const ykit.Point(
+    latitude: 42.8746,
+    longitude: 74.6122,
+  );
 
-  Point _center = const Point(latitude: 42.8746, longitude: 74.6122);
-  List<MapObject> _objects = const [];
-
-  double? _bubbleLeft;
-  double? _bubbleTop;
-  final Size _bubbleSize = const Size(252, 112);
+  ykit.MapWindow? _mapWindow;
 
   @override
   void initState() {
     super.initState();
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      AndroidYandexMap.useAndroidViewSurface = false;
-    }
-
-    _initLocation();
+    mapkit.onStart();
   }
 
-  Future<void> _initLocation() async {
-    try {
-      LocationPermission p = await Geolocator.checkPermission();
-      if (p == LocationPermission.denied || p == LocationPermission.deniedForever) {
-        p = await Geolocator.requestPermission();
-      }
-
-      Position? pos;
-      if (p == LocationPermission.always || p == LocationPermission.whileInUse) {
-        pos = await Geolocator.getCurrentPosition().catchError((_) => null);
-      }
-
-      if (pos != null) {
-        _center = Point(latitude: pos.latitude, longitude: pos.longitude);
-      }
-
-      await _buildObjects();
-
-      if (!mounted || _controller == null) return;
-
-      await _controller!.moveCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: _center, zoom: 16.5),
-        ),
-        animation: const MapAnimation(
-          type: MapAnimationType.smooth,
-          duration: 0.3,
-        ),
-      );
-
-      _updateBubblePosition();
-    } catch (_) {
-      await _buildObjects();
-    }
+  @override
+  void dispose() {
+    mapkit.onStop();
+    super.dispose();
   }
 
-  Future<void> _buildObjects() async {
-    final dotBytes = await _circleBytes(
-      10,
-      _accent,
-      stroke: Colors.white,
-      strokeWidth: 3,
-    );
-
-    final me = PlacemarkMapObject(
-      mapId: _meId,
-      point: _center,
-      icon: PlacemarkIcon.single(
-        PlacemarkIconStyle(
-          image: BitmapDescriptor.fromBytes(dotBytes),
-        ),
+  void _onMapCreated(ykit.MapWindow mapWindow) {
+    _mapWindow = mapWindow;
+    final map = mapWindow.map;
+    map.move(
+      ykit.CameraPosition(
+        _bishkekCenter,
+        zoom: 14.0,
+        azimuth: 0.0,
+        tilt: 0.0,
       ),
-      opacity: 1,
-      zIndex: 2,
     );
-
-    if (mounted) {
-      setState(() => _objects = [me]);
-    }
-  }
-
-  Future<Uint8List> _circleBytes(
-      double radius,
-      Color color, {
-        Color? stroke,
-        double strokeWidth = 0,
-      }) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final size = (radius + strokeWidth) * 2;
-    final center = Offset(size / 2, size / 2);
-
-    if (strokeWidth > 0 && stroke != null) {
-      final sp = Paint()
-        ..color = stroke
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(center, radius + strokeWidth, sp);
-    }
-
-    final p = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius, p);
-
-    final pic = recorder.endRecording();
-    final img = await pic.toImage(size.ceil(), size.ceil());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
-  }
-
-  Future<void> _updateBubblePosition() async {
-    if (!mounted || _controller == null) return;
-
-    final sp = await _controller!.getScreenPoint(_center);
-    if (sp == null) return;
-
-    final left = sp.x - (_bubbleSize.width / 2);
-    final top = sp.y - _bubbleSize.height - 8;
-
-    if (mounted) {
-      setState(() {
-        _bubbleLeft = left;
-        _bubbleTop = top;
-      });
-    }
   }
 
   @override
@@ -156,36 +55,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       body: Stack(
         children: [
           YandexMap(
-            rotateGesturesEnabled: false,
-            mapObjects: _objects,
-            onMapCreated: (c) async {
-              _controller = c;
-              await _controller!.moveCamera(
-                CameraUpdate.newCameraPosition(
-                  CameraPosition(target: _center, zoom: 16.5),
-                ),
-              );
-
-              _updateBubblePosition();
-            },
-            onCameraPositionChanged: (position, _, __) {
-              _updateBubblePosition();
-            },
+            onMapCreated: _onMapCreated,
           ),
-
-          if (_bubbleLeft != null && _bubbleTop != null)
-            Positioned(
-              left: _bubbleLeft,
-              top: _bubbleTop,
-              width: _bubbleSize.width,
-              height: _bubbleSize.height,
-              child: _HereBubble(
-                onEdit: () {
-                  // TODO: открыть поиск адреса, если нужно
-                },
-              ),
-            ),
-
           Positioned(
             left: 16,
             right: 16,
@@ -210,9 +81,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     ),
                     const SizedBox(width: 10),
                     _AddAddressButton(
-                      onTap: () {
-                        // TODO: добавить адрес
-                      },
+                      onTap: () {},
                     ),
                   ],
                 ),
@@ -221,8 +90,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                   height: 52,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                    },
+                    onPressed: () {},
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _accent,
                       foregroundColor: Colors.white,
@@ -241,85 +109,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-
-class _HereBubble extends StatelessWidget {
-  const _HereBubble({this.onEdit});
-  final VoidCallback? onEdit;
-
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 10,
-      shadowColor: const Color(0x22000000),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _tileBorder, width: 1),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Вы здесь',
-              style: TextStyle(
-                fontSize: 18,
-                height: 1.1,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Алкан базары',
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Контейнер 74, 8 проход',
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: _greyText,
-              ),
-            ),
-            const Spacer(),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: onEdit,
-                style: TextButton.styleFrom(
-                  foregroundColor: _greyText,
-                  padding: EdgeInsets.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  minimumSize: const Size(0, 0),
-                  textStyle: const TextStyle(
-                    decoration: TextDecoration.underline,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                child: const Text('Изменить'),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -399,6 +188,7 @@ class _InputTile extends StatelessWidget {
 
 class _AddAddressButton extends StatelessWidget {
   const _AddAddressButton({this.onTap});
+
   final VoidCallback? onTap;
 
   static const _accent = Color(0xFFFF8A00);
