@@ -1,4 +1,3 @@
-// lib/features/main_module/map/order_map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
@@ -15,6 +14,7 @@ class OrderMapScreen extends StatefulWidget {
 
 class _OrderMapScreenState extends State<OrderMapScreen> {
   static const _accent = Color(0xFFFF8A00);
+  static const double _dotSize = 16;
 
   final ykit.Point _bishkekCenter = const ykit.Point(
     latitude: 42.8746,
@@ -22,28 +22,38 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   );
 
   ykit.MapWindow? _mapWindow;
+  late final ykit.MapCameraListener _cameraListener;
+
   ykit.Point _userPoint = const ykit.Point(
     latitude: 42.8746,
     longitude: 74.6122,
   );
 
+  double? _pinX;
+  double? _pinY;
+
   @override
   void initState() {
     super.initState();
     mapkit.onStart();
+    _cameraListener = _CameraListenerImpl(_onCameraPositionChanged);
   }
 
   @override
   void dispose() {
+    final map = _mapWindow?.map;
+    if (map != null) {
+      map.removeCameraListener(_cameraListener);
+    }
     mapkit.onStop();
     super.dispose();
   }
 
   void _onMapCreated(ykit.MapWindow mapWindow) {
     _mapWindow = mapWindow;
+    mapWindow.map.addCameraListener(_cameraListener);
 
-    final map = mapWindow.map;
-    map.move(
+    mapWindow.map.move(
       ykit.CameraPosition(
         _bishkekCenter,
         zoom: 14.0,
@@ -52,7 +62,32 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       ),
     );
 
+    _updatePinScreenPosition();
     _initLocation();
+  }
+
+  void _onCameraPositionChanged(
+      ykit.Map map,
+      ykit.CameraPosition cameraPosition,
+      ykit.CameraUpdateReason cameraUpdateReason,
+      bool finished,
+      ) {
+    _updatePinScreenPosition();
+  }
+
+  void _updatePinScreenPosition() {
+    final window = _mapWindow;
+    if (window == null || !mounted) return;
+
+    final sp = window.worldToScreen(_userPoint);
+    if (sp == null) return;
+
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+
+    setState(() {
+      _pinX = sp.x / dpr;
+      _pinY = (sp.y + _dotSize / 2) / dpr;
+    });
   }
 
   Future<void> _initLocation() async {
@@ -91,10 +126,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         );
       }
 
-      setState(() {});
-    } catch (_) {
-      // Если что-то пошло не так — остаёмся на Бишкеке по умолчанию.
-    }
+      _updatePinScreenPosition();
+    } catch (_) {}
   }
 
   @override
@@ -108,21 +141,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
           YandexMap(
             onMapCreated: _onMapCreated,
           ),
-
-          // Пин + карточка по центру экрана
-          Align(
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                _HereBubble(),
-                SizedBox(height: 8),
-                _MeDot(),
-              ],
+          if (_pinX != null && _pinY != null)
+            Positioned(
+              left: _pinX,
+              top: _pinY,
+              child: const _UserMarker(),
             ),
-          ),
-
-          // Нижняя панель с адресами и кнопкой "Далее"
           Positioned(
             left: 16,
             right: 16,
@@ -174,6 +198,25 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserMarker extends StatelessWidget {
+  const _UserMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionalTranslation(
+      translation: const Offset(-0.5, -1.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          _HereBubble(),
+          SizedBox(height: 8),
+          _MeDot(),
         ],
       ),
     );
@@ -391,5 +434,26 @@ class _AddAddressButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+final class _CameraListenerImpl extends ykit.MapCameraListener {
+  _CameraListenerImpl(this.onChanged);
+
+  final void Function(
+      ykit.Map map,
+      ykit.CameraPosition cameraPosition,
+      ykit.CameraUpdateReason cameraUpdateReason,
+      bool finished,
+      ) onChanged;
+
+  @override
+  void onCameraPositionChanged(
+      ykit.Map map,
+      ykit.CameraPosition cameraPosition,
+      ykit.CameraUpdateReason cameraUpdateReason,
+      bool finished,
+      ) {
+    onChanged(map, cameraPosition, cameraUpdateReason, finished);
   }
 }
