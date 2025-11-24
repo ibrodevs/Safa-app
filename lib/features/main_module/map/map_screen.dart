@@ -1,5 +1,7 @@
+// lib/features/main_module/map/order_map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
 import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
 import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
@@ -20,6 +22,10 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   );
 
   ykit.MapWindow? _mapWindow;
+  ykit.Point _userPoint = const ykit.Point(
+    latitude: 42.8746,
+    longitude: 74.6122,
+  );
 
   @override
   void initState() {
@@ -35,6 +41,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
   void _onMapCreated(ykit.MapWindow mapWindow) {
     _mapWindow = mapWindow;
+
     final map = mapWindow.map;
     map.move(
       ykit.CameraPosition(
@@ -44,6 +51,50 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         tilt: 0.0,
       ),
     );
+
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        perm = await Geolocator.requestPermission();
+      }
+
+      if (perm != LocationPermission.always &&
+          perm != LocationPermission.whileInUse) {
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition();
+
+      final point = ykit.Point(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
+
+      if (!mounted) return;
+
+      _userPoint = point;
+
+      final map = _mapWindow?.map;
+      if (map != null) {
+        map.move(
+          ykit.CameraPosition(
+            _userPoint,
+            zoom: 16.0,
+            azimuth: 0.0,
+            tilt: 0.0,
+          ),
+        );
+      }
+
+      setState(() {});
+    } catch (_) {
+      // Если что-то пошло не так — остаёмся на Бишкеке по умолчанию.
+    }
   }
 
   @override
@@ -57,6 +108,21 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
           YandexMap(
             onMapCreated: _onMapCreated,
           ),
+
+          // Пин + карточка по центру экрана
+          Align(
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                _HereBubble(),
+                SizedBox(height: 8),
+                _MeDot(),
+              ],
+            ),
+          ),
+
+          // Нижняя панель с адресами и кнопкой "Далее"
           Positioned(
             left: 16,
             right: 16,
@@ -109,6 +175,114 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MeDot extends StatelessWidget {
+  const _MeDot();
+
+  static const _accent = Color(0xFFFF8A00);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        color: _accent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white,
+          width: 3,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HereBubble extends StatelessWidget {
+  const _HereBubble({this.onEdit});
+
+  final VoidCallback? onEdit;
+
+  static const _tileBorder = Color(0xFFE9EDF2);
+  static const _greyText = Color(0xFF9FA4AD);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: const Color(0x22000000),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 188,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _tileBorder, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Вы здесь',
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.1,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Алкан базары',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Контейнер 74, 8 проход',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+                color: _greyText,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: onEdit,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: _greyText,
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+              child: const Text('Изменить'),
+            ),
+          ],
+        ),
       ),
     );
   }
