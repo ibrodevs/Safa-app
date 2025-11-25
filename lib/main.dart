@@ -1,32 +1,55 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yandex_maps_mapkit_lite/init.dart' as init;
-
 import 'data/network/api_service.dart';
+import 'data/notifications/firebase_bg_handler.dart';
 import 'features/auth_module/register/data/repo/auth_repo.dart';
 import 'features/auth_module/register/provider/auth_provider.dart';
 import 'core/router/app_router.dart';
+import 'features/main_module/map/data/repo/delivery_geo_repository.dart';
+import 'features/main_module/map/provider/delivery_address_provider.dart';
+
+@pragma('vm:entry-point')
+Future<void> _bgHandler(RemoteMessage message) async {
+  await firebaseMessagingBackgroundHandler(message);
+}
+/*Future<void> _safeInitServices() async {
+  try {
+    await NotificationService.instance.init().timeout(
+      const Duration(seconds: 5),
+    );
+  } catch (_) {}
+  try {
+    await PushService.instance.init().timeout(const Duration(seconds: 5));
+  } catch (_) {}
+}*/
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await init.initMapkit(
-    apiKey: 'de9b5506-7d81-40ae-8c6b-c4a34f2386a9',
-  );
-
+  await Firebase.initializeApp();
+  await init.initMapkit(apiKey: 'de9b5506-7d81-40ae-8c6b-c4a34f2386a9');
+  FirebaseMessaging.onBackgroundMessage(_bgHandler);
   final api = ApiService();
   final authRepo = AuthRepository(api);
 
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider(authRepo)),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(authRepo),
+          create: (_) => DeliveryAddressProvider(
+            DeliveryGeoRepository(ApiService.instance),
+          ),
         ),
       ],
       child: const DoGoApp(),
     ),
   );
+  /*  unawaited(_safeInitServices());*/
 }
 
 class DoGoApp extends StatelessWidget {

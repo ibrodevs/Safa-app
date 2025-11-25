@@ -6,7 +6,7 @@ import 'package:dogo/features/auth_module/register/view/components/selfie_waitin
 import 'package:dogo/features/auth_module/select_role/select_role_screen.dart';
 import 'package:dogo/features/main_module/history/view/components/history_detail_data.dart';
 import 'package:dogo/features/main_module/history/view/history_screen.dart';
-import 'package:dogo/features/main_module/map/map_screen.dart';
+import 'package:dogo/features/main_module/map/view/map_screen.dart';
 import 'package:dogo/features/main_module/profile/view/profile_screen.dart';
 import 'package:dogo/features/auth_module/splash/second_splash_screen.dart';
 import 'package:flutter/widgets.dart';
@@ -145,11 +145,11 @@ class AppRouter {
         builder: (context, state, navShell) =>
             BottomCarrierTabBar(navigationShell: navShell),
         branches: [
-          StatefulShellBranch(
+          /*StatefulShellBranch(
             routes: [
               GoRoute(path: '/home-carrier', builder: (_, __) => const CarrierHomeScreen()),
             ],
-          ),
+          ),*/
           StatefulShellBranch(
             routes: [
               GoRoute(

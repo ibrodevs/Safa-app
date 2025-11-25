@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
 import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
 import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';

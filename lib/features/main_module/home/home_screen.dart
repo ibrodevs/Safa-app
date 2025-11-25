@@ -93,7 +93,7 @@ class _HomeBody extends StatelessWidget {
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                   tagText: 'Внутри Дордоя',
                   imageAsset: 'assets/images/img_home_boxes.png',
-                  onTap: () {},
+                  onTap: () => context.go('/map'),
                 ),
                 const SizedBox(height: 18),
 
@@ -102,7 +102,7 @@ class _HomeBody extends StatelessWidget {
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                   tagText: 'Внутри Дордоя',
                   imageAsset: 'assets/images/img_home_car.png',
-                  onTap: () => context.go('/map'),
+                  onTap: () {},
                 ),
                 const SizedBox(height: 18),
 

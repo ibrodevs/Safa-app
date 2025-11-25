@@ -10,13 +10,14 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
 import '../../features/main_module/history/data/model/shipment_history_models.dart';
+import '../../features/main_module/map/data/model/delivery_reverse_geo.dart';
 import '../../features/main_module/profile/data/model/profile_model.dart';
 import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
 
 final class ApiService {
-  static final ApiService _instance = ApiService._internal();
-  factory ApiService() => _instance;
+  static final ApiService instance = ApiService._internal();
+  factory ApiService() => instance;
 
   static const String _baseUrl = 'http://164.92.182.171/api/';
 
@@ -100,10 +101,12 @@ final class ApiService {
           handler.next(options);
         },
         onError: (e, handler) async {
-          final is403 = e.response?.statusCode == 403;
+          final status = e.response?.statusCode;
           final retried = e.requestOptions.extra['__retried__'] == true;
+          final isAuthError = status == 401 || status == 403;
 
-          if (!is403 || retried || _isAuthEndpoint(e.requestOptions)) {
+          // если это не 401/403, уже ретраили, или запрос к /users/token/ и т.п. — просто отдаём ошибку
+          if (!isAuthError || retried || _isAuthEndpoint(e.requestOptions)) {
             return handler.next(e);
           }
 
@@ -276,6 +279,7 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<void> postDebugWhatsappCode({required String phoneNumber}) async {
     try {
       await _dio.post(
@@ -319,7 +323,6 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
-
 
   Future<void> postToken({
     required String phoneNumber,
@@ -452,8 +455,6 @@ final class ApiService {
     }
   }
 
-
-
   Future<ProfileModel> getProfile() async {
     try {
       final resp = await _dio.get('users/profile/');
@@ -468,6 +469,7 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<ShipmentHistoryPage> getShipmentHistory({
     required int page,
     required int pageSize,
@@ -491,7 +493,53 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+  Future<Map<String, dynamic>> postFcmRegister({
+    required String token,
+    required String platform,
+    required String app,
+    String? deviceId,
+    String? locale,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        'fcm-register/',
+        data: {
+          'token': token,
+          'platform': platform,
+          'app': app,
+          if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+        },
+      );
+      final data = resp.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is String) return Map<String, dynamic>.from(jsonDecode(data));
+      return const {};
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final body = e.response?.data;
+      final uri = (e.response?.requestOptions ?? e.requestOptions).uri;
+      throw Exception(
+        'FCM_REGISTER_${status ?? 'ERR'} @ $uri: ${body is String ? body : (e.message ?? 'Ошибка сети')}',
+      );
+    }
+  }
+  Future<DeliveryReverseGeo> getDeliveryReverseGeo({
+    required double lat,
+    required double lon,
+  }) async {
+    final response = await _dio.get(
+      'delivery/geo/reverse/',
+      queryParameters: {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+      },
+    );
 
+    return DeliveryReverseGeo.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();
     if (raw == null || raw.isEmpty) return null;

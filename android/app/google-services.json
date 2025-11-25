@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "294846180284",
+    "project_id": "dogoapp-7b7a2",
+    "storage_bucket": "dogoapp-7b7a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:294846180284:android:32bac25a408ba9abae19b9",
+        "android_client_info": {
+          "package_name": "com.example.dogo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAP6GVNQTVa8R0L_CtTrQTsa5cMVmcmwPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
