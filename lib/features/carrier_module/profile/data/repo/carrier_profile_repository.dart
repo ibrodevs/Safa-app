@@ -1,5 +1,3 @@
-// lib/features/main_module/profile/data/repo/carrier_profile_repository.dart
-
 import 'package:dogo/data/network/api_service.dart';
 import '../model/carrier_day_stats.dart';
 import '../model/carrier_profile_model.dart';

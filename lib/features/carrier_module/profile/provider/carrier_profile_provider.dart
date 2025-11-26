@@ -1,5 +1,3 @@
-// lib/features/main_module/profile/provider/carrier_profile_provider.dart
-
 import 'package:flutter/foundation.dart';
 import '../data/model/carrier_day_stats.dart';
 import '../data/model/carrier_profile_model.dart';

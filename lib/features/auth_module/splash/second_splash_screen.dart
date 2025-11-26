@@ -1,4 +1,3 @@
-// lib/features/auth_module/splash/second_splash_screen.dart
 import 'dart:async';
 
 import 'package:flutter/material.dart';

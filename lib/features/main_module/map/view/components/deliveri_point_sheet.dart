@@ -180,7 +180,7 @@ class _DeliveryPointContentState extends State<_DeliveryPointContent> {
               const SizedBox(width: 12),
               TextButton.icon(
                 onPressed: () {
-                  // TODO: переход на карту при необходимости
+
                 },
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(

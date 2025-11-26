@@ -145,7 +145,6 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                       InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: () {
-                          // если надо, тут потом сделаем переход на карту
                         },
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
@@ -255,7 +254,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                     height: 56,
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: null, // выбираем из подсказок, чтобы были координаты
+                      onPressed: null,
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
                         backgroundColor: _accent,

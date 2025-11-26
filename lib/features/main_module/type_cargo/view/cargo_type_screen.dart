@@ -1,4 +1,3 @@
-// lib/features/cargo/select_type/cargo_type_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -90,7 +89,6 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
               ),
               const SizedBox(height: 18),
 
-              // маршруты (пока статично как у тебя)
               const _PlaceLine(
                 title: 'Контейнер 74, 8 проход',
                 subtitle: 'Алкан базары',

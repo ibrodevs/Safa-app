@@ -1,4 +1,3 @@
-// lib/features/auth_module/register/view/components/selfie_waiting_screen.dart
 import 'dart:async';
 
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';

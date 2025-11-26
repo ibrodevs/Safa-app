@@ -1,5 +1,3 @@
-// lib/features/main_module/profile/data/model/profile_model.dart
-
 class ProfileModel {
   final String role;
   final String phoneNumber;

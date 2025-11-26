@@ -230,7 +230,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   void _acceptCurrent() {
-    // тут потом повесишь реальный endpoint принятия заказа
     if (_currentShipment == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -253,7 +252,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
             onMapCreated: _onMapCreated,
           ),
 
-          // Welcome-карточка сверху
           if (_showWelcome)
             Align(
               alignment: Alignment.topCenter,
@@ -271,7 +269,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
               ),
             ),
 
-          // Нижний шит с заказом
           if (!_showWelcome && _currentShipment != null)
             Align(
               alignment: Alignment.bottomCenter,

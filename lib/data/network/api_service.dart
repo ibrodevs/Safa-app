@@ -184,7 +184,6 @@ final class ApiService {
           final retried = e.requestOptions.extra['__retried__'] == true;
           final isAuthError = status == 401 || status == 403;
 
-          // если это не 401/403, уже ретраили, или запрос к /users/token/ и т.п. — просто отдаём ошибку
           if (!isAuthError || retried || _isAuthEndpoint(e.requestOptions)) {
             return handler.next(e);
           }

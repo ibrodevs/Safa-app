@@ -1,4 +1,3 @@
-// lib/core/router/app_router.dart
 import 'package:dogo/features/auth_module/register/view/carrier_register_screen.dart';
 import 'package:dogo/features/auth_module/register/view/client_register_screens.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';

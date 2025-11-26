@@ -1,5 +1,3 @@
-// lib/features/main_module/profile/data/model/carrier_day_stats.dart
-
 class CarrierDayStats {
   final DateTime date;
   final int grossTotal;

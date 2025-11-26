@@ -1,4 +1,3 @@
-// lib/features/auth_module/register/selfie_capture_screen.dart
 import 'dart:io';
 
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
