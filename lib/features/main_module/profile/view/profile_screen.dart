@@ -1,4 +1,5 @@
 // lib/features/main_module/profile/view/profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -29,11 +30,11 @@ class _ProfileBody extends StatelessWidget {
     final state = context.watch<ProfileProvider>();
     final profile = state.profile;
 
-    final name = profile != null && profile.fullName.isNotEmpty
-        ? profile.fullName
+    final name = profile != null && profile.firstName.isNotEmpty
+        ? profile.firstName
         : (state.loading ? 'Загрузка...' : '—');
 
-    final rawPhone = profile?.user.phoneNumber ?? '';
+    final rawPhone = profile?.phoneNumber ?? '';
     final phone = rawPhone.isEmpty
         ? '—'
         : (rawPhone.startsWith('+') ? rawPhone : '+$rawPhone');
@@ -73,6 +74,7 @@ class _ProfileBody extends StatelessWidget {
                       child: _HeaderInfo(
                         name: name,
                         phone: phone,
+                        city: profile?.city,
                       ),
                     ),
                   ],
@@ -81,14 +83,14 @@ class _ProfileBody extends StatelessWidget {
                 const Divider(
                   height: 1,
                   thickness: 1,
-                  color: Color(0xFFE9EDF2),
+                  color: ProfileScreen._tileBorder,
                 ),
                 const SizedBox(height: 16),
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     border: Border.all(
-                      color: const Color(0xFFE9EDF2),
+                      color: ProfileScreen._tileBorder,
                       width: 1,
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -130,7 +132,6 @@ class _ProfileBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 200),
-
                 if (state.error != null) ...[
                   const SizedBox(height: 16),
                   Text(
@@ -291,4 +292,3 @@ class _ProfileTile extends StatelessWidget {
     );
   }
 }
-

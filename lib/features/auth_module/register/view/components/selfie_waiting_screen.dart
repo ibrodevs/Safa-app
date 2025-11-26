@@ -169,10 +169,9 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              Center(
+             /* Center(
                 child: TextButton(
                   onPressed: () async {
-                    // Отмена регистрации перевозчика — чистим флаги
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setBool('carrier_pending', false);
                     await prefs.setBool('is_logged_in', false);
@@ -189,7 +188,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                     ),
                   ),
                 ),
-              ),
+              ),*/
             ],
           ),
         ),

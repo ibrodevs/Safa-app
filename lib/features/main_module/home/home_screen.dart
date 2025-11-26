@@ -31,11 +31,8 @@ class _HomeBody extends StatelessWidget {
     String name = 'друг';
     if (profile != null) {
       final topFirst = profile.firstName.trim();
-      final userFirst = profile.user.firstName.trim();
       if (topFirst.isNotEmpty) {
         name = topFirst;
-      } else if (userFirst.isNotEmpty) {
-        name = userFirst;
       }
     }
 

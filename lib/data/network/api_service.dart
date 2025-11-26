@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:pretty_dio_logger/pretty_dio_logger.dart';
-
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
+import '../../features/carrier_module/home/data/model/nearby_shipments.dart';
+import '../../features/carrier_module/profile/data/model/carrier_day_stats.dart';
+import '../../features/carrier_module/profile/data/model/carrier_profile_model.dart';
+import '../../features/main_module/history/data/model/shipment_detail_model.dart';
 import '../../features/main_module/history/data/model/shipment_history_models.dart';
 import '../../features/main_module/map/data/model/delivery_reverse_geo.dart';
 import '../../features/main_module/profile/data/model/profile_model.dart';
+import '../../features/main_module/type_cargo/data/model/cargo_segment_model.dart';
 import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
 
@@ -52,14 +54,91 @@ final class ApiService {
     );
 
     _dio.interceptors.add(
-      PrettyDioLogger(
-        requestBody: true,
-        responseBody: true,
-        requestHeader: false,
-        responseHeader: false,
-        compact: true,
+      QueuedInterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final connected = await _hasInternet();
+          if (!connected) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.unknown,
+                error: 'Нет подключения к интернету',
+              ),
+            );
+          }
+
+          if (_isAuthEndpoint(options)) {
+            options.headers.remove('Authorization');
+          } else {
+            final access = await _storage.getAccessToken();
+            if (access?.isNotEmpty == true) {
+              options.headers['Authorization'] = 'Bearer $access';
+            } else {
+              options.headers.remove('Authorization');
+            }
+          }
+
+          if (!kReleaseMode) {
+            final raw = options.headers['Authorization']?.toString();
+            if (raw != null && raw.isNotEmpty) {
+              final token = raw.startsWith('Bearer ')
+                  ? raw.substring(7)
+                  : raw;
+              debugPrint('💉 JWT access token: $token');
+            } else {
+              debugPrint('💉 JWT access token: <none>');
+            }
+          }
+
+          handler.next(options);
+        },
+        onError: (e, handler) async {
+          final status = e.response?.statusCode;
+          final retried = e.requestOptions.extra['__retried__'] == true;
+          final isAuthError = status == 401 || status == 403;
+
+          if (!isAuthError || retried || _isAuthEndpoint(e.requestOptions)) {
+            return handler.next(e);
+          }
+
+          final refresh = await _storage.getRefreshToken();
+          if (refresh == null || refresh.isEmpty) {
+            return handler.next(e);
+          }
+
+          try {
+            if (_refreshing) {
+              final ok =
+              await (_refreshCompleter?.future ?? Future.value(false));
+              if (!ok) return handler.next(e);
+            } else {
+              _refreshing = true;
+              _refreshCompleter = Completer<bool>();
+              try {
+                final ok = await _refreshTokens(refresh);
+                _refreshCompleter?.complete(ok);
+              } catch (_) {
+                _refreshCompleter?.complete(false);
+                rethrow;
+              } finally {
+                _refreshing = false;
+              }
+            }
+
+            final newAccess = await _storage.getAccessToken();
+            final req = _cloneForRetry(e.requestOptions, newAccess);
+            req.extra['__retried__'] = true;
+            final cloned = await _dio.fetch<dynamic>(req);
+            return handler.resolve(cloned);
+          } catch (_) {
+            await _storage.resetAll();
+            await setBearer(null);
+            return handler.next(e);
+          }
+        },
       ),
     );
+
 
     if (!kReleaseMode) {
       _dio.interceptors.add(
@@ -469,30 +548,21 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
-
-  Future<ShipmentHistoryPage> getShipmentHistory({
-    required int page,
-    required int pageSize,
-  }) async {
+  Future<CarrierProfileModel> getCarrierProfile() async {
     try {
-      final resp = await _dio.get(
-        'delivery/shipments/history/',
-        queryParameters: {
-          'page': page,
-          'page_size': pageSize,
-        },
-      );
+      final resp = await _dio.get('users/profile/');
       final map = _asMap(resp.data);
-      return ShipmentHistoryPage.fromJson(map);
+      return CarrierProfileModel.fromJson(map);
     } on DioException catch (e) {
       throw _mapDioError(
         e,
-        fallback: 'Не удалось загрузить историю доставок',
+        fallback: 'Не удалось загрузить профиль',
       );
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<Map<String, dynamic>> postFcmRegister({
     required String token,
     required String platform,
@@ -539,6 +609,223 @@ final class ApiService {
     return DeliveryReverseGeo.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+  Future<Map<String, dynamic>> getJson(
+      String path, {
+        Map<String, dynamic>? queryParameters,
+        String fallbackError = 'Ошибка сети',
+      }) async {
+    try {
+      final resp = await _dio.get<dynamic>(
+        path,
+        queryParameters: queryParameters,
+      );
+      return _asMap(resp.data);
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: fallbackError);
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getDeliveryAutocompleteRaw(
+      String query,
+      ) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+
+    final json = await getJson(
+      'delivery/geo/autocomplete/',
+      queryParameters: {'q': q},
+      fallbackError: 'Не удалось выполнить поиск адреса',
+    );
+
+    final results = json['results'];
+    if (results is! List) {
+      return const [];
+    }
+
+    return results
+        .where((e) => e is Map)
+        .map<Map<String, dynamic>>(
+          (e) => Map<String, dynamic>.from(e as Map),
+    )
+        .toList();
+  }
+  Future<CarrierDayStats> getCarrierStatsForDate(DateTime date) async {
+    String _fmtDate(DateTime d) {
+      final y = d.year.toString().padLeft(4, '0');
+      final m = d.month.toString().padLeft(2, '0');
+      final day = d.day.toString().padLeft(2, '0');
+      return '$y-$m-$day';
+    }
+
+    try {
+      final resp = await _dio.get(
+        'delivery/stats/',
+        queryParameters: {
+          'date': _fmtDate(date),
+        },
+      );
+      final map = _asMap(resp.data);
+      return CarrierDayStats.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить статистику',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<List<CargoSegment>> getDeliverySegments() async {
+    try {
+      final resp = await _dio.get('delivery/segments/');
+      final data = resp.data;
+
+      if (data is List) {
+        return data
+            .where((e) => e is Map)
+            .map<CargoSegment>(
+              (e) => CargoSegment.fromJson(
+            Map<String, dynamic>.from(e as Map),
+          ),
+        )
+            .toList();
+      }
+
+      return const [];
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить типы груза',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<Map<String, dynamic>> createShipment({
+    required String title,
+    required int segment,
+    required int quantity,
+    required List<Map<String, dynamic>> stops,
+    String size = 'S',
+    bool fragile = false,
+    String description = '',
+    bool returnToStart = false,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        'delivery/shipments/',
+        data: {
+          'title': title,
+          'segment': segment,
+          'size': size,
+          'quantity': quantity,
+          'fragile': fragile,
+          'description': description,
+          'stops': stops,
+          'return_to_start': returnToStart,
+        },
+      );
+      return _asMap(resp.data);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось создать доставку',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<void> deleteShipment(int id) async {
+    try {
+      await _dio.delete('delivery/shipments/$id/');
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось отменить доставку',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<ShipmentHistoryPage> getShipmentHistory({
+    required int page,
+    required int pageSize,
+  }) async {
+    try {
+      final resp = await _dio.get(
+        'delivery/shipments/history/',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+        },
+      );
+      final map = _asMap(resp.data);
+      return ShipmentHistoryPage.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить историю доставок',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<ShipmentDetail> getShipmentDetail(int id) async {
+    try {
+      final resp = await _dio.get('delivery/shipments/$id/');
+      final map = _asMap(resp.data);
+      return ShipmentDetail.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить детали доставки',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<NearbyShipmentsPage> getNearbyShipments({
+    required double lat,
+    required double lon,
+  }) async {
+    try {
+      final resp = await _dio.get(
+        'delivery/shipments/nearby/',
+        queryParameters: {
+          'lat': lat,
+          'lon': lon,
+        },
+      );
+      final map = _asMap(resp.data);
+      return NearbyShipmentsPage.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить ближайшие заказы',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<ShipmentDetail> acceptShipment(int id) async {
+    try {
+      final resp = await _dio.post('delivery/shipments/$id/accept/');
+      final map = _asMap(resp.data);
+      return ShipmentDetail.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось принять заказ',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
   }
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();

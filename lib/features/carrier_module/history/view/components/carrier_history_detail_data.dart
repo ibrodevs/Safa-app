@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/model/shipment_detail_model.dart';
-import '../../data/repo/shipment_detail_repo.dart';
-import '../../provider/shipment_detail_provider.dart';
+import '../../../../main_module/history/data/model/shipment_detail_model.dart';
+import '../../../../main_module/history/data/repo/shipment_detail_repo.dart';
+import '../../../../main_module/history/provider/shipment_detail_provider.dart';
 
-class HistoryDetailsScreen extends StatelessWidget {
-  const HistoryDetailsScreen({super.key, required this.shipmentId});
+
+class CarrierHistoryDetailsScreen extends StatelessWidget {
+  const CarrierHistoryDetailsScreen({super.key, required this.shipmentId});
 
   final int shipmentId;
 

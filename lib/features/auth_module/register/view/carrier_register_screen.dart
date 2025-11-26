@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,8 +13,7 @@ class CarrierRegisterScreen extends StatefulWidget {
   const CarrierRegisterScreen({super.key});
 
   @override
-  State<CarrierRegisterScreen> createState() =>
-      _CarrierRegisterScreenState();
+  State<CarrierRegisterScreen> createState() => _CarrierRegisterScreenState();
 }
 
 class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
@@ -156,6 +156,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
                   hint: 'Телефон с WhatsApp',
                   keyboardType: TextInputType.phone,
                   prefixText: '+',
+                  maxLenth: 10,
                 ),
               ),
               const SizedBox(height: 14),
@@ -295,16 +296,15 @@ class _ShadowField extends StatelessWidget {
   }
 }
 
-
 class _AppTextField extends StatelessWidget {
   const _AppTextField({
-    super.key,
     this.controller,
     required this.hint,
     this.keyboardType,
     this.obscure = false,
     this.suffix,
     this.prefixText,
+    this.maxLenth,
   });
 
   final TextEditingController? controller;
@@ -313,12 +313,15 @@ class _AppTextField extends StatelessWidget {
   final bool obscure;
   final Widget? suffix;
   final String? prefixText;
+  final int? maxLenth;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      /*maxLength: maxLenth,*/
+      maxLengthEnforcement: MaxLengthEnforcement.none,
       obscureText: obscure,
       cursorColor: Colors.black,
       decoration: InputDecoration(
@@ -440,84 +443,84 @@ class _UploadTile extends StatelessWidget {
               : const EdgeInsets.fromLTRB(22, 22, 22, 20),
           child: hasImage
               ? ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(File(imagePath!), fit: BoxFit.cover),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Color(0x6B9E9E9E),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.edit_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              height: 1.2,
-                              color: Colors.white,
-                            ),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.file(File(imagePath!), fit: BoxFit.cover),
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Color(0x6B9E9E9E),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.edit_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          )
+                )
               : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E9EF),
-                  borderRadius: BorderRadius.circular(6),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E9EF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: SvgPicture.asset(
+                        placeholderAsset,
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
-                child: SvgPicture.asset(
-                  placeholderAsset,
-                  width: 30,
-                  height: 30,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -758,11 +761,9 @@ class _ImageSourceTile extends StatelessWidget {
     );
   }
 }
+
 class _PasswordEye extends StatelessWidget {
-  const _PasswordEye({
-    required this.obscured,
-    required this.onTap,
-  });
+  const _PasswordEye({required this.obscured, required this.onTap});
 
   final bool obscured;
   final VoidCallback onTap;

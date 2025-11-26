@@ -9,14 +9,16 @@ import 'package:dogo/features/main_module/history/view/history_screen.dart';
 import 'package:dogo/features/main_module/map/view/map_screen.dart';
 import 'package:dogo/features/main_module/profile/view/profile_screen.dart';
 import 'package:dogo/features/auth_module/splash/second_splash_screen.dart';
+import 'package:dogo/features/main_module/type_cargo/view/cargo_type_screen.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth_module/register/view/components/confirm_selfie_screen.dart';
 import '../../features/auth_module/register/view/components/confirm_whatsapp_code_screen.dart';
 import '../../features/carrier_module/bottom_bar/bottom_tab_bar.dart';
-import '../../features/carrier_module/history/carrier_history_screen.dart';
+import '../../features/carrier_module/history/view/carrier_history_screen.dart';
+import '../../features/carrier_module/history/view/components/carrier_history_detail_data.dart';
 import '../../features/carrier_module/home/carrier_home_screen.dart';
-import '../../features/carrier_module/profile/carrier_profile_screen.dart';
+import '../../features/carrier_module/profile/view/carrier_profile_screen.dart';
 import '../../features/main_module/bottom_bar/bottom_tab_bar.dart';
 import '../../features/main_module/home/home_screen.dart';
 import '../../features/auth_module/splash/splash_screen.dart';
@@ -96,13 +98,28 @@ class AppRouter {
       ),
       GoRoute(
         path: '/history/detail',
-        builder: (_, state) =>
-            HistoryDetailsScreen(data: state.extra as HistoryDetailsData),
+        builder: (context, state) {
+          final id = state.extra as int;
+          return HistoryDetailsScreen(shipmentId: id);
+        },
       ),
+      GoRoute(
+        path: '/history-carrier/detail',
+        builder: (context, state) {
+          final id = state.extra as int;
+          return CarrierHistoryDetailsScreen(shipmentId: id);
+        },
+      ),
+
       GoRoute(
         path: '/selfie-capture',
         builder: (_, state) =>
             SelfieCaptureScreen(),
+      ),
+      GoRoute(
+        path: '/type_cargo',
+        builder: (_, state) =>
+            CargoTypeScreen(),
       ),
       GoRoute(
         path: '/selfie-waiting',
@@ -145,11 +162,11 @@ class AppRouter {
         builder: (context, state, navShell) =>
             BottomCarrierTabBar(navigationShell: navShell),
         branches: [
-          /*StatefulShellBranch(
+          StatefulShellBranch(
             routes: [
               GoRoute(path: '/home-carrier', builder: (_, __) => const CarrierHomeScreen()),
             ],
-          ),*/
+          ),
           StatefulShellBranch(
             routes: [
               GoRoute(

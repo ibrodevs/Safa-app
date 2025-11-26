@@ -5,53 +5,48 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yandex_maps_mapkit_lite/init.dart' as init;
+
+import 'core/router/app_router.dart';
 import 'data/network/api_service.dart';
 import 'data/notifications/firebase_bg_handler.dart';
 import 'features/auth_module/register/data/repo/auth_repo.dart';
 import 'features/auth_module/register/provider/auth_provider.dart';
-import 'core/router/app_router.dart';
 import 'features/main_module/map/data/repo/delivery_geo_repository.dart';
 import 'features/main_module/map/provider/delivery_address_provider.dart';
+import 'features/main_module/map/provider/delivery_autocomplete_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
   await firebaseMessagingBackgroundHandler(message);
 }
-/*Future<void> _safeInitServices() async {
-  try {
-    await NotificationService.instance.init().timeout(
-      const Duration(seconds: 5),
-    );
-  } catch (_) {}
-  try {
-    await PushService.instance.init().timeout(const Duration(seconds: 5));
-  } catch (_) {}
-}*/
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await init.initMapkit(apiKey: 'de9b5506-7d81-40ae-8c6b-c4a34f2386a9');
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
+
   final api = ApiService();
   final authRepo = AuthRepository(api);
+  final geoRepo = DeliveryGeoRepository(api);
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(authRepo)),
         ChangeNotifierProvider(
-          create: (_) => DeliveryAddressProvider(
-            DeliveryGeoRepository(ApiService.instance),
-          ),
+          create: (_) => AuthProvider(authRepo),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DeliveryAddressProvider(geoRepo),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DeliveryAutocompleteProvider(geoRepo),
         ),
       ],
       child: const DoGoApp(),
     ),
   );
-  /*  unawaited(_safeInitServices());*/
 }
-
 class DoGoApp extends StatelessWidget {
   const DoGoApp({super.key});
 

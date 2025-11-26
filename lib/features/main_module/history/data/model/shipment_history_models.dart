@@ -1,16 +1,39 @@
 import 'package:flutter/foundation.dart';
 
+int _asInt(dynamic v) {
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+  return 0;
+}
+
+bool _asBool(dynamic v) {
+  if (v is bool) return v;
+  if (v is num) return v != 0;
+  if (v is String) {
+    final s = v.toLowerCase();
+    return s == 'true' || s == '1' || s == 'yes';
+  }
+  return false;
+}
+
+DateTime _asDateTime(dynamic v) {
+  if (v == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+  return DateTime.tryParse(v.toString()) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+}
+
 @immutable
 class ShipmentHistoryItem {
   final int id;
   final String publicCode;
   final String title;
   final int estimatedFare;
-  final String sizeLabel;
   final int quantity;
   final bool fragile;
   final String stopsCount;
-  final String pickup;
   final String status;
   final DateTime createdAt;
 
@@ -19,34 +42,24 @@ class ShipmentHistoryItem {
     required this.publicCode,
     required this.title,
     required this.estimatedFare,
-    required this.sizeLabel,
     required this.quantity,
     required this.fragile,
     required this.stopsCount,
-    required this.pickup,
     required this.status,
     required this.createdAt,
   });
 
   factory ShipmentHistoryItem.fromJson(Map<String, dynamic> json) {
-    int _asInt(dynamic v) {
-      if (v is int) return v;
-      return int.tryParse(v?.toString() ?? '') ?? 0;
-    }
-
     return ShipmentHistoryItem(
       id: _asInt(json['id']),
       publicCode: json['public_code']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       estimatedFare: _asInt(json['estimated_fare']),
-      sizeLabel: json['size_label']?.toString() ?? '',
       quantity: _asInt(json['quantity']),
-      fragile: json['fragile'] == true,
+      fragile: _asBool(json['fragile']),
       stopsCount: json['stops_count']?.toString() ?? '',
-      pickup: json['pickup']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
+      createdAt: _asDateTime(json['created_at']),
     );
   }
 }
@@ -63,15 +76,13 @@ class ShipmentHistoryPage {
 
   factory ShipmentHistoryPage.fromJson(Map<String, dynamic> json) {
     final list = (json['results'] as List? ?? const [])
-        .map((e) => ShipmentHistoryItem.fromJson(
-      Map<String, dynamic>.from(e as Map),
-    ))
+        .where((e) => e is Map)
+        .map<ShipmentHistoryItem>(
+          (e) => ShipmentHistoryItem.fromJson(
+        Map<String, dynamic>.from(e as Map),
+      ),
+    )
         .toList();
-
-    int _asInt(dynamic v) {
-      if (v is int) return v;
-      return int.tryParse(v?.toString() ?? '') ?? 0;
-    }
 
     return ShipmentHistoryPage(
       count: _asInt(json['count']),

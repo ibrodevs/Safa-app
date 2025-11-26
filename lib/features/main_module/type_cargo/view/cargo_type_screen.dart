@@ -2,33 +2,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-class CargoTypeScreen extends StatefulWidget {
+import '../data/model/cargo_segment_model.dart';
+import '../data/repo/cargo_segments_repo.dart';
+import '../provider/cargo_segments_provider.dart';
+
+class CargoTypeScreen extends StatelessWidget {
   const CargoTypeScreen({super.key});
 
   @override
-  State<CargoTypeScreen> createState() => _CargoTypeScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) =>
+      CargoSegmentsProvider(CargoSegmentsRepository())..refresh(),
+      child: const _CargoTypeBody(),
+    );
+  }
 }
 
-class _CargoTypeScreenState extends State<CargoTypeScreen> {
+class _CargoTypeBody extends StatefulWidget {
+  const _CargoTypeBody();
+
+  @override
+  State<_CargoTypeBody> createState() => _CargoTypeBodyState();
+}
+
+class _CargoTypeBodyState extends State<_CargoTypeBody> {
   static const _accent = Color(0xFFE67E22);
   static const _grey = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
 
-  int? _selected;
+  int? _selectedIndex;
   int _qty = 5;
 
-  final _types = const [
-    ('Мешок', 'Мешки с товары'),
-    ('Пакет', 'Пакеты с товарами'),
-    ('Коробка', 'Коробки с товарами'),
-    ('Товары', 'Хоз товары'),
-  ];
-
-  String get _selectedName => _selected == null ? '' : _types[_selected!].$1;
+  String _selectedName(List<CargoSegment> segments) {
+    final i = _selectedIndex;
+    if (i == null || i < 0 || i >= segments.length) return '';
+    return segments[i].name;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<CargoSegmentsProvider>();
+    final segments = provider.items;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -43,10 +61,15 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                 children: [
                   InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () => context.canPop() ? context.pop() : null,
+                    onTap: () =>
+                    context.canPop() ? context.pop() : null,
                     child: const Padding(
                       padding: EdgeInsets.only(right: 8),
-                      child: Icon(Icons.chevron_left, size: 28, color: Color(0xFFB9C0C8)),
+                      child: Icon(
+                        Icons.chevron_left,
+                        size: 28,
+                        color: Color(0xFFB9C0C8),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -67,38 +90,88 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
               ),
               const SizedBox(height: 18),
 
-              const _PlaceLine(title: 'Контейнер 74, 8 проход', subtitle: 'Алкан базары'),
+              // маршруты (пока статично как у тебя)
+              const _PlaceLine(
+                title: 'Контейнер 74, 8 проход',
+                subtitle: 'Алкан базары',
+              ),
               const SizedBox(height: 6),
-              const Icon(Icons.arrow_downward_rounded, size: 28, color: Colors.black),
+              const Icon(
+                Icons.arrow_downward_rounded,
+                size: 28,
+                color: Colors.black,
+              ),
               const SizedBox(height: 6),
-              const _PlaceLine(title: 'Контейнер 19, 9 проход', subtitle: 'Кытай базары'),
+              const _PlaceLine(
+                title: 'Контейнер 19, 9 проход',
+                subtitle: 'Кытай базары',
+              ),
               const SizedBox(height: 18),
 
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _tile(0)),
-                  const SizedBox(width: 18),
-                  Expanded(child: _tile(1)),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _tile(2)),
-                  const SizedBox(width: 18),
-                  Expanded(child: _tile(3)),
-                ],
-              ),
+              if (provider.loading && segments.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (provider.error != null && segments.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Text(
+                    provider.error!,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.red,
+                    ),
+                  ),
+                )
+              else if (segments.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Text(
+                      'Типы груза не найдены',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: _grey,
+                      ),
+                    ),
+                  )
+                else ...[
+                    for (var i = 0; i < segments.length; i += 2) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _tile(
+                              index: i,
+                              segment: segments[i],
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          if (i + 1 < segments.length)
+                            Expanded(
+                              child: _tile(
+                                index: i + 1,
+                                segment: segments[i + 1],
+                              ),
+                            )
+                          else
+                            const Expanded(child: SizedBox.shrink()),
+                        ],
+                      ),
+                      if (i + 2 < segments.length) const SizedBox(height: 18),
+                    ],
+                  ],
 
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 switchInCurve: Curves.easeOut,
                 switchOutCurve: Curves.easeIn,
-                child: _selected == null
+                child: _selectedIndex == null || segments.isEmpty
                     ? const SizedBox.shrink()
                     : Padding(
+                  key: const ValueKey('qty-block'),
                   padding: const EdgeInsets.only(top: 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +187,7 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Выберите количество ${_selectedName.toLowerCase()}ов',
+                        'Выберите количество ${_selectedName(segments).toLowerCase()}ов',
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.25,
@@ -130,21 +203,39 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                               height: 64,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: _tileBorder, width: 1),
+                                borderRadius:
+                                BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _tileBorder,
+                                  width: 1,
+                                ),
                                 boxShadow: const [
-                                  BoxShadow(color: Color(0x11000000), blurRadius: 20, offset: Offset(0, 8)),
-                                  BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+                                  BoxShadow(
+                                    color: Color(0x11000000),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
+                                  ),
+                                  BoxShadow(
+                                    color: Color(0x08000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
                                 ],
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               child: Row(
                                 children: [
                                   SvgPicture.asset(
                                     'assets/icons/ic_box.svg',
                                     width: 36,
                                     height: 36,
-                                    colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
+                                    colorFilter:
+                                    const ColorFilter.mode(
+                                      _accent,
+                                      BlendMode.srcIn,
+                                    ),
                                   ),
                                   const SizedBox(width: 14),
                                   Text(
@@ -157,13 +248,19 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  Text(
-                                    _selectedName,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.0,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.black,
+                                  Flexible(
+                                    child: Text(
+                                      _selectedName(segments),
+                                      maxLines: 1,
+                                      overflow:
+                                      TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        height: 1.0,
+                                        fontWeight:
+                                        FontWeight.w800,
+                                        color: Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -171,9 +268,19 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          _roundBtn(icon: Icons.remove, onTap: () => setState(() => _qty = (_qty - 1).clamp(0, 999))),
+                          _roundBtn(
+                            icon: Icons.remove,
+                            onTap: () => setState(() {
+                              _qty = (_qty - 1).clamp(0, 999);
+                            }),
+                          ),
                           const SizedBox(width: 12),
-                          _roundBtn(icon: Icons.add, onTap: () => setState(() => _qty = (_qty + 1).clamp(0, 999))),
+                          _roundBtn(
+                            icon: Icons.add,
+                            onTap: () => setState(() {
+                              _qty = (_qty + 1).clamp(0, 999);
+                            }),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 18),
@@ -181,16 +288,32 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
                         height: 64,
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {/* continue */},
-                          style: ButtonStyle(
-                            backgroundColor: const WidgetStatePropertyAll(_accent),
-                            foregroundColor: const WidgetStatePropertyAll(Colors.white),
+                          onPressed: _selectedIndex == null
+                              ? null
+                              : () {
+                            final seg = segments[_selectedIndex!];
+                            context.pop(
+                              CargoTypeResult(
+                                segmentId: seg.id,
+                                quantity: _qty,
+                              ),
+                            );
+                          },
+                          style: const ButtonStyle(
+                            backgroundColor: WidgetStatePropertyAll(_accent),
+                            foregroundColor: WidgetStatePropertyAll(Colors.white),
+                            elevation: WidgetStatePropertyAll(0),
                             shape: WidgetStatePropertyAll(
-                              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(12)),
+                              ),
                             ),
-                            elevation: const WidgetStatePropertyAll(0),
-                            textStyle: const WidgetStatePropertyAll(
-                              TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.0),
+                            textStyle: WidgetStatePropertyAll(
+                              TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                height: 1.0,
+                              ),
                             ),
                           ),
                           child: const Text('Далее'),
@@ -207,22 +330,29 @@ class _CargoTypeScreenState extends State<CargoTypeScreen> {
     );
   }
 
-  Widget _tile(int index) {
-    final (title, subtitle) = _types[index];
-    final selected = _selected == index;
+  Widget _tile({
+    required int index,
+    required CargoSegment segment,
+  }) {
+    final selected = _selectedIndex == index;
 
     return _CargoTile(
       iconAsset: 'assets/icons/ic_box.svg',
-      title: title,
-      subtitle: subtitle,
+      title: segment.name,
+      subtitle: segment.description,
       selected: selected,
-      onTap: () => setState(() {
-        _selected = index;
-      }),
+      onTap: () {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
     );
   }
 
-  Widget _roundBtn({required IconData icon, required VoidCallback onTap}) {
+  Widget _roundBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
     return SizedBox(
       height: 64,
       width: 64,
@@ -313,14 +443,23 @@ class _CargoTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _tileBorder, width: 1),
               boxShadow: const [
-                BoxShadow(color: Color(0x11000000), blurRadius: 20, offset: Offset(0, 8)),
-                BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+                BoxShadow(
+                  color: Color(0x11000000),
+                  blurRadius: 20,
+                  offset: Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             child: Stack(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                  padding:
+                  const EdgeInsets.fromLTRB(20, 18, 20, 18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -328,7 +467,10 @@ class _CargoTile extends StatelessWidget {
                         iconAsset,
                         width: 36,
                         height: 36,
-                        colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
+                        colorFilter: const ColorFilter.mode(
+                          _accent,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       const Spacer(),
                       Text(
@@ -357,7 +499,6 @@ class _CargoTile extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 Positioned(
                   top: 16,
                   right: 16,
@@ -369,7 +510,11 @@ class _CargoTile extends StatelessWidget {
                       color: Color(0xFF4CAF50),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   )
                       : Container(
                     width: 22,
@@ -387,4 +532,13 @@ class _CargoTile extends StatelessWidget {
       ),
     );
   }
+}
+class CargoTypeResult {
+  final int segmentId;
+  final int quantity;
+
+  const CargoTypeResult({
+    required this.segmentId,
+    required this.quantity,
+  });
 }

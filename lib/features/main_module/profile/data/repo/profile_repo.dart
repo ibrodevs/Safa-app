@@ -5,10 +5,6 @@ import '../model/profile_model.dart';
 
 class ProfileRepository {
   final ApiService _api;
-
   ProfileRepository(this._api);
-
-  Future<ProfileModel> getProfile() {
-    return _api.getProfile();
-  }
+  Future<ProfileModel> getProfile() => _api.getProfile();
 }

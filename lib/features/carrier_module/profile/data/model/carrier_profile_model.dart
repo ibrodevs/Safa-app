@@ -1,6 +1,6 @@
 // lib/features/main_module/profile/data/model/profile_model.dart
 
-class ProfileModel {
+class CarrierProfileModel {
   final String role;
   final String phoneNumber;
   final String firstName;
@@ -10,7 +10,7 @@ class ProfileModel {
   final int clientRateCount;
   final DateTime createdAt;
 
-  ProfileModel({
+  CarrierProfileModel({
     required this.role,
     required this.phoneNumber,
     required this.firstName,
@@ -21,7 +21,7 @@ class ProfileModel {
     required this.createdAt,
   });
 
-  factory ProfileModel.fromJson(Map<String, dynamic> json) {
+  factory CarrierProfileModel.fromJson(Map<String, dynamic> json) {
     int _asInt(dynamic v) {
       if (v is int) return v;
       if (v is num) return v.toInt();
@@ -37,7 +37,7 @@ class ProfileModel {
     final dynamic cityRaw = json['city'];
     final dynamic avatarRaw = json['avatar'];
 
-    return ProfileModel(
+    return CarrierProfileModel(
       role: json['role']?.toString() ?? '',
       phoneNumber: json['phone_number']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',

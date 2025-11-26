@@ -1,11 +1,18 @@
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
+import 'package:dogo/features/main_module/map/view/components/deliveri_point_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
 import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
 import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
+
+import '../../../../data/network/api_service.dart';
+import '../../type_cargo/view/cargo_type_screen.dart';
+import '../data/model/delivery_point_model.dart';
+import 'components/intermediate_point_sheet.dart';
 
 class OrderMapScreen extends StatefulWidget {
   const OrderMapScreen({super.key});
@@ -33,6 +40,15 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
   double? _pinX;
   double? _pinY;
+
+  DeliveryPoint? _deliveryPoint;
+  final List<DeliveryPoint> _intermediatePoints = [];
+
+  int? _activeShipmentId;
+  bool _creatingShipment = false;
+  bool _cancellingShipment = false;
+
+  bool get _searchMode => _activeShipmentId != null;
 
   @override
   void initState() {
@@ -136,8 +152,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       _updatePinScreenPosition();
     } catch (_) {}
   }
-  void _openIntermediatePointSheet() {
-    showModalBottomSheet(
+  Future<void> _openIntermediatePointSheet() async {
+    final result = await showModalBottomSheet<DeliveryPoint>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -145,16 +161,23 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         final bottom = MediaQuery.viewInsetsOf(context).bottom;
         return Padding(
           padding: EdgeInsets.only(bottom: bottom),
-          child: const _IntermediatePointSheet(
+          child: const IntermediatePointSheet(
             addressLine: 'Контейнер 74, 8 проход',
             placeLine: 'Алкан базары',
           ),
         );
       },
     );
+
+    if (result != null && mounted) {
+      setState(() {
+        _intermediatePoints.add(result);
+      });
+    }
   }
 
-  void _openDeliveryPointSheet() {
+
+  Future<void> _openDeliveryPointSheet() async {
     final addressProvider = context.read<DeliveryAddressProvider>();
     final hereAddress = addressProvider.hereAddress;
     final hereLoading = addressProvider.loading;
@@ -174,16 +197,146 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       }
     }
 
-    showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<DeliveryPoint>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _DeliveryPointSheet(
+      builder: (context) => DeliveryPointSheet(
         mainTitle: mainTitle,
         bazarTitle: bazarTitle,
       ),
     );
+
+    if (result != null && mounted) {
+      setState(() {
+        _deliveryPoint = result;
+      });
+    }
   }
+  Future<void> _createShipmentWithCargo(CargoTypeResult cargo) async {
+    if (_creatingShipment) return;
+    if (_deliveryPoint == null) return;
+
+    final stops = <Map<String, dynamic>>[];
+
+    final addressProvider = context.read<DeliveryAddressProvider>();
+    final hereAddress = addressProvider.hereAddress;
+    final originTitle = (hereAddress != null && hereAddress.isNotEmpty)
+        ? hereAddress
+        : 'Мой адрес';
+
+    stops.add({
+      'title': originTitle,
+      'lat': _userPoint.latitude,
+      'lon': _userPoint.longitude,
+    });
+
+    for (final p in _intermediatePoints) {
+      stops.add({
+        'title': p.title,
+        'lat': p.lat,
+        'lon': p.lon,
+      });
+    }
+
+    final dest = _deliveryPoint!;
+    stops.add({
+      'title': dest.title,
+      'lat': dest.lat,
+      'lon': dest.lon,
+    });
+
+    setState(() {
+      _creatingShipment = true;
+    });
+
+    try {
+      final json = await ApiService.instance.createShipment(
+        title: 'Доставка',
+        segment: cargo.segmentId,
+        quantity: cargo.quantity,
+        stops: stops,
+      );
+
+      final id = json['id'] as int?;
+      if (id != null) {
+        setState(() {
+          _activeShipmentId = id;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _creatingShipment = false;
+        });
+      }
+    }
+  }
+
+
+  Future<void> _cancelShipment() async {
+    final id = _activeShipmentId;
+    if (id == null || _cancellingShipment) return;
+
+    setState(() {
+      _cancellingShipment = true;
+    });
+
+    try {
+      await ApiService.instance.deleteShipment(id);
+      setState(() {
+        _activeShipmentId = null;
+        _deliveryPoint = null;
+        _intermediatePoints.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _cancellingShipment = false;
+        });
+      }
+    }
+  }
+
+  List<DeliveryPoint> _buildStopsForSearchSheet({
+    required String fromTitle,
+    String? bazarTitle,
+    String? detailText,
+  }) {
+    final stops = <DeliveryPoint>[];
+
+    final startTitle =
+    (detailText != null && detailText.isNotEmpty) ? detailText : fromTitle;
+    final startSubtitle = bazarTitle ?? '';
+
+    stops.add(
+      DeliveryPoint(
+        title: startTitle,
+        subtitle: startSubtitle,
+        lat: _userPoint.latitude,
+        lon: _userPoint.longitude,
+      ),
+    );
+
+    stops.addAll(_intermediatePoints);
+
+    if (_deliveryPoint != null) {
+      stops.add(_deliveryPoint!);
+    }
+
+    return stops;
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +353,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
     if (hereLoading) {
       fromTitle = 'Определяем адрес...';
     } else if (hereAddress == null || hereAddress.isEmpty) {
-      fromTitle = 'Не удалось определить';
+      fromTitle = 'Определяем адрес...';
     } else {
       final parsed = _parseAddressForUi(hereAddress);
       fromTitle =
@@ -216,7 +369,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
           YandexMap(
             onMapCreated: _onMapCreated,
           ),
-          if (_pinX != null && _pinY != null)
+          if (!_searchMode && _pinX != null && _pinY != null)
             Positioned(
               left: _pinX,
               top: _pinY,
@@ -231,7 +384,17 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
             left: 16,
             right: 16,
             bottom: 16 + bottomInsets,
-            child: Column(
+            child: _searchMode
+                ? _SearchingSheet(
+              stops: _buildStopsForSearchSheet(
+                fromTitle: fromTitle,
+                bazarTitle: bazarTitle,
+                detailText: detailText,
+              ),
+              cancelling: _cancellingShipment,
+              onCancel: _cancelShipment,
+            )
+                : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _InputTile(
@@ -245,8 +408,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     Expanded(
                       child: _InputTile(
                         iconAsset: 'assets/icons/ic_box.svg',
-                        title: 'Куда доставить',
-                        enabled: false,
+                        title: _deliveryPoint?.title ?? 'Куда доставить',
+                        enabled: _deliveryPoint != null,
                         onTap: _openDeliveryPointSheet,
                       ),
                     ),
@@ -261,7 +424,17 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                   height: 52,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: (_deliveryPoint == null ||
+                        _creatingShipment)
+                        ? null
+                        : () async {
+                      final result =
+                      await context.push<CargoTypeResult>(
+                          '/type_cargo');
+                      if (result != null && mounted) {
+                        await _createShipmentWithCargo(result);
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _accent,
                       foregroundColor: Colors.white,
@@ -273,7 +446,9 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    child: const Text('Далее'),
+                    child: Text(
+                      _creatingShipment ? 'Создаём заказ…' : 'Далее',
+                    ),
                   ),
                 ),
               ],
@@ -372,18 +547,18 @@ class _HereBubble extends StatelessWidget {
     String subtitleLine;
 
     if (loading) {
-      titleLine = marketTitle ?? 'Алкан базары';
+      titleLine = marketTitle ?? 'Определяем адрес...';
       subtitleLine = 'Определяем адрес...';
     } else if (address == null || address!.isEmpty) {
-      titleLine = marketTitle ?? 'Алкан базары';
-      subtitleLine = 'Не удалось определить';
+      titleLine = marketTitle ?? 'Определяем адрес...';
+      subtitleLine = 'Определяем адрес...';
     } else {
       if (marketTitle != null || detail != null) {
-        titleLine = marketTitle ?? 'Алкан базары';
+        titleLine = marketTitle ?? 'Определяем адрес...';
         subtitleLine = detail ?? address!;
       } else {
         final parsed = _parseAddressForUi(address);
-        titleLine = parsed.marketTitle ?? 'Алкан базары';
+        titleLine = parsed.marketTitle ?? 'Определяем адрес...';
         subtitleLine = parsed.detail ?? parsed.fullAfterCity;
       }
     }
@@ -579,231 +754,106 @@ class _AddAddressButton extends StatelessWidget {
   }
 }
 
-class _DeliveryPointSheet extends StatelessWidget {
-  const _DeliveryPointSheet({
-    required this.mainTitle,
-    this.bazarTitle,
+class _SearchingSheet extends StatelessWidget {
+  const _SearchingSheet({
+    required this.stops,
+    required this.cancelling,
+    required this.onCancel,
   });
 
-  final String mainTitle;
-  final String? bazarTitle;
+  final List<DeliveryPoint> stops;
+  final bool cancelling;
+  final VoidCallback onCancel;
 
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
+  static const _green = Color(0xFF22C55E);
   static const _greyText = Color(0xFF9FA4AD);
+  static const _accentBorder = Color(0xFFFF8A00);
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
-        color: const Color(0x33000000),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(32),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(28),
+      elevation: 10,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Поиск тачкистов',
+              style: TextStyle(
+                fontSize: 24,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+                color: _green,
+              ),
+            ),
+            const SizedBox(height: 24),
+            for (int i = 0; i < stops.length; i++) ...[
+              Text(
+                stops[i].title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
                 ),
               ),
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottom),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Точка доставки',
-                    style: TextStyle(
-                      fontSize: 28,
-                      height: 1.05,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                    ),
+              const SizedBox(height: 2),
+              Text(
+                stops[i].subtitle,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  color: _greyText,
+                ),
+              ),
+              if (i != stops.length - 1) ...[
+                const SizedBox(height: 16),
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 26,
+                  color: Colors.black,
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                const SizedBox(height: 24),
+              ],
+            ],
+            const Divider(
+              height: 1,
+              color: Color(0xFFE0E4EA),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: cancelling ? null : onCancel,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                    color: _accentBorder,
+                    width: 1.5,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    mainTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      height: 1.1,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    bazarTitle ?? 'Алкан базары',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.2,
-                      fontWeight: FontWeight.w600,
-                      color: _greyText,
-                    ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  cancelling ? 'Отменяем…' : 'Отменить поиск',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
                   ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF6F7FA),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: _tileBorder),
-                          ),
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
-                            children: [
-                              SvgPicture.asset(
-                                'assets/icons/ic_box.svg',
-                                width: 20,
-                                height: 20,
-                                colorFilter: const ColorFilter.mode(
-                                  _accent,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: TextField(
-                                  autofocus: true,
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    border: InputBorder.none,
-                                    hintText: 'Откуда отправка',
-                                    hintStyle: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                      color: _greyText,
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton.icon(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 10,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          foregroundColor: _accent,
-                          textStyle: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        icon: const Icon(
-                          Icons.near_me_rounded,
-                          size: 20,
-                        ),
-                        label: const Text('Карта'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Divider(height: 1, color: _tileBorder),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: const [
-                      Expanded(
-                        child: _DeliveryTypeChip(title: 'Контейнер'),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: _DeliveryTypeChip(title: 'Проход'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    height: 56,
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _accent,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      child: const Text('Далее'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-class _DeliveryTypeChip extends StatelessWidget {
-  const _DeliveryTypeChip({required this.title});
-
-  final String title;
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _tileBorder, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Row(
-        children: [
-          SvgPicture.asset(
-            'assets/icons/ic_box.svg',
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(
-              _accent,
-              BlendMode.srcIn,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _greyText,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -915,251 +965,4 @@ _ParsedAddress _parseAddressForUi(String? address) {
     marketTitle: marketTitle,
     detail: detail,
   );
-}
-class _IntermediatePointSheet extends StatelessWidget {
-  const _IntermediatePointSheet({
-    required this.addressLine,
-    required this.placeLine,
-  });
-
-  final String addressLine;
-  final String placeLine;
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Промежуточная точка',
-                  style: TextStyle(
-                    fontSize: 28,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  addressLine,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  placeLine,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                    color: _greyText,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const _PrimaryInputRow(),
-                const SizedBox(height: 22),
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: _tileBorder,
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: const [
-                    Expanded(
-                      child: _TagButton(
-                        title: 'Контейнер',
-                        iconAsset: 'assets/icons/ic_box.svg',
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: _TagButton(
-                        title: 'Проход',
-                        iconAsset: 'assets/icons/ic_box.svg',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 56,
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: null, // пока просто заглушка, как в макете
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor: _accent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    child: const Text('Далее'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryInputRow extends StatelessWidget {
-  const _PrimaryInputRow();
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _tileBorder, width: 1),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/ic_box.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: const ColorFilter.mode(
-                    _accent,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Откуда отправка',
-                      hintStyle: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFC7CFD9),
-                      ),
-                    ),
-                    cursorColor: Colors.black,
-                    textInputAction: TextInputAction.next,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(
-                  Icons.near_me_rounded,
-                  size: 20,
-                  color: _accent,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  'Карта',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _accent,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TagButton extends StatelessWidget {
-  const _TagButton({
-    required this.title,
-    required this.iconAsset,
-  });
-
-  final String title;
-  final String iconAsset;
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFFC7CFD9);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _tileBorder, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          SvgPicture.asset(
-            iconAsset,
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(
-              _accent,
-              BlendMode.srcIn,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: _greyText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

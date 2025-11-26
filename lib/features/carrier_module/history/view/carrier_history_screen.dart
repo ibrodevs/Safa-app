@@ -3,12 +3,12 @@ import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../data/model/shipment_history_models.dart';
-import '../data/repo/shipments_history_repo.dart';
-import '../provider/shipments_history_provider.dart';
+import '../../../main_module/history/data/model/shipment_history_models.dart';
+import '../../../main_module/history/data/repo/shipments_history_repo.dart';
+import '../../../main_module/history/provider/shipments_history_provider.dart';
 
-class HistoryScreen extends StatelessWidget {
-  const HistoryScreen({super.key});
+class CarrierHistoryScreen extends StatelessWidget {
+  const CarrierHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
