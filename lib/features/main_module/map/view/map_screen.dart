@@ -1,3 +1,5 @@
+// lib/features/main_module/map/order_map_screen.dart
+
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
 import 'package:dogo/features/main_module/map/view/components/deliveri_point_sheet.dart';
 import 'package:flutter/material.dart';
@@ -5,9 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
-import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
-import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
+import 'package:dgis_mobile_sdk_full/dgis.dart' as sdk;
 
 import '../../../../data/network/api_service.dart';
 import '../../type_cargo/view/cargo_type_screen.dart';
@@ -25,21 +25,20 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   static const _accent = Color(0xFFFF8A00);
   static const double _dotSize = 16;
 
-  final ykit.Point _bishkekCenter = const ykit.Point(
-    latitude: 42.8746,
-    longitude: 74.6122,
+  final sdk.GeoPoint _bishkekCenter = const sdk.GeoPoint(
+    latitude: sdk.Latitude(42.8746),
+    longitude: sdk.Longitude(74.6122),
   );
 
-  ykit.MapWindow? _mapWindow;
-  late final ykit.MapCameraListener _cameraListener;
+  late final sdk.Context _sdkContext;
+  late final sdk.MapWidgetController _mapWidgetController;
+  sdk.Map? _sdkMap;
 
-  ykit.Point _userPoint = const ykit.Point(
-    latitude: 42.8746,
-    longitude: 74.6122,
-  );
+  sdk.RouteEditor? _routeEditor;
+  sdk.RouteEditorSource? _routeEditorSource;
 
-  double? _pinX;
-  double? _pinY;
+  double _userLat = 42.8746;
+  double _userLon = 74.6122;
 
   DeliveryPoint? _deliveryPoint;
   final List<DeliveryPoint> _intermediatePoints = [];
@@ -53,59 +52,24 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   @override
   void initState() {
     super.initState();
-    mapkit.onStart();
-    _cameraListener = _CameraListenerImpl(_onCameraPositionChanged);
+
+    _sdkContext = sdk.DGis.initialize();
+    _mapWidgetController = sdk.MapWidgetController();
+
+    _mapWidgetController.getMapAsync((map) {
+      _sdkMap = map;
+    });
+
+    _initLocation();
   }
 
   @override
   void dispose() {
-    final map = _mapWindow?.map;
-    if (map != null) {
-      map.removeCameraListener(_cameraListener);
+    final map = _sdkMap;
+    if (map != null && _routeEditorSource != null) {
+      map.removeSource(_routeEditorSource!);
     }
-    mapkit.onStop();
     super.dispose();
-  }
-
-  void _onMapCreated(ykit.MapWindow mapWindow) {
-    _mapWindow = mapWindow;
-    mapWindow.map.addCameraListener(_cameraListener);
-
-    mapWindow.map.move(
-      ykit.CameraPosition(
-        _bishkekCenter,
-        zoom: 14.0,
-        azimuth: 0.0,
-        tilt: 0.0,
-      ),
-    );
-
-    _updatePinScreenPosition();
-    _initLocation();
-  }
-
-  void _onCameraPositionChanged(
-      ykit.Map map,
-      ykit.CameraPosition cameraPosition,
-      ykit.CameraUpdateReason cameraUpdateReason,
-      bool finished,
-      ) {
-    _updatePinScreenPosition();
-  }
-
-  void _updatePinScreenPosition() {
-    final window = _mapWindow;
-    if (window == null || !mounted) return;
-
-    final sp = window.worldToScreen(_userPoint);
-    if (sp == null) return;
-
-    final dpr = MediaQuery.of(context).devicePixelRatio;
-
-    setState(() {
-      _pinX = sp.x / dpr;
-      _pinY = (sp.y + _dotSize / 2) / dpr;
-    });
   }
 
   Future<void> _initLocation() async {
@@ -123,35 +87,23 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
       final pos = await Geolocator.getCurrentPosition();
 
-      final point = ykit.Point(
-        latitude: pos.latitude,
-        longitude: pos.longitude,
-      );
-
       if (!mounted) return;
 
-      _userPoint = point;
-
-      final map = _mapWindow?.map;
-      if (map != null) {
-        map.move(
-          ykit.CameraPosition(
-            _userPoint,
-            zoom: 16.0,
-            azimuth: 0.0,
-            tilt: 0.0,
-          ),
-        );
-      }
+      _userLat = pos.latitude;
+      _userLon = pos.longitude;
 
       await context.read<DeliveryAddressProvider>().fetchHereAddress(
-        lat: _userPoint.latitude,
-        lon: _userPoint.longitude,
+        lat: _userLat,
+        lon: _userLon,
       );
 
-      _updatePinScreenPosition();
-    } catch (_) {}
+      if (_activeShipmentId != null && _deliveryPoint != null) {
+        await _buildRouteOnMap();
+      }
+    } catch (_) {
+    }
   }
+
   Future<void> _openIntermediatePointSheet() async {
     final result = await showModalBottomSheet<DeliveryPoint>(
       context: context,
@@ -175,7 +127,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       });
     }
   }
-
 
   Future<void> _openDeliveryPointSheet() async {
     final addressProvider = context.read<DeliveryAddressProvider>();
@@ -211,8 +162,14 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       setState(() {
         _deliveryPoint = result;
       });
+
+      // Если у нас есть активный заказ – строим маршрут.
+      if (_activeShipmentId != null) {
+        await _buildRouteOnMap();
+      }
     }
   }
+
   Future<void> _createShipmentWithCargo(CargoTypeResult cargo) async {
     if (_creatingShipment) return;
     if (_deliveryPoint == null) return;
@@ -227,8 +184,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
     stops.add({
       'title': originTitle,
-      'lat': _userPoint.latitude,
-      'lon': _userPoint.longitude,
+      'lat': _userLat,
+      'lon': _userLon,
     });
 
     for (final p in _intermediatePoints) {
@@ -263,6 +220,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         setState(() {
           _activeShipmentId = id;
         });
+
+        await _buildRouteOnMap();
       }
     } catch (e) {
       if (!mounted) return;
@@ -277,7 +236,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       }
     }
   }
-
 
   Future<void> _cancelShipment() async {
     final id = _activeShipmentId;
@@ -294,6 +252,13 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         _deliveryPoint = null;
         _intermediatePoints.clear();
       });
+
+      final map = _sdkMap;
+      if (map != null && _routeEditorSource != null) {
+        map.removeSource(_routeEditorSource!);
+        _routeEditorSource = null;
+        _routeEditor = null;
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -323,8 +288,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       DeliveryPoint(
         title: startTitle,
         subtitle: startSubtitle,
-        lat: _userPoint.latitude,
-        lon: _userPoint.longitude,
+        lat: _userLat,
+        lon: _userLon,
       ),
     );
 
@@ -337,6 +302,59 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
     return stops;
   }
 
+  Future<void> _buildRouteOnMap() async {
+    final map = _sdkMap;
+    final dest = _deliveryPoint;
+    if (map == null || dest == null) return;
+
+    if (_routeEditorSource != null) {
+      map.removeSource(_routeEditorSource!);
+      _routeEditorSource = null;
+      _routeEditor = null;
+    }
+
+    final routeEditor = sdk.RouteEditor(_sdkContext);
+    final routeEditorSource = sdk.RouteEditorSource(_sdkContext, routeEditor);
+    map.addSource(routeEditorSource);
+
+    final startPoint = sdk.RouteSearchPoint(
+      coordinates: sdk.GeoPoint(
+        latitude: sdk.Latitude(_userLat),
+        longitude: sdk.Longitude(_userLon),
+      ),
+    );
+
+    final finishPoint = sdk.RouteSearchPoint(
+      coordinates: sdk.GeoPoint(
+        latitude: sdk.Latitude(dest.lat),
+        longitude: sdk.Longitude(dest.lon),
+      ),
+    );
+
+    final carOptions = sdk.CarRouteSearchOptions(
+      avoidTollRoads: true,
+      avoidUnpavedRoads: true,
+      avoidFerries: true,
+      avoidLockedRoads: true,
+      routeSearchType: sdk.RouteSearchType.jam,
+      excludedAreas: const [],
+    );
+
+    final routeSearchOptions = sdk.RouteSearchOptions.car(carOptions);
+
+    routeEditor.setRouteParams(
+      sdk.RouteEditorRouteParams(
+        startPoint: startPoint,
+        finishPoint: finishPoint,
+        routeSearchOptions: routeSearchOptions,
+      ),
+    );
+
+    setState(() {
+      _routeEditor = routeEditor;
+      _routeEditorSource = routeEditorSource;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -366,13 +384,15 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          YandexMap(
-            onMapCreated: _onMapCreated,
+          sdk.MapWidget(
+            sdkContext: _sdkContext,
+            mapOptions:  sdk.MapOptions(),
+            controller: _mapWidgetController,
           ),
-          if (!_searchMode && _pinX != null && _pinY != null)
-            Positioned(
-              left: _pinX,
-              top: _pinY,
+
+          if (!_searchMode)
+            Align(
+              alignment: Alignment.center,
               child: _UserMarker(
                 address: hereAddress,
                 loading: hereLoading,
@@ -380,6 +400,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                 detail: detailText,
               ),
             ),
+
           Positioned(
             left: 16,
             right: 16,
@@ -408,7 +429,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     Expanded(
                       child: _InputTile(
                         iconAsset: 'assets/icons/ic_box.svg',
-                        title: _deliveryPoint?.title ?? 'Куда доставить',
+                        title:
+                        _deliveryPoint?.title ?? 'Куда доставить',
                         enabled: _deliveryPoint != null,
                         onTap: _openDeliveryPointSheet,
                       ),
@@ -430,7 +452,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                         : () async {
                       final result =
                       await context.push<CargoTypeResult>(
-                          '/type_cargo');
+                        '/type_cargo',
+                      );
                       if (result != null && mounted) {
                         await _createShipmentWithCargo(result);
                       }
@@ -859,28 +882,7 @@ class _SearchingSheet extends StatelessWidget {
   }
 }
 
-final class _CameraListenerImpl extends ykit.MapCameraListener {
-  _CameraListenerImpl(this.onChanged);
-
-  final void Function(
-      ykit.Map map,
-      ykit.CameraPosition cameraPosition,
-      ykit.CameraUpdateReason cameraUpdateReason,
-      bool finished,
-      ) onChanged;
-
-  @override
-  void onCameraPositionChanged(
-      ykit.Map map,
-      ykit.CameraPosition cameraPosition,
-      ykit.CameraUpdateReason cameraUpdateReason,
-      bool finished,
-      ) {
-    onChanged(map, cameraPosition, cameraUpdateReason, finished);
-  }
-}
-
-class _ParsedAddress {
+final class _ParsedAddress {
   final String fullAfterCity;
   final String? marketTitle;
   final String? detail;

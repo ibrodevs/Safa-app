@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:yandex_maps_mapkit_lite/init.dart' as init;
 
 import 'core/router/app_router.dart';
 import 'data/network/api_service.dart';
@@ -23,7 +22,6 @@ Future<void> _bgHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  await init.initMapkit(apiKey: 'de9b5506-7d81-40ae-8c6b-c4a34f2386a9');
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
 
   final api = ApiService();
@@ -47,6 +45,7 @@ Future<void> main() async {
     ),
   );
 }
+
 class DoGoApp extends StatelessWidget {
   const DoGoApp({super.key});
 

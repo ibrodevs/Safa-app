@@ -1,3 +1,4 @@
+/*
 import 'package:dio/dio.dart';
 import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
 
@@ -83,3 +84,4 @@ class RoutingService {
     return routePoints;
   }
 }
+*/

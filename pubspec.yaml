@@ -49,9 +49,7 @@ dependencies:
   internet_connection_checker: ^3.0.1
   pretty_dio_logger: ^1.4.0
   share_plus: ^12.0.1
-
-  yandex_maps_mapkit_lite:
-    version: ^4.25.0-beta
+  dgis_mobile_sdk_full: ^13.0.0
 
 dev_dependencies:
   flutter_test:
@@ -61,7 +59,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
   assets:
+    - assets/dgissdk.key
     - assets/images/
     - assets/icons/
 

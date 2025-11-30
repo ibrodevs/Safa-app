@@ -2,8 +2,17 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+
+        maven {
+            url = uri("https://storage.googleapis.com/download.flutter.io")
+        }
+
+        maven {
+            url = uri("https://artifactory.2gis.dev/sdk-maven-release")
+        }
     }
 }
+
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
@@ -15,6 +24,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }

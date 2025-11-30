@@ -2,12 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
-import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ykit;
-import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
 
 import '../../../data/network/api_service.dart';
-import '../../../data/services/routing_service.dart';
 import 'data/model/nearby_shipments.dart';
 
 class CarrierHomeScreen extends StatefulWidget {
@@ -22,13 +18,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   static const _titleBlack = Color(0xFF000000);
   static const _greyText = Color(0xFF9FA4AD);
 
-  final ykit.Point _bishkekCenter = const ykit.Point(
+ /* final ykit.Point _bishkekCenter = const ykit.Point(
     latitude: 42.8746,
     longitude: 74.6122,
-  );
+  );*/
 
+/*
   ykit.MapWindow? _mapWindow;
   late final RoutingService _routing;
+*/
 
   bool _loadingOnline = false;
   bool _showWelcome = true;
@@ -38,7 +36,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   bool _routeLoading = false;
 
-  @override
+ /* @override
   void initState() {
     super.initState();
     mapkit.onStart();
@@ -50,8 +48,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     mapkit.onStop();
     super.dispose();
   }
-
-  void _onMapCreated(ykit.MapWindow mapWindow) {
+*/
+ /* void _onMapCreated(ykit.MapWindow mapWindow) {
     _mapWindow = mapWindow;
     final map = mapWindow.map;
     map.move(
@@ -62,7 +60,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         tilt: 0.0,
       ),
     );
-  }
+  }*/
 
   Future<void> _goOnline() async {
     if (_loadingOnline) return;
@@ -95,7 +93,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _currentShipment = _shipments.first;
       _showWelcome = false;
 
-      await _showShipmentOnMap(_currentShipment!);
+      /*await _showShipmentOnMap(_currentShipment!);*/
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +128,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     );
   }
 
-  Future<void> _showShipmentOnMap(NearbyShipment shipment) async {
+ /* Future<void> _showShipmentOnMap(NearbyShipment shipment) async {
     if (_mapWindow == null || shipment.stops.isEmpty) return;
 
     setState(() {
@@ -237,7 +235,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       ),
     );
   }
-
+*/
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -248,9 +246,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          YandexMap(
-            onMapCreated: _onMapCreated,
-          ),
+
 
           if (_showWelcome)
             Align(
@@ -279,13 +275,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   12,
                   bottomSafe + viewInsets.bottom,
                 ),
-                child: _ShipmentSheet(
+                /*child: _ShipmentSheet(
                   shipment: _currentShipment!,
                   accent: _accent,
                   routeLoading: _routeLoading,
                   onAccept: _acceptCurrent,
                   onReject: _rejectCurrent,
-                ),
+                ),*/
               ),
             ),
         ],
