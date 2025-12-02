@@ -1,13 +1,17 @@
-// lib/data/notifications/service/push_service.dart
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/router/app_router.dart';
 import '../../../data/network/api_service.dart';
+import 'notification_service.dart';
 
 class PushService {
   PushService._();
+
   static final PushService instance = PushService._();
 
   final FirebaseMessaging _fm = FirebaseMessaging.instance;
@@ -20,26 +24,32 @@ class PushService {
     if (_inited) return;
 
     final settings = await _fm.requestPermission(
-      alert: true, badge: true, sound: true, provisional: false,
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
     );
-    if (kDebugMode) print('🔔 Permission: ${settings.authorizationStatus}');
+    if (kDebugMode) {
+      print('🔔 Permission: ${settings.authorizationStatus}');
+    }
 
     await _fm.setForegroundNotificationPresentationOptions(
-      alert: true, badge: true, sound: true,
+      alert: true,
+      badge: true,
+      sound: true,
     );
 
     _lastToken = await _fm.getToken();
-    if (kDebugMode) print('🔑 FCM token: $_lastToken');
+    if (kDebugMode) {
+      print('🔑 FCM token: $_lastToken');
+    }
 
-    await registerFcmIfPossible(app: 'passenger');
-
-    _fm.onTokenRefresh.listen((t) {
-      _lastToken = t;
-      if (kDebugMode) print('🔁 Token refreshed: $t');
-      unawaited(registerFcmIfPossible(app: 'passenger'));
+    _fgSub = FirebaseMessaging.onMessage.listen((msg) async {
+      if (kDebugMode) {
+        print('📬 FG message: ${msg.data}');
+      }
+      await NotificationService.instance.showFromMessage(msg);
     });
-
-    _fgSub = FirebaseMessaging.onMessage.listen((msg) async {});
 
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
       _routeFromData(msg.data);
@@ -50,41 +60,76 @@ class PushService {
       _routeFromData(initial.data);
     }
 
+    _fm.onTokenRefresh.listen((t) {
+      _lastToken = t;
+      if (kDebugMode) {
+        print('🔁 Token refreshed: $t');
+      }
+    });
+
     _inited = true;
   }
 
   void _routeFromData(Map<String, dynamic> data) {
-    final route = data['route']?.toString();
+    final route = _extractRoute(data);
     if (route != null && route.isNotEmpty) {
-     /* AppRouterNav.pushFromOutside(route);*/
+      AppRouter.router.go(route);
     }
   }
 
-  Future<void> subscribeTo(String topic) => _fm.subscribeToTopic(topic);
-  Future<void> unsubscribeFrom(String topic) => _fm.unsubscribeFromTopic(topic);
+  String? _extractRoute(Map<String, dynamic> data) {
+    final r = data['route']?.toString();
+    if (r != null && r.isNotEmpty) {
+      return r;
+    }
+    final dl = data['deep_link']?.toString();
+    if (dl != null && dl.isNotEmpty) {
+      return dl;
+    }
+    return null;
+  }
 
-  Future<void> registerFcmIfPossible({String app = 'passenger'}) async {
+  Future<void> subscribeTo(String topic) => _fm.subscribeToTopic(topic);
+
+  Future<void> unsubscribeFrom(String topic) =>
+      _fm.unsubscribeFromTopic(topic);
+
+  Future<void> registerOnServerOnce({required String kind}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'fcm_registered_$kind';
+    if (prefs.getBool(key) == true) {
+      return;
+    }
+
     final token = _lastToken ?? await _fm.getToken();
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      return;
+    }
 
     final api = ApiService();
     final bearer = api.currentAccessToken;
-    if (bearer == null || bearer.isEmpty) return;
+    if (bearer == null || bearer.isEmpty) {
+      return;
+    }
 
-    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final platform =
+    defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+
     final l = ui.PlatformDispatcher.instance.locale;
-    final locale = l.languageCode + (l.countryCode == null ? '' : '-${l.countryCode}');
 
     try {
       await api.postFcmRegister(
         token: token,
         platform: platform,
-        app: app,
-        locale: locale.isEmpty ? null : locale,
       );
-      if (kDebugMode) print('📮 FCM registered on server [$platform/$app]');
+      await prefs.setBool(key, true);
+      if (kDebugMode) {
+        print('📮 FCM registered on server [$platform/$kind]');
+      }
     } catch (e) {
-      if (kDebugMode) print('⚠️ FCM register failed: $e');
+      if (kDebugMode) {
+        print('⚠️ FCM register failed: $e');
+      }
     }
   }
 }

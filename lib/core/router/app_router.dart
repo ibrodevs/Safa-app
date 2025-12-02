@@ -18,9 +18,14 @@ import '../../features/carrier_module/history/view/carrier_history_screen.dart';
 import '../../features/carrier_module/history/view/components/carrier_history_detail_data.dart';
 import '../../features/carrier_module/home/carrier_home_screen.dart';
 import '../../features/carrier_module/profile/view/carrier_profile_screen.dart';
+import '../../features/carrier_module/profile/view/components/balance_top_up_screen.dart';
 import '../../features/main_module/bottom_bar/bottom_tab_bar.dart';
 import '../../features/main_module/home/home_screen.dart';
 import '../../features/auth_module/splash/splash_screen.dart';
+import '../../features/main_module/profile/view/components/profile_account_screen.dart';
+import '../../features/main_module/profile/view/components/profile_balance_history_screen.dart';
+import '../../features/main_module/profile/view/components/profile_notifications_screen.dart';
+import '../../features/main_module/profile/view/components/profile_support_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -109,7 +114,27 @@ class AppRouter {
           return CarrierHistoryDetailsScreen(shipmentId: id);
         },
       ),
+      GoRoute(
+        path: '/profile/notifications',
+        builder: (_, __) => const ProfileNotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/account',
+        builder: (_, __) => const ProfileAccountScreen(),
+      ),
+      GoRoute(
+        path: '/profile/balance-history',
+        builder: (_, __) => const ProfileBalanceHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/profile/support',
+        builder: (_, __) => const ProfileSupportScreen(),
+      ),
 
+      GoRoute(
+        path: '/selfie-capture',
+        builder: (_, state) => SelfieCaptureScreen(),
+      ),
       GoRoute(
         path: '/selfie-capture',
         builder: (_, state) =>
@@ -125,6 +150,11 @@ class AppRouter {
         builder: (_, state) =>
             SelfieWaitingScreen(),
       ),
+      GoRoute(
+        path: '/profile/topup',
+        builder: (_, __) => const BalanceTopUpScreen(),
+      ),
+
       StatefulShellRoute.indexedStack(
         builder: (context, state, navShell) =>
             BottomTabBar(navigationShell: navShell),

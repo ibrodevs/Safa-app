@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'core/router/app_router.dart';
 import 'data/network/api_service.dart';
 import 'data/notifications/firebase_bg_handler.dart';
+import 'data/notifications/service/notification_service.dart';
+import 'data/notifications/service/push_service.dart';
 import 'features/auth_module/register/data/repo/auth_repo.dart';
 import 'features/auth_module/register/provider/auth_provider.dart';
 import 'features/main_module/map/data/repo/delivery_geo_repository.dart';
@@ -19,9 +21,23 @@ Future<void> _bgHandler(RemoteMessage message) async {
   await firebaseMessagingBackgroundHandler(message);
 }
 
+Future<void> _safeInitServices() async {
+  try {
+    await NotificationService.instance.init().timeout(
+      const Duration(seconds: 5),
+    );
+  } catch (_) {}
+  try {
+    await PushService.instance.init().timeout(
+      const Duration(seconds: 5),
+    );
+  } catch (_) {}
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
 
   final api = ApiService();
@@ -44,6 +60,8 @@ Future<void> main() async {
       child: const DoGoApp(),
     ),
   );
+
+  unawaited(_safeInitServices());
 }
 
 class DoGoApp extends StatelessWidget {

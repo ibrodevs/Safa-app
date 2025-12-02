@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../provider/profile_provider.dart';
@@ -106,25 +107,29 @@ class _ProfileBody extends StatelessWidget {
                     ],
                   ),
                   child: Column(
-                    children: const [
+                    children: [
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_notification.svg',
                         title: 'Уведомление',
+                        onTap: () => context.push('/profile/notifications'),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_human.svg',
                         title: 'Аккаунт',
+                        onTap: () => context.push('/profile/account'),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_clock.svg',
                         title: 'История пополнений/трат',
+                        onTap: () => context.push('/profile/balance-history'),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_phone.svg',
                         title: 'Служба поддержки',
+                        onTap: () => context.push('/profile/support'),
                       ),
                     ],
                   ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../data/network/api_service.dart';
+import '../../../data/notifications/service/push_service.dart';
 import 'data/model/nearby_shipments.dart';
 
 class CarrierHomeScreen extends StatefulWidget {
@@ -36,6 +37,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   bool _routeLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      PushService.instance.registerOnServerOnce(kind: 'carrier');
+    });
+  }
  /* @override
   void initState() {
     super.initState();
@@ -247,16 +255,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       body: Stack(
         children: [
 
-
           if (_showWelcome)
             Align(
-              alignment: Alignment.topCenter,
+              alignment: Alignment.bottomCenter,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  16,
-                  24 + padding.top,
-                  16,
+                  12,
                   0,
+                  12,
+                  bottomSafe + viewInsets.bottom + 12,
                 ),
                 child: _WelcomeCard(
                   loading: _loadingOnline,
@@ -273,15 +280,16 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   12,
                   0,
                   12,
-                  bottomSafe + viewInsets.bottom,
+                  bottomSafe + viewInsets.bottom + 12,
                 ),
-                /*child: _ShipmentSheet(
-                  shipment: _currentShipment!,
-                  accent: _accent,
-                  routeLoading: _routeLoading,
-                  onAccept: _acceptCurrent,
-                  onReject: _rejectCurrent,
-                ),*/
+                // child: _ShipmentSheet(
+                //   shipment: _currentShipment!,
+                //   accent: _accent,
+                //   routeLoading: _routeLoading,
+                //   onAccept: _acceptCurrent,
+                //   onReject: _rejectCurrent,
+                // ),
+                child: SizedBox.shrink(),
               ),
             ),
         ],

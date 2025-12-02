@@ -2,6 +2,7 @@
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repo/carrier_profile_repository.dart';
@@ -144,31 +145,36 @@ class _CarrierProfileBody extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_notification.svg',
                         title: 'Уведомление',
+                        onTap: () => context.push('/profile/notifications'),
                       ),
-                      _ProfileInnerDivider(),
+                      const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_human.svg',
                         title: 'Аккаунт',
+                        onTap: () => context.push('/profile/account'),
                       ),
-                      _ProfileInnerDivider(),
+                      const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_wallet.svg',
                         title: 'Пополнить счет',
+                        onTap: () => context.push('/profile/topup'),
                       ),
-                      _ProfileInnerDivider(),
+                      const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_clock.svg',
                         title: 'История пополнений/трат',
+                        onTap: () => context.push('/profile/balance-history'),
                       ),
-                      _ProfileInnerDivider(),
+                      const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_phone.svg',
                         title: 'Служба поддержки',
+                        onTap: () => context.push('/profile/support'),
                       ),
                     ],
                   ),

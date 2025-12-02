@@ -1,5 +1,3 @@
-// lib/features/main_module/map/order_map_screen.dart
-
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
 import 'package:dogo/features/main_module/map/view/components/deliveri_point_sheet.dart';
 import 'package:flutter/material.dart';
@@ -7,8 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:dgis_mobile_sdk_full/dgis.dart' as sdk;
-
+import 'package:dgis_mobile_sdk_map/dgis.dart' as sdk;
 import '../../../../data/network/api_service.dart';
 import '../../type_cargo/view/cargo_type_screen.dart';
 import '../data/model/delivery_point_model.dart';
@@ -34,8 +31,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   late final sdk.MapWidgetController _mapWidgetController;
   sdk.Map? _sdkMap;
 
-  sdk.RouteEditor? _routeEditor;
-  sdk.RouteEditorSource? _routeEditorSource;
+  // sdk.RouteEditor? _routeEditor;
+  // sdk.RouteEditorSource? _routeEditorSource;
 
   double _userLat = 42.8746;
   double _userLon = 74.6122;
@@ -65,10 +62,10 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
   @override
   void dispose() {
-    final map = _sdkMap;
-    if (map != null && _routeEditorSource != null) {
-      map.removeSource(_routeEditorSource!);
-    }
+    // final map = _sdkMap;
+    // if (map != null && _routeEditorSource != null) {
+    //   map.removeSource(_routeEditorSource!);
+    // }
     super.dispose();
   }
 
@@ -97,11 +94,10 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         lon: _userLon,
       );
 
-      if (_activeShipmentId != null && _deliveryPoint != null) {
-        await _buildRouteOnMap();
-      }
-    } catch (_) {
-    }
+      // if (_activeShipmentId != null && _deliveryPoint != null) {
+      //   await _buildRouteOnMap();
+      // }
+    } catch (_) {}
   }
 
   Future<void> _openIntermediatePointSheet() async {
@@ -163,10 +159,9 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         _deliveryPoint = result;
       });
 
-      // Если у нас есть активный заказ – строим маршрут.
-      if (_activeShipmentId != null) {
-        await _buildRouteOnMap();
-      }
+      // if (_activeShipmentId != null) {
+      //   await _buildRouteOnMap();
+      // }
     }
   }
 
@@ -178,9 +173,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
     final addressProvider = context.read<DeliveryAddressProvider>();
     final hereAddress = addressProvider.hereAddress;
-    final originTitle = (hereAddress != null && hereAddress.isNotEmpty)
-        ? hereAddress
-        : 'Мой адрес';
+    final originTitle =
+    (hereAddress != null && hereAddress.isNotEmpty) ? hereAddress : 'Мой адрес';
 
     stops.add({
       'title': originTitle,
@@ -221,7 +215,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
           _activeShipmentId = id;
         });
 
-        await _buildRouteOnMap();
+        // await _buildRouteOnMap();
       }
     } catch (e) {
       if (!mounted) return;
@@ -253,12 +247,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         _intermediatePoints.clear();
       });
 
-      final map = _sdkMap;
-      if (map != null && _routeEditorSource != null) {
-        map.removeSource(_routeEditorSource!);
-        _routeEditorSource = null;
-        _routeEditor = null;
-      }
+      // final map = _sdkMap;
+      // if (map != null && _routeEditorSource != null) {
+      //   map.removeSource(_routeEditorSource!);
+      //   _routeEditorSource = null;
+      //   _routeEditor = null;
+      // }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -292,16 +286,14 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         lon: _userLon,
       ),
     );
-
     stops.addAll(_intermediatePoints);
-
     if (_deliveryPoint != null) {
       stops.add(_deliveryPoint!);
     }
-
     return stops;
   }
 
+  /*
   Future<void> _buildRouteOnMap() async {
     final map = _sdkMap;
     final dest = _deliveryPoint;
@@ -355,6 +347,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       _routeEditorSource = routeEditorSource;
     });
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +379,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         children: [
           sdk.MapWidget(
             sdkContext: _sdkContext,
-            mapOptions:  sdk.MapOptions(),
+            mapOptions: sdk.MapOptions(),
             controller: _mapWidgetController,
           ),
 
@@ -446,8 +439,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                   height: 52,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: (_deliveryPoint == null ||
-                        _creatingShipment)
+                    onPressed: (_deliveryPoint == null || _creatingShipment)
                         ? null
                         : () async {
                       final result =
@@ -470,7 +462,9 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                       ),
                     ),
                     child: Text(
-                      _creatingShipment ? 'Создаём заказ…' : 'Далее',
+                      _creatingShipment
+                          ? 'Создаём заказ…'
+                          : 'Далее',
                     ),
                   ),
                 ),

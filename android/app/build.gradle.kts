@@ -1,20 +1,19 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.example.dogo"
+    namespace = "kg.genesis.dogo"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -22,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.dogo"
+        applicationId = "kg.genesis.dogo"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -41,6 +40,5 @@ flutter {
 }
 
 dependencies {
-    implementation("com.google.android.gms:play-services-location:21.1.0")
-    implementation("com.yandex.android:maps.mobile:4.22.0-lite")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

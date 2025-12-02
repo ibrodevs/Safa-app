@@ -21,7 +21,7 @@ final class ApiService {
   static final ApiService instance = ApiService._internal();
   factory ApiService() => instance;
 
-  static const String _baseUrl = 'http://164.92.182.171/api/';
+  static const String _baseUrl = 'https://dordoi-go.tech/api/';
 
   final SecureStorageService _storage = SecureStorageService();
   late final Dio _dio;
@@ -562,37 +562,6 @@ final class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> postFcmRegister({
-    required String token,
-    required String platform,
-    required String app,
-    String? deviceId,
-    String? locale,
-  }) async {
-    try {
-      final resp = await _dio.post(
-        'fcm-register/',
-        data: {
-          'token': token,
-          'platform': platform,
-          'app': app,
-          if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
-          if (locale != null && locale.isNotEmpty) 'locale': locale,
-        },
-      );
-      final data = resp.data;
-      if (data is Map<String, dynamic>) return data;
-      if (data is String) return Map<String, dynamic>.from(jsonDecode(data));
-      return const {};
-    } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      final body = e.response?.data;
-      final uri = (e.response?.requestOptions ?? e.requestOptions).uri;
-      throw Exception(
-        'FCM_REGISTER_${status ?? 'ERR'} @ $uri: ${body is String ? body : (e.message ?? 'Ошибка сети')}',
-      );
-    }
-  }
   Future<DeliveryReverseGeo> getDeliveryReverseGeo({
     required double lat,
     required double lon,
@@ -826,6 +795,36 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+  Future<Map<String, dynamic>> postFcmRegister({
+    required String token,
+    required String platform,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        'fcm/register/',
+        data: {
+          'token': token,
+          'platform': platform,
+        },
+      );
+      final data = resp.data;
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      if (data is String) {
+        return Map<String, dynamic>.from(jsonDecode(data));
+      }
+      return const {};
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final body = e.response?.data;
+      final uri = (e.response?.requestOptions ?? e.requestOptions).uri;
+      throw Exception(
+        'FCM_REGISTER_${status ?? 'ERR'} @ $uri: ${body is String ? body : (e.message ?? 'Ошибка сети')}',
+      );
+    }
+  }
+
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();
     if (raw == null || raw.isEmpty) return null;

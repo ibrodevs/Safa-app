@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../data/notifications/service/push_service.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -20,8 +22,21 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _HomeBody extends StatelessWidget {
+class _HomeBody extends StatefulWidget {
   const _HomeBody();
+
+  @override
+  State<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<_HomeBody> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      PushService.instance.registerOnServerOnce(kind: 'client');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +63,8 @@ class _HomeBody extends StatelessWidget {
           backgroundColor: Colors.white,
           strokeWidth: 2.4,
           displacement: 32,
-          onRefresh: () => context.read<ProfileProvider>().loadProfile(),
+          onRefresh: () =>
+              context.read<ProfileProvider>().loadProfile(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
@@ -62,7 +78,6 @@ class _HomeBody extends StatelessWidget {
                   title: greeting,
                 ),
                 const SizedBox(height: 24),
-
                 const Text(
                   'Основное',
                   style: TextStyle(
@@ -84,7 +99,6 @@ class _HomeBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-
                 _BigFeatureCard(
                   title: 'Доставка грузов',
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
@@ -93,7 +107,6 @@ class _HomeBody extends StatelessWidget {
                   onTap: () => context.go('/map'),
                 ),
                 const SizedBox(height: 18),
-
                 _BigFeatureCard(
                   title: 'Такси',
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
@@ -102,7 +115,6 @@ class _HomeBody extends StatelessWidget {
                   onTap: () {},
                 ),
                 const SizedBox(height: 18),
-
                 IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,7 +145,6 @@ class _HomeBody extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 if (state.error != null) ...[
                   const SizedBox(height: 16),
                   Text(
@@ -153,6 +164,7 @@ class _HomeBody extends StatelessWidget {
     );
   }
 }
+
 
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
