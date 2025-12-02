@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:294846180284:android:32bac25a408ba9abae19b9",
+        "mobilesdk_app_id": "1:294846180284:android:1abcbdfd382e9359ae19b9",
         "android_client_info": {
-          "package_name": "com.example.dogo"
+          "package_name": "kg.genesis.dogo"
         }
       },
       "oauth_client": [],
