@@ -65,7 +65,7 @@ class _CarrierProfileBody extends StatelessWidget {
     final clientRateCount = profile?.clientRateCount ?? 0;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFFFFFFF),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -76,7 +76,7 @@ class _CarrierProfileBody extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottom),
+            padding: EdgeInsets.fromLTRB(14, 24, 14, 24 + bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -131,16 +131,16 @@ class _CarrierProfileBody extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _tileBorder, width: 1),
+                    border: Border.all(color: Color(0xFFF4F4F4), width: 1),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x11000000),
-                        blurRadius: 18,
-                        offset: Offset(0, 8),
+                        color: Color(0xF808080),
+                        blurRadius: 60,
+                        offset: Offset(0, 3),
                       ),
                       BoxShadow(
                         color: Color(0x08000000),
-                        blurRadius: 10,
+                        blurRadius: 12,
                         offset: Offset(0, 3),
                       ),
                     ],
@@ -213,15 +213,11 @@ class _CarrierProfileBody extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
-                            Icons.emoji_events_rounded,
-                            size: 22,
-                            color: _green,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
+                          SvgPicture.asset('assets/icons/ic_rait.svg'),
+                          const SizedBox(width: 6),
+                          const Text(
                             'Рейтинг',
                             style: TextStyle(
                               fontSize: 17,
@@ -478,110 +474,127 @@ class _StatisticsCard extends StatelessWidget {
           ],
           const SizedBox(height: 18),
 
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      grossTotal.toString(),
-                      style: const TextStyle(
-                        fontSize: 40,
-                        height: 1.0,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      commission.toString(),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        height: 1.0,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      clients.toString(),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        height: 1.0,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 18),
-                Container(
-                  width: 1,
-                  color: _tileBorder,
-                ),
-                const SizedBox(width: 18),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          deltaText,
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 1.1,
-                            fontWeight: FontWeight.w700,
-                            color: deltaColor,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Заработано\nза сегодня',
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 1.2,
-                            fontWeight: FontWeight.w600,
-                            color: _greyText,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-
-                    const Text(
-                      'Комиссия',
-                      style: TextStyle(
-                        fontSize: 16,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                        color: _greyText,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-
-                    const Text(
-                      'Клиентов',
-                      style: TextStyle(
-                        fontSize: 16,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                        color: _greyText,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            _StatLine(
+              leftText: grossTotal.toString(),
+              rightTopText: deltaText,
+              rightTopStyle: TextStyle(
+                fontSize: 16,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+                color: deltaColor,
+              ),
+              rightBottomText: 'Заработано\nза сегодня',
+              rightBottomStyle: const TextStyle(
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Color(0x9E1E1E3E),
+              ),
+              valueStyle: const TextStyle(
+                fontSize: 40,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
             ),
-          ),
+            const SizedBox(height: 18),
+            _StatLine(
+              leftText: commission.toString(),
+              rightTopText: null,
+              rightBottomText: 'Комиссия',
+              rightBottomStyle: const TextStyle(
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Color(0x9E1E1E3E),
+              ),
+              valueStyle: const TextStyle(
+                fontSize: 32,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _StatLine(
+              leftText: clients.toString(),
+              rightTopText: null,
+              rightBottomText: 'Клиентов',
+              rightBottomStyle: const TextStyle(
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Color(0x9E1E1E3E),
+              ),
+              valueStyle: const TextStyle(
+                fontSize: 32,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
+class _StatLine extends StatelessWidget {
+  const _StatLine({
+    required this.leftText,
+    required this.valueStyle,
+    required this.rightBottomText,
+    required this.rightBottomStyle,
+    this.rightTopText,
+    this.rightTopStyle,
+  });
+
+  final String leftText;
+  final TextStyle valueStyle;
+  final String? rightTopText;
+  final TextStyle? rightTopStyle;
+  final String rightBottomText;
+  final TextStyle rightBottomStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            leftText,
+            style:valueStyle ,
+          ),
+          const SizedBox(width: 18),
+          Container(
+            width: 1,
+            color: Colors.black,
+          ),
+          const SizedBox(width: 18),
+          Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (rightTopText != null) ...[
+                Text(
+                  rightTopText!,
+                  style: rightTopStyle,
+                ),
+                const SizedBox(height: 4),
+              ],
+              Text(
+                rightBottomText,
+                style: rightBottomStyle,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _StatChip extends StatelessWidget {
   const _StatChip({

@@ -3,57 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/styles.dart';
 import '../register/data/models/register_request_model.dart';
+import '../register/view/components/register_dots_indicator.dart';
 
 class RoleSelectScreen extends StatelessWidget {
-  const RoleSelectScreen({
-    super.key,
-    this.onTapClient,
-    this.onTapCarrier,
-  });
+  const RoleSelectScreen({super.key, this.onTapClient, this.onTapCarrier});
 
   final VoidCallback? onTapClient;
   final VoidCallback? onTapCarrier;
 
-  static const _sidePadding = 24.0;
-
-  static const _orange = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
-
-  static const _titleBlackStyle = TextStyle(
-    fontFamily: 'SFProText',
-    fontWeight: FontWeight.w700,
-    fontSize: 24,
-    height: 1.1,
-    color: Colors.black,
-  );
-
-  static const _titleGreyStyle = TextStyle(
-    fontFamily: 'SFProText',
-    fontWeight: FontWeight.w600,
-    fontSize: 24,
-    height: 1.1,
-    color: Color(0xFFB5BCC5),
-  );
-
-  static const _cardTitleStyle = TextStyle(
-    fontFamily: 'SFProText',
-    fontWeight: FontWeight.w600,
-    fontSize: 15,
-    height: 1.2,
-    color: Colors.black,
-  );
-
-  static const _cardSubtitleStyle = TextStyle(
-    fontFamily: 'SFProText',
-    fontWeight: FontWeight.w500,
-    fontSize: 13,
-    height: 1.25,
-    color: _greyText,
-  );
-
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -65,12 +28,7 @@ class RoleSelectScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      _sidePadding,
-                      40,
-                      _sidePadding,
-                      0,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -80,10 +38,12 @@ class RoleSelectScreen extends StatelessWidget {
                           imageAsset: 'assets/images/img_client.jpg',
                           title: 'Я являюсь клиентом',
                           subtitle:
-                          'Узнайте размер и вес посылки\nдля расчета прайса',
+                          'Узнайте размер и вес посылки для расчета прайса',
                           onTap: onTapClient ??
                                   () {
-                                context.read<AuthProvider>().setRole(UserRole.client);
+                                context
+                                    .read<AuthProvider>()
+                                    .setRole(UserRole.client);
                                 context.push('/register-client');
                               },
                         ),
@@ -92,10 +52,12 @@ class RoleSelectScreen extends StatelessWidget {
                           imageAsset: 'assets/images/img_spec.jpg',
                           title: 'Я являюсь специалистом',
                           subtitle:
-                          'Узнайте размер и вес посылки\nдля расчета прайса',
+                          'Узнайте размер и вес посылки для расчета прайса',
                           onTap: onTapCarrier ??
                                   () {
-                                context.read<AuthProvider>().setRole(UserRole.carrier);
+                                context
+                                    .read<AuthProvider>()
+                                    .setRole(UserRole.carrier);
                                 context.push('/register-carrier');
                               },
                         ),
@@ -107,29 +69,36 @@ class RoleSelectScreen extends StatelessWidget {
               ],
             ),
           ),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: bottomPadding + 20,
+            child: const Center(
+              child: Hero(
+                tag: 'register_dots',
+                child: RegisterDotsIndicator(activeIndex: 0),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
+
 class _Header extends StatelessWidget {
   const _Header();
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Кыргызский сервис\nнового поколения —',
-          style: RoleSelectScreen._titleBlackStyle,
-        ),
-        SizedBox(height: 12),
-        Text(
-          'всё, что нужно,\nв одном приложении',
-          style: RoleSelectScreen._titleGreyStyle,
-        ),
+        Text('Кыргызский сервис\nнового поколения —',  style: AppTextStyles.titleBlackStyle,),
+        const SizedBox(height: 12),
+        Text('всё, что нужно,\nв одном приложении',  style: AppTextStyles.titleGreyStyle,),
       ],
     );
   }
@@ -159,14 +128,11 @@ class _RoleCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: const Color(0xFFE9EDF2),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFE9EDF2), width: 1),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -181,9 +147,7 @@ class _RoleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 24),
-              const Expanded(
-                child: _RoleTexts(),
-              ),
+              const Expanded(child: _RoleTexts()),
             ],
           ),
         ),
@@ -202,15 +166,9 @@ class _RoleTexts extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          card.title,
-          style: RoleSelectScreen._cardTitleStyle,
-        ),
+        Text(card.title, style: AppTextStyles.cardTitleStyle),
         const SizedBox(height: 8),
-        Text(
-          card.subtitle,
-          style: RoleSelectScreen._cardSubtitleStyle,
-        ),
+        Text(card.subtitle, style: AppTextStyles.cardSubtitleStyle),
       ],
     );
   }
@@ -232,4 +190,3 @@ class _TopPattern extends StatelessWidget {
     );
   }
 }
-

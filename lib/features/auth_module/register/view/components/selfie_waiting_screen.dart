@@ -95,7 +95,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-
+    final auth = context.read<AuthProvider>();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -129,7 +129,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
               const SizedBox(height: 12),
               const Center(
                 child: Text(
-                  'Сатурн — шестая планета по удалённости от\n'
+                  'Сатурн—шестая планета по удалённости от '
                       'Солнца и вторая по размерам планета',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -168,7 +168,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-             /* Center(
+              Center(
                 child: TextButton(
                   onPressed: () async {
                     final prefs = await SharedPreferences.getInstance();
@@ -187,7 +187,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                     ),
                   ),
                 ),
-              ),*/
+              ),
             ],
           ),
         ),

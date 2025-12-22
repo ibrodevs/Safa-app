@@ -272,9 +272,11 @@ class _SelfieFrame extends StatelessWidget {
                 ),
               ),
             const Align(
-              alignment: Alignment(0, -0.35),
+              alignment: Alignment(0, -0.60),
+
               child: _HeadTarget(),
             ),
+            SizedBox(height: 20),
             const Align(
               alignment: Alignment(0, 0.5),
               child: _CardTarget(),

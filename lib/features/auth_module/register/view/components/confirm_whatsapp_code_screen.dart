@@ -1,7 +1,14 @@
+import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/widgets/app_text_field.dart';
+import 'package:dogo/core/widgets/primary_button.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
+import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../../core/utils/styles.dart';
+import '../../../../../core/widgets/shadow_field.dart';
 
 class ConfirmWhatsappCodeScreen extends StatefulWidget {
   const ConfirmWhatsappCodeScreen({super.key});
@@ -11,9 +18,8 @@ class ConfirmWhatsappCodeScreen extends StatefulWidget {
       _ConfirmWhatsappCodeScreenState();
 }
 
-class _ConfirmWhatsappCodeScreenState
-    extends State<ConfirmWhatsappCodeScreen> {
-  final _ctrl = TextEditingController();
+class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
+  final _code = TextEditingController();
   final _focus = FocusNode();
 
   @override
@@ -26,7 +32,7 @@ class _ConfirmWhatsappCodeScreenState
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _code.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -38,21 +44,20 @@ class _ConfirmWhatsappCodeScreenState
       final ok = await provider.sendWhatsappCode();
       if (!mounted) return;
       if (!ok) {
-        final msg =
-            provider.error ?? 'Не удалось отправить код в WhatsApp';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        final msg = provider.error ?? 'Не удалось отправить код в WhatsApp';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       }
     });
   }
 
   Future<void> _onNext() async {
-    final code = _ctrl.text.trim();
+    final code = _code.text.trim();
     if (code.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите код из WhatsApp')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Введите код из WhatsApp')));
       return;
     }
 
@@ -65,147 +70,94 @@ class _ConfirmWhatsappCodeScreenState
       context.go('/home');
     } else {
       final msg = provider.error ?? 'Неверный код из WhatsApp';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const side = 24.0;
-    const titleColor = Color(0xFF000000);
-    const subtitleColor = Color(0xFF8E8E93);
-    const hintColor = Color(0xFFC9CCD3);
-    const buttonColor = Color(0xFFE47F26);
-    const cancelColor = Color(0xFFB8BAC2);
-
     final loading = context.watch<AuthProvider>().loading;
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          bottom: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(side, 20, side, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                const Text(
-                  'Подтверждение',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 27,
-                    height: 1.15,
-                    color: titleColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Отслеживайте и узнавайте адреса\nактуальных складов  для доставки товаров',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    height: 1.25,
-                    color: subtitleColor,
-                  ),
-                ),
-                const SizedBox(height: 26),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 28,
-                        offset: Offset(0, 12),
-                      ),
-                      BoxShadow(
-                        color: Color(0x0D000000),
-                        blurRadius: 10,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _ctrl,
-                    focusNode: _focus,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      height: 1.25,
-                      color: Colors.black,
+        body: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 80),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Подтверждение',
+                      style: AppTextStyles.titleBlackStyle,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'Введите код с Whatsapp',
-                      hintStyle: TextStyle(
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Отслеживайте и узнавайте адреса\nактуальных складов  для доставки товаров',
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        fontSize: 13,
                         height: 1.25,
-                        color: hintColor,
-                      ),
-                      isDense: true,
-                      contentPadding:
-                      EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 64,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: buttonColor,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.subtitleColor,
                       ),
                     ),
-                    onPressed: loading ? null : _onNext,
-                    child: Text(
-                      loading ? 'Проверка...' : 'Далее',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                        height: 1.1,
-                        letterSpacing: 0.2,
-                        color: Colors.white,
+                    const SizedBox(height: 26),
+                    ShadowField(
+                      child: AppTextField(
+                        controller: _code,
+                        hint: 'Введите код с Whatsapp',
+                        prefixText: '  ',
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => context.go('/select_role'),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Text(
-                        'Отменить регистрацию',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                          height: 1.2,
-                          color: cancelColor,
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 64,
+                      child: PrimaryButton(
+                        text: loading ? 'Проверка...' : 'Далее',
+                        onPressed: loading ? null : _onNext,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Center(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => context.go('/select_role'),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            'Отменить регистрацию',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 17,
+                              height: 1.2,
+                              color: AppColors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 30,
+              child: const Center(
+                child: Hero(
+                  tag: 'register_dots',
+                  child: RegisterDotsIndicator(activeIndex: 2),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

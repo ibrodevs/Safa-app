@@ -26,6 +26,7 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2300),
     );
+
     _textCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2300),

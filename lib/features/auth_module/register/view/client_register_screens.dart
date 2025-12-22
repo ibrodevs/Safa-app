@@ -1,7 +1,14 @@
+import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/widgets/primary_button.dart';
+import 'package:dogo/core/widgets/shadow_field.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/eye_password.dart';
+import 'components/register_dots_indicator.dart';
+import 'widgets/client_title_block_widget.dart';
 
 class ClientRegisterScreen extends StatefulWidget {
   const ClientRegisterScreen({super.key});
@@ -80,22 +87,26 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
     final loading = context.watch<AuthProvider>().loading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(14, 28, 14, 24 + bottom),
+          padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + bottom),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _TitleBlock(),
+              const ClientTitleBlock(),
               const SizedBox(height: 18),
-              _ShadowField(
-                child: _AppTextField(controller: _name, hint: 'Имя'),
+              ShadowField(
+                child: AppTextField(
+                  controller: _name,
+                  hint: 'Имя',
+                  prefixText: '  ',
+                ),
               ),
               const SizedBox(height: 14),
-              _ShadowField(
-                child: _AppTextField(
+              ShadowField(
+                child: AppTextField(
                   controller: _phone,
                   hint: 'Телефон с WhatsApp',
                   keyboardType: TextInputType.phone,
@@ -103,12 +114,13 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              _ShadowField(
-                child: _AppTextField(
+              ShadowField(
+                child: AppTextField(
                   controller: _pass,
                   hint: 'Пароль',
+                  prefixText: '  ',
                   obscure: _passObscured,
-                  suffix: _PasswordEye(
+                  suffix: PasswordEye(
                     obscured: _passObscured,
                     onTap: () {
                       setState(() {
@@ -119,12 +131,13 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              _ShadowField(
-                child: _AppTextField(
+              ShadowField(
+                child: AppTextField(
                   controller: _pass2,
                   hint: 'Повторите пароль',
+                  prefixText: '  ',
                   obscure: _pass2Obscured,
-                  suffix: _PasswordEye(
+                  suffix: PasswordEye(
                     obscured: _pass2Obscured,
                     onTap: () {
                       setState(() {
@@ -135,7 +148,7 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              _PrimaryButton(
+              PrimaryButton(
                 text: loading ? 'Отправка...' : 'Далее',
                 onPressed: loading ? null : _onNext,
               ),
@@ -154,211 +167,15 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
                   ),
                 ),
               ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: const Hero(
+                  tag: 'register_dots',
+                  child: RegisterDotsIndicator(activeIndex: 1),
+                ),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TitleBlock extends StatelessWidget {
-  const _TitleBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Регистрация',
-          style: TextStyle(
-            fontSize: 27,
-            fontWeight: FontWeight.w900,
-            height: 1.1,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 14),
-        Text(
-          'Данные клиента',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            height: 1.15,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 6),
-        Text(
-          'Отслеживайте и узнавайте адреса\nактуальных складов  для доставки товаров',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            height: 1.25,
-            color: Color(0xFF9FA4AD),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ShadowField extends StatelessWidget {
-  const _ShadowField({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 20,
-            offset: Offset(0, 12),
-          ),
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _AppTextField extends StatelessWidget {
-  const _AppTextField({
-    super.key,
-    this.controller,
-    required this.hint,
-    this.keyboardType,
-    this.obscure = false,
-    this.suffix,
-    this.prefixText,
-  });
-
-  final TextEditingController? controller;
-  final String hint;
-  final TextInputType? keyboardType;
-  final bool obscure;
-  final Widget? suffix;
-  final String? prefixText;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscure,
-      cursorColor: Colors.black,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          height: 1.25,
-          color: Color(0xFFD0D5DD),
-        ),
-        isDense: true,
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 18,
-        ),
-        border: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        suffixIcon: suffix,
-        prefixText: prefixText,
-        prefixStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          height: 1.2,
-          color: Colors.black,
-        ),
-      ),
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        height: 1.2,
-        color: Colors.black,
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.text, required this.onPressed});
-
-  final String text;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 64,
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ButtonStyle(
-          backgroundColor: const WidgetStatePropertyAll(Color(0xFFE67E22)),
-          foregroundColor: const WidgetStatePropertyAll(Colors.white),
-          shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          elevation: const WidgetStatePropertyAll(0),
-          textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: 18, fontWeight: FontWeight.w800, height: 1.0),
-          ),
-        ),
-        child: Text(text),
-      ),
-    );
-  }
-}
-
-class _PasswordEye extends StatelessWidget {
-  const _PasswordEye({
-    required this.obscured,
-    required this.onTap,
-  });
-
-  final bool obscured;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        width: 10,
-        height: 10,
-        margin: const EdgeInsets.only(right: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE5E9EF),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          obscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-          size: 20,
-          color: const Color(0xFF8F97A3),
         ),
       ),
     );

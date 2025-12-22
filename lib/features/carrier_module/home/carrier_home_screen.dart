@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../data/network/api_service.dart';
 import '../../../data/notifications/service/push_service.dart';
-import 'data/model/nearby_shipments.dart';
+import 'data/model/nearby_shipment.dart';
 
 class CarrierHomeScreen extends StatefulWidget {
   const CarrierHomeScreen({super.key});
@@ -19,15 +19,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   static const _titleBlack = Color(0xFF000000);
   static const _greyText = Color(0xFF9FA4AD);
 
- /* final ykit.Point _bishkekCenter = const ykit.Point(
-    latitude: 42.8746,
-    longitude: 74.6122,
-  );*/
-
-/*
-  ykit.MapWindow? _mapWindow;
-  late final RoutingService _routing;
-*/
 
   bool _loadingOnline = false;
   bool _showWelcome = true;
@@ -44,7 +35,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       PushService.instance.registerOnServerOnce(kind: 'carrier');
     });
   }
- /* @override
+
+  /* @override
   void initState() {
     super.initState();
     mapkit.onStart();
@@ -57,7 +49,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     super.dispose();
   }
 */
- /* void _onMapCreated(ykit.MapWindow mapWindow) {
+  /* void _onMapCreated(ykit.MapWindow mapWindow) {
     _mapWindow = mapWindow;
     final map = mapWindow.map;
     map.move(
@@ -87,9 +79,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       if (!mounted) return;
 
       if (page.results.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Рядом нет заказов')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Рядом нет заказов')));
         setState(() {
           _loadingOnline = false;
           _showWelcome = true;
@@ -104,9 +96,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       /*await _showShipmentOnMap(_currentShipment!);*/
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) {
         setState(() {
@@ -136,7 +128,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     );
   }
 
- /* Future<void> _showShipmentOnMap(NearbyShipment shipment) async {
+  /* Future<void> _showShipmentOnMap(NearbyShipment shipment) async {
     if (_mapWindow == null || shipment.stops.isEmpty) return;
 
     setState(() {
@@ -254,21 +246,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-
           if (_showWelcome)
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  12,
+                  10,
                   0,
-                  12,
+                  10,
                   bottomSafe + viewInsets.bottom + 12,
                 ),
-                child: _WelcomeCard(
-                  loading: _loadingOnline,
-                  onTap: _goOnline,
-                ),
+                child: _WelcomeCard(loading: _loadingOnline, onTap: _goOnline),
               ),
             ),
 
@@ -298,12 +286,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 }
 
-
 class _WelcomeCard extends StatelessWidget {
-  const _WelcomeCard({
-    required this.loading,
-    required this.onTap,
-  });
+  const _WelcomeCard({required this.loading, required this.onTap});
 
   final bool loading;
   final VoidCallback onTap;
@@ -313,7 +297,7 @@ class _WelcomeCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
@@ -395,8 +379,9 @@ class _ShipmentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final distance = shipment.distanceM;
-    final distanceText =
-    distance >= 1000 ? '${(distance / 1000).toStringAsFixed(1)} км' : '$distance метров';
+    final distanceText = distance >= 1000
+        ? '${(distance / 1000).toStringAsFixed(1)} км'
+        : '$distance метров';
 
     final stopsCount = shipment.stops.length;
 
@@ -440,15 +425,9 @@ class _ShipmentSheet extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Chip(
-                icon: Icons.inventory_2_outlined,
-                label: 'Большие мешки',
-              ),
+              _Chip(icon: Icons.inventory_2_outlined, label: 'Большие мешки'),
               const SizedBox(width: 8),
-              _Chip(
-                icon: Icons.map_outlined,
-                label: '$stopsCount точки',
-              ),
+              _Chip(icon: Icons.map_outlined, label: '$stopsCount точки'),
             ],
           ),
           const SizedBox(height: 18),
@@ -464,11 +443,7 @@ class _ShipmentSheet extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: const [
-              Icon(
-                Icons.add,
-                size: 16,
-                color: Color(0xFF22C55E),
-              ),
+              Icon(Icons.add, size: 16, color: Color(0xFF22C55E)),
               SizedBox(width: 2),
               Text(
                 '+1 рейтинг',
@@ -502,10 +477,7 @@ class _ShipmentSheet extends StatelessWidget {
               ),
               child: const Text(
                 'Забрать заказ',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -524,10 +496,7 @@ class _ShipmentSheet extends StatelessWidget {
               ),
               child: const Text(
                 'Отказать',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -538,10 +507,7 @@ class _ShipmentSheet extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.icon,
-    required this.label,
-  });
+  const _Chip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -553,19 +519,12 @@ class _Chip extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.3,
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFFFF8A00),
-          ),
+          Icon(icon, size: 18, color: const Color(0xFFFF8A00)),
           const SizedBox(width: 6),
           Text(
             label,

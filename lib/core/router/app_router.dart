@@ -27,43 +27,47 @@ import '../../features/main_module/profile/view/components/profile_balance_histo
 import '../../features/main_module/profile/view/components/profile_notifications_screen.dart';
 import '../../features/main_module/profile/view/components/profile_support_screen.dart';
 
-class AppRouter {
+final class AppRouter {
   AppRouter._();
 
   static final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
-  static CustomTransitionPage<T> _buildPage<T>({
+  static const _transitionIn = Duration(milliseconds: 280);
+  static const _transitionOut = Duration(milliseconds: 260);
+  static const _curve = Curves.easeOutCubic;
+
+  static CustomTransitionPage<T> _page<T>({
     required GoRouterState state,
     required Widget child,
   }) {
     return CustomTransitionPage<T>(
       key: state.pageKey,
       child: child,
-      transitionDuration: const Duration(milliseconds: 260),
-      reverseTransitionDuration: const Duration(milliseconds: 240),
+      transitionDuration: _transitionIn,
+      reverseTransitionDuration: _transitionOut,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final inAnimation = animation.drive(
+        final primary = animation.drive(
           Tween<Offset>(
             begin: const Offset(1.0, 0.0),
             end: Offset.zero,
           ).chain(
-            CurveTween(curve: Curves.easeOutCubic),
+            CurveTween(curve: _curve),
           ),
         );
 
-        final outAnimation = secondaryAnimation.drive(
+        final secondary = secondaryAnimation.drive(
           Tween<Offset>(
             begin: Offset.zero,
-            end: const Offset(-0.15, 0.0),
+            end: const Offset(-0.12, 0.0),
           ).chain(
-            CurveTween(curve: Curves.easeOutCubic),
+            CurveTween(curve: _curve),
           ),
         );
 
         return SlideTransition(
-          position: inAnimation,
+          position: primary,
           child: SlideTransition(
-            position: outAnimation,
+            position: secondary,
             child: child,
           ),
         );
@@ -71,88 +75,103 @@ class AppRouter {
     );
   }
 
+
+  static Page<dynamic> _build(GoRouterState state, Widget child) =>
+      _page(
+        state: state,
+        child: child,
+      );
+
   static final GoRouter router = GoRouter(
-    initialLocation: '/',
     navigatorKey: _navKey,
+    initialLocation: '/',
     routes: [
-      GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+      GoRoute(
+        path: '/',
+        pageBuilder: (context, state) => _build(state, const SplashScreen()),
+      ),
       GoRoute(
         path: '/second_splash',
-        builder: (_, __) => const SecondSplashScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const SecondSplashScreen()),
       ),
       GoRoute(
         path: '/select_role',
-        builder: (_, __) => const RoleSelectScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const RoleSelectScreen()),
       ),
       GoRoute(
         path: '/register-client',
-        builder: (_, __) => const ClientRegisterScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ClientRegisterScreen()),
       ),
       GoRoute(
         path: '/register-carrier',
-        builder: (_, __) => const CarrierRegisterScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const CarrierRegisterScreen()),
       ),
       GoRoute(
         path: '/register/confirm',
-        builder: (_, __) => const ConfirmSelfieScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ConfirmSelfieScreen()),
       ),
       GoRoute(
         path: '/register/confirm/whatsapp',
-        builder: (_, __) => const ConfirmWhatsappCodeScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ConfirmWhatsappCodeScreen()),
       ),
       GoRoute(
         path: '/history/detail',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.extra as int;
-          return HistoryDetailsScreen(shipmentId: id);
+          return _build(state, HistoryDetailsScreen(shipmentId: id));
         },
       ),
       GoRoute(
         path: '/history-carrier/detail',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.extra as int;
-          return CarrierHistoryDetailsScreen(shipmentId: id);
+          return _build(state, CarrierHistoryDetailsScreen(shipmentId: id));
         },
       ),
       GoRoute(
         path: '/profile/notifications',
-        builder: (_, __) => const ProfileNotificationsScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ProfileNotificationsScreen()),
       ),
       GoRoute(
         path: '/profile/account',
-        builder: (_, __) => const ProfileAccountScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ProfileAccountScreen()),
       ),
       GoRoute(
         path: '/profile/balance-history',
-        builder: (_, __) => const ProfileBalanceHistoryScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ProfileBalanceHistoryScreen()),
       ),
       GoRoute(
         path: '/profile/support',
-        builder: (_, __) => const ProfileSupportScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const ProfileSupportScreen()),
       ),
 
       GoRoute(
         path: '/selfie-capture',
-        builder: (_, state) => SelfieCaptureScreen(),
+        pageBuilder: (context, state) => _build(state, SelfieCaptureScreen()),
       ),
-      GoRoute(
-        path: '/selfie-capture',
-        builder: (_, state) =>
-            SelfieCaptureScreen(),
-      ),
+
       GoRoute(
         path: '/type_cargo',
-        builder: (_, state) =>
-            CargoTypeScreen(),
+        pageBuilder: (context, state) => _build(state, CargoTypeScreen()),
       ),
       GoRoute(
         path: '/selfie-waiting',
-        builder: (_, state) =>
-            SelfieWaitingScreen(),
+        pageBuilder: (context, state) => _build(state, SelfieWaitingScreen()),
       ),
       GoRoute(
         path: '/profile/topup',
-        builder: (_, __) => const BalanceTopUpScreen(),
+        pageBuilder: (context, state) =>
+            _build(state, const BalanceTopUpScreen()),
       ),
 
       StatefulShellRoute.indexedStack(
@@ -161,19 +180,28 @@ class AppRouter {
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+              GoRoute(
+                path: '/home',
+                pageBuilder: (context, state) =>
+                    _build(state, const HomeScreen()),
+              ),
             ],
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/map', builder: (_, __) => const OrderMapScreen()),
+              GoRoute(
+                path: '/map',
+                pageBuilder: (context, state) =>
+                    _build(state, const OrderMapScreen()),
+              ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/history',
-                builder: (_, __) => const HistoryScreen(),
+                pageBuilder: (context, state) =>
+                    _build(state, const HistoryScreen()),
               ),
             ],
           ),
@@ -181,26 +209,33 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: '/profile',
-                builder: (_, __) => const ProfileScreen(),
+                pageBuilder: (context, state) =>
+                    _build(state, const ProfileScreen()),
               ),
             ],
           ),
         ],
       ),
+
       StatefulShellRoute.indexedStack(
         builder: (context, state, navShell) =>
             BottomCarrierTabBar(navigationShell: navShell),
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/home-carrier', builder: (_, __) => const CarrierHomeScreen()),
+              GoRoute(
+                path: '/home-carrier',
+                pageBuilder: (context, state) =>
+                    _build(state, const CarrierHomeScreen()),
+              ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/history-carrier',
-                builder: (_, __) => const CarrierHistoryScreen(),
+                pageBuilder: (context, state) =>
+                    _build(state, const CarrierHistoryScreen()),
               ),
             ],
           ),
@@ -208,7 +243,8 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: '/profile-carrier',
-                builder: (_, __) => const CarrierProfileScreen(),
+                pageBuilder: (context, state) =>
+                    _build(state, const CarrierProfileScreen()),
               ),
             ],
           ),
