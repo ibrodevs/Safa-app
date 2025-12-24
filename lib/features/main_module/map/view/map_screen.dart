@@ -24,14 +24,10 @@ class OrderMapScreen extends StatefulWidget {
 
 class _OrderMapScreenState extends State<OrderMapScreen> {
   static const _accent = Color(0xFFFF8A00);
-
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
-
-  // Мои реальные координаты (GPS) — для _HereBubble (маркер на карте)
   double _myLat = 42.8746;
   double _myLon = 74.6122;
 
-  // Центр карты (точка выбора) — для reverse/address при перетаскивании
   double _centerLat = 42.8746;
   double _centerLon = 74.6122;
 

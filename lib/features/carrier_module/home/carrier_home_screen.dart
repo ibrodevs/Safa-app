@@ -1,7 +1,19 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+
+import '../../../data/network/api_service.dart';
+import '../../../data/notifications/service/push_service.dart';
+import 'data/model/nearby_shipment.dart';
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../data/network/api_service.dart';
 import '../../../data/notifications/service/push_service.dart';
@@ -19,6 +31,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   static const _titleBlack = Color(0xFF000000);
   static const _greyText = Color(0xFF9FA4AD);
 
+  final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
+
+  final MapController _mapController = MapController();
+
+  double _myLat = 42.8746;
+  double _myLon = 74.6122;
+  double _centerLat = 42.8746;
+  double _centerLon = 74.6122;
 
   bool _loadingOnline = false;
   bool _showWelcome = true;
@@ -34,33 +54,55 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     Future.microtask(() {
       PushService.instance.registerOnServerOnce(kind: 'carrier');
     });
+    _initLocation();
   }
 
-  /* @override
-  void initState() {
-    super.initState();
-    mapkit.onStart();
-    _routing = RoutingService(ApiService.instance.dio);
+  Future<void> _initLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _moveMap(_bishkekCenter);
+        return;
+      }
+
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever) {
+        _moveMap(_bishkekCenter);
+        return;
+      }
+      if (perm != LocationPermission.always && perm != LocationPermission.whileInUse) {
+        _moveMap(_bishkekCenter);
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _myLat = pos.latitude;
+        _myLon = pos.longitude;
+        _centerLat = _myLat;
+        _centerLon = _myLon;
+      });
+
+      _moveMap(LatLng(_myLat, _myLon), zoom: 15);
+    } catch (_) {
+      if (!mounted) return;
+      _moveMap(_bishkekCenter);
+    }
   }
 
-  @override
-  void dispose() {
-    mapkit.onStop();
-    super.dispose();
+  void _moveMap(LatLng center, {double zoom = 15}) {
+    try {
+      _mapController.move(center, zoom);
+    } catch (_) {}
   }
-*/
-  /* void _onMapCreated(ykit.MapWindow mapWindow) {
-    _mapWindow = mapWindow;
-    final map = mapWindow.map;
-    map.move(
-      ykit.CameraPosition(
-        _bishkekCenter,
-        zoom: 14.0,
-        azimuth: 0.0,
-        tilt: 0.0,
-      ),
-    );
-  }*/
 
   Future<void> _goOnline() async {
     if (_loadingOnline) return;
@@ -79,9 +121,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       if (!mounted) return;
 
       if (page.results.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Рядом нет заказов')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Рядом нет заказов')),
+        );
         setState(() {
           _loadingOnline = false;
           _showWelcome = true;
@@ -93,12 +135,18 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _currentShipment = _shipments.first;
       _showWelcome = false;
 
-      /*await _showShipmentOnMap(_currentShipment!);*/
+      setState(() {
+        _myLat = pos.latitude;
+        _myLon = pos.longitude;
+        _centerLat = _myLat;
+        _centerLon = _myLon;
+      });
+      _moveMap(LatLng(_myLat, _myLon), zoom: 15);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -118,8 +166,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       throw Exception('Нет доступа к геолокации');
     }
 
@@ -128,124 +175,68 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     );
   }
 
-  /* Future<void> _showShipmentOnMap(NearbyShipment shipment) async {
-    if (_mapWindow == null || shipment.stops.isEmpty) return;
-
-    setState(() {
-      _routeLoading = true;
-    });
-
-    try {
-      final stopsPoints = shipment.stops
-          .map(
-            (s) => ykit.Point(latitude: s.lat, longitude: s.lon),
-      )
-          .toList();
-
-      final polylinePoints =
-      await _routing.buildWalkingRoute(stopsPoints);
-
-      if (!mounted) return;
-
-      _updateRouteObjects(
-        polylinePoints: polylinePoints,
-        stops: stopsPoints,
-      );
-
-      final firstPoint = stopsPoints.first;
-      _mapWindow!.map.move(
-        ykit.CameraPosition(firstPoint, zoom: 17, azimuth: 0, tilt: 0),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Не удалось построить маршрут: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _routeLoading = false;
-        });
-      }
-    }
-  }
-
-  void _updateRouteObjects({
-    required List<ykit.Point> polylinePoints,
-    required List<ykit.Point> stops,
-  }) {
-    final map = _mapWindow?.map;
-    if (map == null) return;
-
-    final objects = map.mapObjects;
-
-    objects.clear();
-
-    if (polylinePoints.length >= 2) {
-      final polyline = objects.addPolyline();
-      polyline.geometry = ykit.Polyline(polylinePoints);
-      polyline.strokeWidth = 4;
-      polyline.outlineColor = Colors.white;
-    }
-
-    for (final p in stops) {
-      final circle = objects.addCircle(ykit.Circle as ykit.Circle);
-      circle.geometry = ykit.Circle(
-        p,
-        radius: 8,
-      );
-      circle.strokeWidth = 3;
-      circle.strokeColor = const Color(0xFFFFD2A7);
-      circle.fillColor = const Color(0xFFFFE3C4);
-    }
-  }
-
-
-  void _rejectCurrent() {
-    if (_shipments.isEmpty || _currentShipment == null) return;
-
-    final idx = _shipments.indexOf(_currentShipment!);
-    if (idx + 1 < _shipments.length) {
-      setState(() {
-        _currentShipment = _shipments[idx + 1];
-      });
-      _showShipmentOnMap(_currentShipment!);
-    } else {
-      setState(() {
-        _currentShipment = null;
-        _shipments = const [];
-        _showWelcome = true;
-      });
-      final map = _mapWindow?.map;
-      map?.mapObjects.clear();
-      if (map != null) {
-        map.move(
-          ykit.CameraPosition(_bishkekCenter, zoom: 14, azimuth: 0, tilt: 0),
-        );
-      }
-    }
-  }
-
-  void _acceptCurrent() {
-    if (_currentShipment == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Заказ ${_currentShipment!.publicCode} принят'),
-      ),
-    );
-  }
-*/
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final padding = MediaQuery.viewPaddingOf(context);
     final bottomSafe = padding.bottom;
 
+    final myPoint = LatLng(_myLat, _myLon);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(_centerLat, _centerLon),
+              initialZoom: 15,
+              onPositionChanged: (pos, hasGesture) {
+                final c = pos.center;
+                if (c == null) return;
+                _centerLat = c.latitude;
+                _centerLon = c.longitude;
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'kg.genesis.dogo',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: myPoint,
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: const _MeDot(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: true,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           if (_showWelcome)
             Align(
               alignment: Alignment.bottomCenter,
@@ -270,16 +261,98 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   12,
                   bottomSafe + viewInsets.bottom + 12,
                 ),
-                // child: _ShipmentSheet(
-                //   shipment: _currentShipment!,
-                //   accent: _accent,
-                //   routeLoading: _routeLoading,
-                //   onAccept: _acceptCurrent,
-                //   onReject: _rejectCurrent,
-                // ),
                 child: SizedBox.shrink(),
               ),
             ),
+
+          Positioned(
+            top: padding.top + 10,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1A000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _showWelcome ? 'Курьер' : 'На линии',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.0,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      _moveMap(LatLng(_myLat, _myLon), zoom: 15);
+                    },
+                    icon: const Icon(Icons.my_location_rounded, size: 18, color: Colors.black),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeDot extends StatelessWidget {
+  const _MeDot();
+
+  static const _accent = Color(0xFFFF8A00);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        color: _accent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white,
+          width: 3,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
     );
@@ -294,68 +367,74 @@ class _WelcomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(),
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0x1A000000),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Рады вас видеть',
-            style: TextStyle(
-              fontSize: 26,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Сатурн — шестая планета по удалённости от Солнца и вторая по размерам планета',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.3,
-              fontWeight: FontWeight.w400,
-              color: Color(0xFF9FA4AD),
-            ),
-          ),
-          const SizedBox(height: 22),
-          SizedBox(
-            height: 54,
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: loading ? null : onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF8A00),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Рады вас видеть',
+                style: TextStyle(
+                  fontSize: 26,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black,
                 ),
               ),
-              child: Text(
-                loading ? 'Загружаем…' : 'На линию',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 8),
+              const Text(
+                'Сатурн — шестая планета по удалённости от Солнца и вторая по размерам планета',
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.3,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF9FA4AD),
                 ),
               ),
-            ),
+              const SizedBox(height: 22),
+              SizedBox(
+                height: 54,
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: loading ? null : onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF8A00),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: Text(
+                    loading ? 'Загружаем…' : 'На линию',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
