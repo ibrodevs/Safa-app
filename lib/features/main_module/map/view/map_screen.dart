@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
 import 'package:dogo/features/main_module/map/view/components/deliveri_point_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:dgis_mobile_sdk_map/dgis.dart' as sdk;
+import '../../type_cargo/view/cargo_type_screen.dart' show CargoTypeResult, CargoRouteArgs;
 import '../../../../data/network/api_service.dart';
 import '../../type_cargo/view/cargo_type_screen.dart';
 import '../data/model/delivery_point_model.dart';
@@ -20,22 +24,20 @@ class OrderMapScreen extends StatefulWidget {
 
 class _OrderMapScreenState extends State<OrderMapScreen> {
   static const _accent = Color(0xFFFF8A00);
-  static const double _dotSize = 16;
 
-  final sdk.GeoPoint _bishkekCenter = const sdk.GeoPoint(
-    latitude: sdk.Latitude(42.8746),
-    longitude: sdk.Longitude(74.6122),
-  );
+  final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
 
-  late final sdk.Context _sdkContext;
-  late final sdk.MapWidgetController _mapWidgetController;
-  sdk.Map? _sdkMap;
+  // Мои реальные координаты (GPS) — для _HereBubble (маркер на карте)
+  double _myLat = 42.8746;
+  double _myLon = 74.6122;
 
-  // sdk.RouteEditor? _routeEditor;
-  // sdk.RouteEditorSource? _routeEditorSource;
+  // Центр карты (точка выбора) — для reverse/address при перетаскивании
+  double _centerLat = 42.8746;
+  double _centerLon = 74.6122;
 
-  double _userLat = 42.8746;
-  double _userLon = 74.6122;
+  final MapController _mapController = MapController();
+
+  Timer? _reverseDebounce;
 
   DeliveryPoint? _deliveryPoint;
   final List<DeliveryPoint> _intermediatePoints = [];
@@ -49,55 +51,88 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   @override
   void initState() {
     super.initState();
-
-    _sdkContext = sdk.DGis.initialize();
-    _mapWidgetController = sdk.MapWidgetController();
-
-    _mapWidgetController.getMapAsync((map) {
-      _sdkMap = map;
-    });
-
     _initLocation();
   }
 
   @override
   void dispose() {
-    // final map = _sdkMap;
-    // if (map != null && _routeEditorSource != null) {
-    //   map.removeSource(_routeEditorSource!);
-    // }
+    _reverseDebounce?.cancel();
     super.dispose();
   }
 
   Future<void> _initLocation() async {
     try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        perm = await Geolocator.requestPermission();
-      }
-
-      if (perm != LocationPermission.always &&
-          perm != LocationPermission.whileInUse) {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('Location service disabled');
+        await context.read<DeliveryAddressProvider>().fetchHereAddress(
+          lat: _bishkekCenter.latitude,
+          lon: _bishkekCenter.longitude,
+        );
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition();
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever) {
+        debugPrint('Location permission deniedForever');
+        await context.read<DeliveryAddressProvider>().fetchHereAddress(
+          lat: _bishkekCenter.latitude,
+          lon: _bishkekCenter.longitude,
+        );
+        return;
+      }
+      if (perm != LocationPermission.always && perm != LocationPermission.whileInUse) {
+        debugPrint('Location permission not granted: $perm');
+        await context.read<DeliveryAddressProvider>().fetchHereAddress(
+          lat: _bishkekCenter.latitude,
+          lon: _bishkekCenter.longitude,
+        );
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
 
       if (!mounted) return;
 
-      _userLat = pos.latitude;
-      _userLon = pos.longitude;
+      setState(() {
+        _myLat = pos.latitude;
+        _myLon = pos.longitude;
+        _centerLat = _myLat;
+        _centerLon = _myLon;
+      });
+      _mapController.move(LatLng(_myLat, _myLon), 15);
 
       await context.read<DeliveryAddressProvider>().fetchHereAddress(
-        lat: _userLat,
-        lon: _userLon,
+        lat: _centerLat,
+        lon: _centerLon,
       );
 
-      // if (_activeShipmentId != null && _deliveryPoint != null) {
-      //   await _buildRouteOnMap();
-      // }
-    } catch (_) {}
+      debugPrint('Location OK: $_myLat, $_myLon');
+    } catch (e, st) {
+      debugPrint('initLocation error: $e\n$st');
+      if (mounted) {
+        await context.read<DeliveryAddressProvider>().fetchHereAddress(
+          lat: _bishkekCenter.latitude,
+          lon: _bishkekCenter.longitude,
+        );
+      }
+    }
+  }
+
+
+  void _scheduleReverseByCenter(LatLng center) {
+    _reverseDebounce?.cancel();
+    _reverseDebounce = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      context.read<DeliveryAddressProvider>().fetchHereAddress(
+        lat: center.latitude,
+        lon: center.longitude,
+      );
+    });
   }
 
   Future<void> _openIntermediatePointSheet() async {
@@ -158,10 +193,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       setState(() {
         _deliveryPoint = result;
       });
-
-      // if (_activeShipmentId != null) {
-      //   await _buildRouteOnMap();
-      // }
     }
   }
 
@@ -173,13 +204,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
     final addressProvider = context.read<DeliveryAddressProvider>();
     final hereAddress = addressProvider.hereAddress;
-    final originTitle =
-    (hereAddress != null && hereAddress.isNotEmpty) ? hereAddress : 'Мой адрес';
+    final originTitle = (hereAddress != null && hereAddress.isNotEmpty) ? hereAddress : 'Мой адрес';
 
     stops.add({
       'title': originTitle,
-      'lat': _userLat,
-      'lon': _userLon,
+      'lat': _myLat, // старт именно от моих координат
+      'lon': _myLon,
     });
 
     for (final p in _intermediatePoints) {
@@ -214,8 +244,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         setState(() {
           _activeShipmentId = id;
         });
-
-        // await _buildRouteOnMap();
       }
     } catch (e) {
       if (!mounted) return;
@@ -246,13 +274,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         _deliveryPoint = null;
         _intermediatePoints.clear();
       });
-
-      // final map = _sdkMap;
-      // if (map != null && _routeEditorSource != null) {
-      //   map.removeSource(_routeEditorSource!);
-      //   _routeEditorSource = null;
-      //   _routeEditor = null;
-      // }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,80 +295,24 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   }) {
     final stops = <DeliveryPoint>[];
 
-    final startTitle =
-    (detailText != null && detailText.isNotEmpty) ? detailText : fromTitle;
+    final startTitle = (detailText != null && detailText.isNotEmpty) ? detailText : fromTitle;
     final startSubtitle = bazarTitle ?? '';
 
     stops.add(
       DeliveryPoint(
         title: startTitle,
         subtitle: startSubtitle,
-        lat: _userLat,
-        lon: _userLon,
+        lat: _myLat,
+        lon: _myLon,
       ),
     );
+
     stops.addAll(_intermediatePoints);
     if (_deliveryPoint != null) {
       stops.add(_deliveryPoint!);
     }
     return stops;
   }
-
-  /*
-  Future<void> _buildRouteOnMap() async {
-    final map = _sdkMap;
-    final dest = _deliveryPoint;
-    if (map == null || dest == null) return;
-
-    if (_routeEditorSource != null) {
-      map.removeSource(_routeEditorSource!);
-      _routeEditorSource = null;
-      _routeEditor = null;
-    }
-
-    final routeEditor = sdk.RouteEditor(_sdkContext);
-    final routeEditorSource = sdk.RouteEditorSource(_sdkContext, routeEditor);
-    map.addSource(routeEditorSource);
-
-    final startPoint = sdk.RouteSearchPoint(
-      coordinates: sdk.GeoPoint(
-        latitude: sdk.Latitude(_userLat),
-        longitude: sdk.Longitude(_userLon),
-      ),
-    );
-
-    final finishPoint = sdk.RouteSearchPoint(
-      coordinates: sdk.GeoPoint(
-        latitude: sdk.Latitude(dest.lat),
-        longitude: sdk.Longitude(dest.lon),
-      ),
-    );
-
-    final carOptions = sdk.CarRouteSearchOptions(
-      avoidTollRoads: true,
-      avoidUnpavedRoads: true,
-      avoidFerries: true,
-      avoidLockedRoads: true,
-      routeSearchType: sdk.RouteSearchType.jam,
-      excludedAreas: const [],
-    );
-
-    final routeSearchOptions = sdk.RouteSearchOptions.car(carOptions);
-
-    routeEditor.setRouteParams(
-      sdk.RouteEditorRouteParams(
-        startPoint: startPoint,
-        finishPoint: finishPoint,
-        routeSearchOptions: routeSearchOptions,
-      ),
-    );
-
-    setState(() {
-      _routeEditor = routeEditor;
-      _routeEditorSource = routeEditorSource;
-    });
-  }
-  */
 
   @override
   Widget build(BuildContext context) {
@@ -367,32 +332,68 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       fromTitle = 'Определяем адрес...';
     } else {
       final parsed = _parseAddressForUi(hereAddress);
-      fromTitle =
-      parsed.fullAfterCity.isNotEmpty ? parsed.fullAfterCity : hereAddress;
+      fromTitle = parsed.fullAfterCity.isNotEmpty ? parsed.fullAfterCity : hereAddress;
       bazarTitle = parsed.marketTitle;
       detailText = parsed.detail;
     }
 
+    final myPoint = LatLng(_myLat, _myLon);
+    final hereError = addressProvider.error;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          sdk.MapWidget(
-            sdkContext: _sdkContext,
-            mapOptions: sdk.MapOptions(),
-            controller: _mapWidgetController,
-          ),
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(_centerLat, _centerLon),
+              initialZoom: 15,
+              onPositionChanged: (pos, hasGesture) {
+                final c = pos.center;
+                if (c == null) return;
 
-          if (!_searchMode)
-            Align(
-              alignment: Alignment.center,
-              child: _UserMarker(
-                address: hereAddress,
-                loading: hereLoading,
-                marketTitle: bazarTitle,
-                detail: detailText,
-              ),
+                _centerLat = c.latitude;
+                _centerLon = c.longitude;
+
+                if (hasGesture) {
+                  _scheduleReverseByCenter(c);
+                }
+              },
             ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'kg.genesis.dogo',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: myPoint,
+                    width: 220,
+                    height: 140,
+                    alignment: Alignment.center,
+                    child: Transform.translate(
+                      offset: const Offset(0, -55),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _HereBubble(
+                            address: hereAddress,
+                            loading: hereLoading,
+                            error: hereError,
+                            marketTitle: bazarTitle,
+                            detail: detailText,
+                          ),
+                          const SizedBox(height: 8),
+                          const _MeDot(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
 
           Positioned(
             left: 16,
@@ -422,8 +423,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     Expanded(
                       child: _InputTile(
                         iconAsset: 'assets/icons/ic_box.svg',
-                        title:
-                        _deliveryPoint?.title ?? 'Куда доставить',
+                        title: _deliveryPoint?.title ?? 'Куда доставить',
                         enabled: _deliveryPoint != null,
                         onTap: _openDeliveryPointSheet,
                       ),
@@ -442,10 +442,16 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     onPressed: (_deliveryPoint == null || _creatingShipment)
                         ? null
                         : () async {
-                      final result =
-                      await context.push<CargoTypeResult>(
-                        '/type_cargo',
+                      final stops = _buildStopsForSearchSheet(
+                        fromTitle: fromTitle,
+                        bazarTitle: bazarTitle,
+                        detailText: detailText,
                       );
+                      final result = await context.push<CargoTypeResult>(
+                        '/type_cargo',
+                        extra: CargoRouteArgs(stops: stops),
+                      );
+
                       if (result != null && mounted) {
                         await _createShipmentWithCargo(result);
                       }
@@ -461,11 +467,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    child: Text(
-                      _creatingShipment
-                          ? 'Создаём заказ…'
-                          : 'Далее',
-                    ),
+                    child: Text(_creatingShipment ? 'Создаём заказ…' : 'Далее'),
                   ),
                 ),
               ],
@@ -547,6 +549,7 @@ class _HereBubble extends StatelessWidget {
     this.loading = false,
     this.marketTitle,
     this.detail,
+    this.error,
   });
 
   final VoidCallback? onEdit;
@@ -554,7 +557,7 @@ class _HereBubble extends StatelessWidget {
   final bool loading;
   final String? marketTitle;
   final String? detail;
-
+  final String? error;
   static const _tileBorder = Color(0xFFE9EDF2);
   static const _greyText = Color(0xFF9FA4AD);
 
@@ -579,7 +582,12 @@ class _HereBubble extends StatelessWidget {
         subtitleLine = parsed.detail ?? parsed.fullAfterCity;
       }
     }
+    if (error != null && error!.isNotEmpty) {
+      titleLine = 'Не удалось получить адрес';
+      subtitleLine = 'Проверь интернет / доступ к геокодингу';
+    } else if (loading) {
 
+    }
     return Material(
       color: Colors.white,
       elevation: 10,
@@ -709,10 +717,7 @@ class _InputTile extends StatelessWidget {
                 iconAsset,
                 width: 20,
                 height: 20,
-                colorFilter: const ColorFilter.mode(
-                  _accent,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -930,8 +935,7 @@ _ParsedAddress _parseAddressForUi(String? address) {
   if (marketIdx != -1) {
     final raw = rest[marketIdx];
     const prefix = 'рынок ';
-    var name =
-    raw.startsWith(prefix) ? raw.substring(prefix.length).trim() : raw;
+    var name = raw.startsWith(prefix) ? raw.substring(prefix.length).trim() : raw;
     if (name.isEmpty) {
       name = raw;
     }

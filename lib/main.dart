@@ -16,6 +16,10 @@ import 'features/auth_module/register/provider/auth_provider.dart';
 import 'features/main_module/map/data/repo/delivery_geo_repository.dart';
 import 'features/main_module/map/provider/delivery_address_provider.dart';
 import 'features/main_module/map/provider/delivery_autocomplete_provider.dart';
+import 'features/main_module/profile/data/repo/notifications_repo.dart';
+import 'features/main_module/profile/data/repo/profile_repo.dart';
+import 'features/main_module/profile/provider/notifications_provider.dart';
+import 'features/main_module/profile/provider/profile_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
@@ -49,7 +53,8 @@ Future<void> main() async {
   final api = ApiService();
   final authRepo = AuthRepository(api);
   final geoRepo = DeliveryGeoRepository(api);
-
+  final profileRepo = ProfileRepository(api);
+  final notiRepo = NotificationsRepository(api);
   runApp(
     MultiProvider(
       providers: [
@@ -62,6 +67,12 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => DeliveryAutocompleteProvider(geoRepo),
         ),
+        ChangeNotifierProvider(
+          create: (_) => ProfileProvider(repo: profileRepo),
+        ),
+        /*ChangeNotifierProvider(
+          create: (_) => NotificationsProvider(repo: notiRepo),
+        )*/
       ],
       child: const DoGoApp(),
     ),

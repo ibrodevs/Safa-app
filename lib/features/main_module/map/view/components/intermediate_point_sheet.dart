@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/model/delivery_point_model.dart';
+import '../../provider/delivery_address_provider.dart';
 import '../../provider/delivery_autocomplete_provider.dart';
+import 'map_picker_screen.dart';
 
 class IntermediatePointSheet extends StatefulWidget {
   const IntermediatePointSheet({
@@ -144,7 +147,28 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                       const SizedBox(width: 12),
                       InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () {
+                        onTap: () async {
+                          FocusScope.of(context).unfocus();
+                          context.read<DeliveryAutocompleteProvider>().clearSuggestions();
+
+                          final p = await Navigator.of(context).push<DeliveryPoint>(
+                            MaterialPageRoute(
+                              builder: (_) => MultiProvider(
+                                providers: [
+                                  ChangeNotifierProvider.value(value: context.read<DeliveryAddressProvider>()),
+                                  ChangeNotifierProvider.value(value: context.read<DeliveryAutocompleteProvider>()),
+                                ],
+                                child: const MapPickerScreen(
+                                  initial: LatLng(42.8746, 74.6122),
+                                  title: 'Промежуточная точка',
+                                ),
+                              ),
+                            ),
+                          );
+
+                          if (p != null && mounted) {
+                            Navigator.of(context).pop(p);
+                          }
                         },
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),

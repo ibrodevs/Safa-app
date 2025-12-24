@@ -1,9 +1,12 @@
 import 'package:dogo/features/main_module/map/provider/delivery_autocomplete_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/model/delivery_point_model.dart';
+import '../../provider/delivery_address_provider.dart';
+import 'map_picker_screen.dart';
 
 class DeliveryPointSheet extends StatelessWidget {
   const DeliveryPointSheet({
@@ -179,8 +182,28 @@ class _DeliveryPointContentState extends State<_DeliveryPointContent> {
               ),
               const SizedBox(width: 12),
               TextButton.icon(
-                onPressed: () {
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
+                  context.read<DeliveryAutocompleteProvider>().clearSuggestions();
 
+                  final p = await Navigator.of(context).push<DeliveryPoint>(
+                    MaterialPageRoute(
+                      builder: (_) => MultiProvider(
+                        providers: [
+                          ChangeNotifierProvider.value(value: context.read<DeliveryAddressProvider>()),
+                          ChangeNotifierProvider.value(value: context.read<DeliveryAutocompleteProvider>()),
+                        ],
+                        child: const MapPickerScreen(
+                          initial: LatLng(42.8746, 74.6122),
+                          title: 'Точка доставки',
+                        ),
+                      ),
+                    ),
+                  );
+
+                  if (p != null && context.mounted) {
+                    Navigator.of(context).pop(p);
+                  }
                 },
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(

@@ -13,10 +13,12 @@ class ProfileProvider extends ChangeNotifier {
 
   ProfileModel? _profile;
   bool _loading = false;
+  bool _saving = false;
   String? _error;
 
   ProfileModel? get profile => _profile;
   bool get loading => _loading;
+  bool get saving => _saving;
   String? get error => _error;
 
   Future<void> loadProfile() async {
@@ -37,5 +39,49 @@ class ProfileProvider extends ChangeNotifier {
 
     _loading = false;
     notifyListeners();
+  }
+
+  Future<bool> updateProfile({
+    String? firstName,
+    String? city,
+    String? avatar,
+    int? rate,
+    int? clientRateCount,
+  }) async {
+    final current = _profile;
+    if (current == null) {
+      _error = 'Профиль не загружен';
+      notifyListeners();
+      return false;
+    }
+
+    _saving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updated = await _repo.patchProfile(
+        id: current.id,
+        firstName: firstName,
+        city: city,
+        avatar: avatar,
+        rate: rate,
+        clientRateCount: clientRateCount,
+      );
+      _profile = updated;
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
+    } catch (e, st) {
+      _error = 'Не удалось обновить профиль';
+      if (kDebugMode) {
+        print('ProfileProvider.updateProfile error: $e\n$st');
+      }
+      return false;
+    } finally {
+      _saving = false;
+      notifyListeners();
+    }
   }
 }

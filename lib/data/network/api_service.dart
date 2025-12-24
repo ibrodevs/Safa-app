@@ -15,6 +15,7 @@ import '../../features/main_module/history/data/model/shipment_history_models.da
 import '../../features/main_module/map/data/model/delivery_reverse_geo.dart';
 import '../../features/main_module/profile/data/model/profile_model.dart';
 import '../../features/main_module/type_cargo/data/model/cargo_segment_model.dart';
+import '../services/http_logger.dart';
 import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
 
@@ -53,7 +54,8 @@ final class ApiService {
         },
       ),
     );
-
+    _dio.interceptors.add(HttpLoggerInterceptor());
+    _authDio.interceptors.add(HttpLoggerInterceptor());
     _dio.interceptors.add(
       QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -369,6 +371,33 @@ final class ApiService {
       );
     } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Не удалось отправить код в WhatsApp');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+  Future<ProfileModel> patchProfile({
+    required int? id,
+    String? firstName,
+    String? city,
+    String? avatar,
+    int? rate,
+    int? clientRateCount,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (firstName != null) data['first_name'] = firstName;
+      if (city != null) data['city'] = city;
+      if (avatar != null) data['avatar'] = avatar;
+      if (rate != null) data['rate'] = rate;
+      if (clientRateCount != null) data['client_rate_count'] = clientRateCount;
+
+      final path = (id != null) ? 'users/profile/$id/' : 'users/profile/';
+
+      final resp = await _dio.patch(path, data: data);
+      final map = _asMap(resp.data);
+      return ProfileModel.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось обновить профиль');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }

@@ -17,25 +17,23 @@ class DeliveryAddressProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
-  Future<void> fetchHereAddress({
-    required double lat,
-    required double lon,
-  }) async {
+  Future<void> fetchHereAddress({required double lat, required double lon}) async {
     _loading = true;
     _error = null;
     notifyListeners();
-
     try {
+      debugPrint('reverse request: lat=$lat lon=$lon');
       final result = await _repo.getAddress(lat: lat, lon: lon);
+      debugPrint('reverse response: ${result.address}');
       _here = result;
     } catch (e, st) {
       _error = e.toString();
-      if (kDebugMode) {
-        print('fetchHereAddress error: $e\n$st');
-      }
+      debugPrint('fetchHereAddress error: $e\n$st');
+      _here = null;
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
+
 }

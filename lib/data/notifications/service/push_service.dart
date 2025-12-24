@@ -54,19 +54,16 @@ class PushService {
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
       _routeFromData(msg.data);
     });
-
     final initial = await _fm.getInitialMessage();
     if (initial != null) {
       _routeFromData(initial.data);
     }
-
     _fm.onTokenRefresh.listen((t) {
       _lastToken = t;
       if (kDebugMode) {
         print('🔁 Token refreshed: $t');
       }
     });
-
     _inited = true;
   }
 
@@ -124,11 +121,11 @@ class PushService {
       );
       await prefs.setBool(key, true);
       if (kDebugMode) {
-        print('📮 FCM registered on server [$platform/$kind]');
+        print('FCM registered on server [$platform/$kind]');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ FCM register failed: $e');
+        print('FCM register failed: $e');
       }
     }
   }

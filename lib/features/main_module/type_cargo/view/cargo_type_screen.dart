@@ -3,10 +3,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../map/data/model/delivery_point_model.dart';
 import '../data/model/cargo_segment_model.dart';
 import '../data/repo/cargo_segments_repo.dart';
 import '../provider/cargo_segments_provider.dart';
-
+class CargoRouteArgs {
+  final List<DeliveryPoint> stops;
+  const CargoRouteArgs({required this.stops});
+}
 class CargoTypeScreen extends StatelessWidget {
   const CargoTypeScreen({super.key});
 
@@ -45,6 +49,9 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
   Widget build(BuildContext context) {
     final provider = context.watch<CargoSegmentsProvider>();
     final segments = provider.items;
+    final extra = GoRouterState.of(context).extra;
+    final routeArgs = extra is CargoRouteArgs ? extra : null;
+    final stops = routeArgs?.stops ?? const <DeliveryPoint>[];
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -89,21 +96,30 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
               ),
               const SizedBox(height: 18),
 
-              const _PlaceLine(
-                title: 'Контейнер 74, 8 проход',
-                subtitle: 'Алкан базары',
-              ),
-              const SizedBox(height: 6),
-              const Icon(
-                Icons.arrow_downward_rounded,
-                size: 28,
-                color: Colors.black,
-              ),
-              const SizedBox(height: 6),
-              const _PlaceLine(
-                title: 'Контейнер 19, 9 проход',
-                subtitle: 'Кытай базары',
-              ),
+              if (stops.isNotEmpty) ...[
+                for (int i = 0; i < stops.length; i++) ...[
+                  _PlaceLine(
+                    title: stops[i].title,
+                    subtitle: stops[i].subtitle,
+                  ),
+                  if (i != stops.length - 1) ...[
+                    const SizedBox(height: 6),
+                    const Icon(
+                      Icons.arrow_downward_rounded,
+                      size: 28,
+                      color: Colors.black,
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+                const SizedBox(height: 18),
+              ] else ...[
+                const _PlaceLine(
+                  title: 'Маршрут не выбран',
+                  subtitle: 'Вернитесь и выберите точки на карте',
+                ),
+                const SizedBox(height: 18),
+              ],
               const SizedBox(height: 18),
 
               if (provider.loading && segments.isEmpty)
@@ -380,11 +396,15 @@ class _PlaceLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSub = subtitle.trim().isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontSize: 17,
             height: 1.15,
@@ -392,16 +412,20 @@ class _PlaceLine extends StatelessWidget {
             color: Colors.black,
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            fontSize: 15,
-            height: 1.2,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF9FA4AD),
+        if (hasSub) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF9FA4AD),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

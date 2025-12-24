@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class ProfileAccountScreen extends StatelessWidget {
+import '../../provider/profile_provider.dart';
+
+class ProfileAccountScreen extends StatefulWidget {
   const ProfileAccountScreen({super.key});
 
   static const _accent = Color(0xFFFF8A00);
@@ -8,11 +11,45 @@ class ProfileAccountScreen extends StatelessWidget {
   static const _tileBorder = Color(0xFFE9EDF2);
 
   @override
+  State<ProfileAccountScreen> createState() => _ProfileAccountScreenState();
+}
+
+class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
+  bool _requested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_requested) return;
+    _requested = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ProfileProvider>().loadProfile();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Здесь пока заглушки — потом можно будет прокинуть реальные данные профиля.
-    const name = 'Ваше имя';
-    const phone = '+996 XXX XX XX XX';
-    const city = 'Ваш город';
+    final p = context.watch<ProfileProvider>();
+
+    final profile = p.profile;
+    final loading = p.loading;
+    final error = p.error;
+
+    final name = profile == null
+        ? '—'
+        : (profile.firstName.trim().isEmpty ? '—' : profile.firstName.trim());
+    final phone = profile == null
+        ? '—'
+        : (profile.phoneNumber.trim().isEmpty
+              ? '—'
+              : profile.phoneNumber.trim());
+    final city = profile == null
+        ? '—'
+        : ((profile.city ?? '').trim().isEmpty
+              ? '—'
+              : (profile.city ?? '').trim());
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -47,13 +84,20 @@ class ProfileAccountScreen extends StatelessWidget {
                       color: Colors.black,
                     ),
                   ),
+                  const Spacer(),
+                  if (loading)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                 ],
               ),
             ),
             const Divider(
               height: 1,
               thickness: 1,
-              color: _tileBorder,
+              color: ProfileAccountScreen._tileBorder,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -62,6 +106,14 @@ class ProfileAccountScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (error != null) ...[
+                      _ErrorCard(
+                        text: error,
+                        onRetry: () =>
+                            context.read<ProfileProvider>().loadProfile(),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
                     const Text(
                       'Личные данные',
                       style: TextStyle(
@@ -78,46 +130,54 @@ class ProfileAccountScreen extends StatelessWidget {
                         fontSize: 13,
                         height: 1.25,
                         fontWeight: FontWeight.w500,
-                        color: _greyText,
+                        color: ProfileAccountScreen._greyText,
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _tileBorder, width: 1),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x11000000),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                          BoxShadow(
-                            color: Color(0x08000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                    _Card(
                       child: Column(
                         children: [
                           _AccountTile(
                             label: 'Имя и фамилия',
                             value: name,
-                            onTap: () => _showSoonSnack(context),
+                            onTap: profile == null
+                                ? null
+                                : () => _openEditDialog(
+                                    context,
+                                    title: 'Имя и фамилия',
+                                    hint: 'Введите имя',
+                                    initialValue: profile.firstName,
+                                    keyboardType: TextInputType.name,
+                                    onSave: (v) => context
+                                        .read<ProfileProvider>()
+                                        .updateProfile(firstName: v.trim()),
+                                  ),
                           ),
                           const _AccountDivider(),
                           _AccountTile(
                             label: 'Город',
                             value: city,
-                            onTap: () => _showSoonSnack(context),
+                            onTap: profile == null
+                                ? null
+                                : () => _openEditDialog(
+                                    context,
+                                    title: 'Город',
+                                    hint: 'Введите город',
+                                    initialValue: profile.city ?? '',
+                                    keyboardType: TextInputType.text,
+                                    onSave: (v) => context
+                                        .read<ProfileProvider>()
+                                        .updateProfile(city: v.trim()),
+                                  ),
                           ),
                           const _AccountDivider(),
                           _AccountTile(
                             label: 'Номер телефона',
                             value: phone,
-                            onTap: () => _showSoonSnack(context),
+                            onTap: () => _showSnack(
+                              context,
+                              'Телефон меняется через подтверждение (OTP).',
+                            ),
                           ),
                         ],
                       ),
@@ -133,24 +193,7 @@ class ProfileAccountScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _tileBorder, width: 1),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x11000000),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                          BoxShadow(
-                            color: Color(0x08000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                    _Card(
                       child: Column(
                         children: [
                           _AccountTile(
@@ -158,11 +201,11 @@ class ProfileAccountScreen extends StatelessWidget {
                             value: 'Рекомендуется',
                             valueStyle: const TextStyle(
                               fontSize: 13,
-                              color: _greyText,
+                              color: ProfileAccountScreen._greyText,
                               fontWeight: FontWeight.w500,
                               height: 1.2,
                             ),
-                            onTap: () => _showSoonSnack(context),
+                            onTap: () => _showSnack(context, 'Сделаем позже.'),
                           ),
                           const _AccountDivider(),
                           _AccountTile(
@@ -174,7 +217,7 @@ class ProfileAccountScreen extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               height: 1.2,
                             ),
-                            onTap: () => _showSoonSnack(context),
+                            onTap: () => _showSnack(context, 'Сделаем позже.'),
                             showChevron: false,
                           ),
                         ],
@@ -190,10 +233,358 @@ class ProfileAccountScreen extends StatelessWidget {
     );
   }
 
-  void _showSoonSnack(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Функционал редактирования будет добавлен позже.'),
+  Future<void> _openEditDialog(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    required String initialValue,
+    required TextInputType keyboardType,
+    required Future<bool> Function(String value) onSave,
+  }) async {
+    String? errorText;
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final controller = TextEditingController(text: initialValue);
+            final focusNode = FocusNode();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: StatefulBuilder(
+                builder: (ctx, setState) {
+                  final saving = ctx.watch<ProfileProvider>().saving;
+                  return Container(
+                    margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x22000000),
+                          blurRadius: 28,
+                          offset: Offset(0, 14),
+                        ),
+                        BoxShadow(
+                          color: Color(0x0A000000),
+                          blurRadius: 10,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(999),
+                              onTap: saving
+                                  ? null
+                                  : () => Navigator.of(ctx).pop(false),
+                              child: const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.black,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          keyboardType: keyboardType,
+                          textInputAction: TextInputAction.done,
+                          autofocus: true,
+                          onChanged: (_) {
+                            if (errorText != null)
+                              setState(() => errorText = null);
+                          },
+                          onSubmitted: (_) async {
+                            if (saving) return;
+                            await _trySave(
+                              ctx,
+                              controller.text,
+                              setState,
+                              (e) => errorText = e,
+                              onSave,
+                            );
+                          },
+                          decoration: InputDecoration(
+                            hintText: hint,
+                            errorText: errorText,
+                            filled: true,
+                            fillColor: const Color(0xFFF7F8FA),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: ProfileAccountScreen._tileBorder,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: ProfileAccountScreen._tileBorder,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: ProfileAccountScreen._accent,
+                                width: 1.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: OutlinedButton(
+                                  onPressed: saving
+                                      ? null
+                                      : () => Navigator.of(ctx).pop(false),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: ProfileAccountScreen._tileBorder,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Отмена',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed: saving
+                                      ? null
+                                      : () async {
+                                          await _trySave(
+                                            ctx,
+                                            controller.text,
+                                            setState,
+                                            (e) => errorText = e,
+                                            onSave,
+                                          );
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        ProfileAccountScreen._accent,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: saving
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Сохранить',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (ok == true && mounted) {
+      _showSnack(context, 'Сохранено');
+    }
+  }
+
+  Future<void> _trySave(
+    BuildContext ctx,
+    String raw,
+    void Function(void Function()) setState,
+    void Function(String? e) setError,
+    Future<bool> Function(String value) onSave,
+  ) async {
+    final v = raw.trim();
+    if (v.isEmpty) {
+      setState(() => setError('Поле не может быть пустым'));
+      return;
+    }
+
+    final ok = await onSave(v);
+    if (!ctx.mounted) return;
+
+    if (ok) {
+      Navigator.of(ctx).pop(true);
+    } else {
+      final err = ctx.read<ProfileProvider>().error ?? 'Не удалось сохранить';
+      setState(() => setError(err));
+    }
+  }
+
+  void _showSnack(BuildContext context, String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+}
+
+class _Card extends StatelessWidget {
+  const _Card({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ProfileAccountScreen._tileBorder, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.text, required this.onRetry});
+
+  final String text;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD6D6)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 20,
+            color: Color(0xFFCC2B2B),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Не удалось загрузить профиль',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.25,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF7A2B2B),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 36,
+                  child: OutlinedButton(
+                    onPressed: onRetry,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFFB5B5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Повторить',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFCC2B2B),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -219,8 +610,6 @@ class _AccountTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasValue = value.isNotEmpty;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -241,30 +630,25 @@ class _AccountTile extends StatelessWidget {
                       color: Colors.black,
                     ),
                   ),
-                  if (hasValue) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: valueStyle ??
-                          const TextStyle(
-                            fontSize: 15,
-                            height: 1.2,
-                            fontWeight: FontWeight.w500,
-                            color: _greyText,
-                          ),
-                    ),
-                  ],
+                  const SizedBox(height: 4),
+                  Text(
+                    value.isEmpty ? '—' : value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        valueStyle ??
+                        const TextStyle(
+                          fontSize: 15,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                          color: _greyText,
+                        ),
+                  ),
                 ],
               ),
             ),
             if (showChevron)
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color: _chev,
-              ),
+              const Icon(Icons.chevron_right_rounded, size: 22, color: _chev),
           ],
         ),
       ),
@@ -277,10 +661,6 @@ class _AccountDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      height: 1,
-      thickness: 1,
-      color: Color(0xFFE9EDF2),
-    );
+    return const Divider(height: 1, thickness: 1, color: Color(0xFFE9EDF2));
   }
 }
