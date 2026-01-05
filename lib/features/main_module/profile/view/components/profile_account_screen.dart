@@ -1,6 +1,9 @@
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../data/services/logout_service.dart';
 import '../../provider/profile_provider.dart';
 
 class ProfileAccountScreen extends StatefulWidget {
@@ -210,14 +213,15 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
                           const _AccountDivider(),
                           _AccountTile(
                             label: 'Выйти из аккаунта',
-                            value: '',
+                            value: 'при выходе все данные сохранятся',
                             valueStyle: const TextStyle(
                               fontSize: 13,
-                              color: Colors.red,
+                              color: AppColors.red2,
+                              fontFamily: 'SFProText',
                               fontWeight: FontWeight.w600,
                               height: 1.2,
                             ),
-                            onTap: () => _showSnack(context, 'Сделаем позже.'),
+                            onTap: () => _showLogoutSheet(context),
                             showChevron: false,
                           ),
                         ],
@@ -232,7 +236,24 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
       ),
     );
   }
+  Future<void> _showLogoutSheet(BuildContext context) async {
+    final res = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => const _LogoutSheet(),
+    );
 
+    if (res != true || !context.mounted) return;
+
+    await const LogoutService().logout();
+
+    if (!context.mounted) return;
+
+    context.go('/');
+  }
   Future<void> _openEditDialog(
     BuildContext context, {
     required String title,
@@ -589,7 +610,135 @@ class _ErrorCard extends StatelessWidget {
     );
   }
 }
+class _LogoutSheet extends StatelessWidget {
+  const _LogoutSheet();
 
+  static const _radius = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottom),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E8EA),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE9EA),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFE53935),
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Выйти из аккаунта?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Мы удалим данные сессии на этом устройстве. Вы сможете войти снова в любое время.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.25,
+                color: Color(0xFF7B808A),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE7E8EA)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        foregroundColor: const Color(0xFF111318),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: const Text('Отмена'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE53935),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('Выйти'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 class _AccountTile extends StatelessWidget {
   const _AccountTile({
     required this.label,

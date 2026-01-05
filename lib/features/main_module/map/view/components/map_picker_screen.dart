@@ -36,17 +36,29 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   @override
   void initState() {
     super.initState();
-    _center = widget.initial;
+
+    final p = context.read<DeliveryAddressProvider>();
+
+    final lat = p.fromLat;
+    final lon = p.fromLon;
+
+    if (lat != null && lon != null) {
+      _center = LatLng(lat, lon);
+    } else {
+      _center = widget.initial;
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       context.read<DeliveryAutocompleteProvider>().clearSuggestions();
-      await context.read<DeliveryAddressProvider>().fetchHereAddress(
+      _mapController.move(_center, 15);
+      await context.read<DeliveryAddressProvider>().fetchPickerHereAddress(
         lat: _center.latitude,
         lon: _center.longitude,
       );
     });
   }
+
 
   @override
   void dispose() {
@@ -60,7 +72,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _reverseDebounce?.cancel();
     _reverseDebounce = Timer(const Duration(milliseconds: 650), () {
       if (!mounted) return;
-      context.read<DeliveryAddressProvider>().fetchHereAddress(
+      context.read<DeliveryAddressProvider>().fetchPickerHereAddress(
         lat: c.latitude,
         lon: c.longitude,
       );
@@ -78,9 +90,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final autocomplete = context.watch<DeliveryAutocompleteProvider>();
     final address = context.watch<DeliveryAddressProvider>();
 
-    final hereAddress = address.hereAddress ?? '';
-    final hereLoading = address.loading;
-    final hereError = address.error;
+
+    final hereAddress = address.pickerHereAddress ?? '';
+    final hereLoading = address.pickerLoading;
+    final hereError = address.pickerError;
+
 
     return Scaffold(
       backgroundColor: Colors.white,

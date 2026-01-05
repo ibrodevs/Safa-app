@@ -1,5 +1,6 @@
 name: dogo
-description: DoGo
+description: "DoGo"
+publish_to: 'none'
 
 version: 1.0.0+1
 
@@ -83,6 +84,12 @@ flutter:
           weight: 600
         - asset: assets/fonts/SFProText-Bold.ttf
           weight: 700
+    - family: SFProDisplay
+      fonts:
+        - asset: assets/fonts/SF-Pro-Display-Medium.otf
+          weight: 500
+        - asset: assets/fonts/SF-Pro-Display-Semibold.otf
+          weight: 600
 
 flutter_launcher_icons:
   android: true

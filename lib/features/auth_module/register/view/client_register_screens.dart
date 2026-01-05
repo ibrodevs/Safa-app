@@ -83,99 +83,109 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     final loading = context.watch<AuthProvider>().loading;
-
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + bottom),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ClientTitleBlock(),
-              const SizedBox(height: 18),
-              ShadowField(
-                child: AppTextField(
-                  controller: _name,
-                  hint: 'Имя',
-                  prefixText: '  ',
-                ),
-              ),
-              const SizedBox(height: 14),
-              ShadowField(
-                child: AppTextField(
-                  controller: _phone,
-                  hint: 'Телефон с WhatsApp',
-                  keyboardType: TextInputType.phone,
-                  prefixText: '+',
-                ),
-              ),
-              const SizedBox(height: 14),
-              ShadowField(
-                child: AppTextField(
-                  controller: _pass,
-                  hint: 'Пароль',
-                  prefixText: '  ',
-                  obscure: _passObscured,
-                  suffix: PasswordEye(
-                    obscured: _passObscured,
-                    onTap: () {
-                      setState(() {
-                        _passObscured = !_passObscured;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ShadowField(
-                child: AppTextField(
-                  controller: _pass2,
-                  hint: 'Повторите пароль',
-                  prefixText: '  ',
-                  obscure: _pass2Obscured,
-                  suffix: PasswordEye(
-                    obscured: _pass2Obscured,
-                    onTap: () {
-                      setState(() {
-                        _pass2Obscured = !_pass2Obscured;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              PrimaryButton(
-                text: loading ? 'Отправка...' : 'Далее',
-                onPressed: loading ? null : _onNext,
-              ),
-              const SizedBox(height: 18),
-              Center(
-                child: TextButton(
-                  onPressed: () => context.pop(),
-                  child: const Text(
-                    'Отменить регистрацию',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      height: 1.25,
-                      color: Color(0xFFB9C0C8),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + keyboard),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ClientTitleBlock(),
+                  const SizedBox(height: 18),
+                  ShadowField(
+                    child: AppTextField(
+                      controller: _name,
+                      hint: 'Имя',
+                      prefixText: '  ',
                     ),
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  ShadowField(
+                    child: AppTextField(
+                      controller: _phone,
+                      hint: 'Телефон с WhatsApp',
+                      keyboardType: TextInputType.phone,
+                      prefixText: '+',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ShadowField(
+                    child: AppTextField(
+                      controller: _pass,
+                      hint: 'Пароль',
+                      prefixText: '  ',
+                      obscure: _passObscured,
+                      suffix: PasswordEye(
+                        obscured: _passObscured,
+                        onTap: () {
+                          setState(() {
+                            _passObscured = !_passObscured;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ShadowField(
+                    child: AppTextField(
+                      controller: _pass2,
+                      hint: 'Повторите пароль',
+                      prefixText: '  ',
+                      obscure: _pass2Obscured,
+                      suffix: PasswordEye(
+                        obscured: _pass2Obscured,
+                        onTap: () {
+                          setState(() {
+                            _pass2Obscured = !_pass2Obscured;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  PrimaryButton(
+                    text: loading ? 'Отправка...' : 'Далее',
+                    onPressed: loading ? null : _onNext,
+                  ),
+                  const SizedBox(height: 18),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text(
+                        'Отменить регистрацию',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          height: 1.25,
+                          color: Color(0xFFB9C0C8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height:240),
+                ],
               ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: const Hero(
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: bottomPadding,
+              child: const Center(
+                child: Hero(
                   tag: 'register_dots',
                   child: RegisterDotsIndicator(activeIndex: 1),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

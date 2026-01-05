@@ -1,7 +1,7 @@
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dogo/data/network/api_service.dart';
-
 import '../../data/model/app_notification_model.dart';
 import '../../data/repo/notifications_repo.dart';
 import '../../provider/notifications_provider.dart';
@@ -15,9 +15,6 @@ class ProfileNotificationsScreen extends StatefulWidget {
 }
 
 class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen> {
-  static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
-  static const _tileBorder = Color(0xFFE9EDF2);
 
   bool _newShipments = true;
   bool _statusUpdates = true;
@@ -64,7 +61,7 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
           final p = context.watch<NotificationsProvider>();
 
           return Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.white,
             body: SafeArea(
               bottom: false,
               child: Column(
@@ -82,7 +79,7 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                             child: Icon(
                               Icons.arrow_back_ios_new_rounded,
                               size: 20,
-                              color: Colors.black,
+                              color: AppColors.black,
                             ),
                           ),
                         ),
@@ -93,7 +90,7 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                             fontSize: 20,
                             height: 1.05,
                             fontWeight: FontWeight.w900,
-                            color: Colors.black,
+                            color: AppColors.black,
                           ),
                         ),
                         const Spacer(),
@@ -101,10 +98,10 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                       ],
                     ),
                   ),
-                  const Divider(height: 1, thickness: 1, color: _tileBorder),
+                  const Divider(height: 1, thickness: 1, color: AppColors.tileBorder),
                   Expanded(
                     child: RefreshIndicator(
-                      color: _accent,
+                      color: AppColors.accent,
                       onRefresh: p.refresh,
                       child: SingleChildScrollView(
                         controller: _scroll,
@@ -114,17 +111,17 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _tileBorder, width: 1),
+                                border: Border.all(color: AppColors.tileBorder, width: 1),
                                 boxShadow: const [
                                   BoxShadow(
-                                    color: Color(0x11000000),
+                                    color: AppColors.boxShadow,
                                     blurRadius: 20,
                                     offset: Offset(0, 8),
                                   ),
                                   BoxShadow(
-                                    color: Color(0x08000000),
+                                    color: AppColors.boxShadow2,
                                     blurRadius: 8,
                                     offset: Offset(0, 2),
                                   ),
@@ -197,12 +194,12 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                             ],
                             const SizedBox(height: 10),
                             Text(
-                              'Источник: /api/fcm/notifications/ (page, page_size, is_read=0/1).',
+                              'Источник: сервер',
                               style: const TextStyle(
                                 fontSize: 12,
                                 height: 1.3,
                                 fontWeight: FontWeight.w500,
-                                color: _greyText,
+                                color: AppColors.grey,
                               ),
                             ),
                           ],
@@ -255,7 +252,10 @@ class _NotificationsBody extends StatelessWidget {
         for (final n in provider.items)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _NotificationCard(n: n),
+            child: _NotificationCard(
+              n: n,
+              onTap: () => provider.markRead(n.id),
+            ),
           ),
       ],
     );
@@ -263,128 +263,136 @@ class _NotificationsBody extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.n});
+  const _NotificationCard({
+    required this.n,
+    this.onTap,
+  });
 
   final AppNotificationModel n;
-
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final icon = _iconFor(n.channel);
     final meta = _formatTime(n.createdAt);
+    final r = BorderRadius.circular(14);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: n.isRead ? Colors.white : const Color(0xFFFFF7EE),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _tileBorder, width: 1),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: n.isRead ? const Color(0xFFF7F8FA) : const Color(0xFFFFE6CC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _tileBorder, width: 1),
-                ),
-                child: Icon(icon, size: 22, color: Colors.black),
-              ),
-              if (!n.isRead)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _accent,
-                    ),
-                  ),
-                ),
-            ],
+    return Material(
+      color: Colors.transparent,
+      borderRadius: r,
+      child: InkWell(
+        borderRadius: r,
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: n.isRead ? AppColors.white : AppColors.chev3,
+            borderRadius: r,
+            border: Border.all(color: AppColors.tileBorder, width: 1),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        n.title.isEmpty ? 'Уведомление' : n.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.1,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                        ),
-                      ),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: n.isRead ? AppColors.grey : AppColors.org2,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.tileBorder, width: 1),
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      meta,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.0,
-                        fontWeight: FontWeight.w600,
-                        color: _greyText,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  n.body,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.3,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF5F6670),
+                    child: Icon(icon, size: 22, color: Colors.black),
                   ),
-                ),
-                if (n.channel.isNotEmpty || n.type.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _Tag(text: n.channel.isEmpty ? 'channel' : n.channel),
-                      const SizedBox(width: 8),
-                      _Tag(text: n.type.isEmpty ? 'type' : n.type),
-                      const Spacer(),
-                      Text(
-                        n.isRead ? 'Прочитано' : 'Новое',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.0,
-                          fontWeight: FontWeight.w800,
-                          color: n.isRead ? const Color(0xFF9FA4AD) : _accent,
+                  if (!n.isRead)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.accent,
                         ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            n.title.isEmpty ? 'Уведомление' : n.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          meta,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.0,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      n.body,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.grey2,
+                      ),
+                    ),
+                    if (n.channel.isNotEmpty || n.type.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _Tag(text: n.channel.isEmpty ? 'channel' : n.channel),
+                          const SizedBox(width: 8),
+                          _Tag(text: n.type.isEmpty ? 'type' : n.type),
+                          const Spacer(),
+                          Text(
+                            n.isRead ? 'Прочитано' : 'Новое',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.0,
+                              fontWeight: FontWeight.w800,
+                              color: n.isRead ? AppColors.grey : AppColors.accent,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
-
   IconData _iconFor(String channel) {
     switch (channel) {
       case 'orders':

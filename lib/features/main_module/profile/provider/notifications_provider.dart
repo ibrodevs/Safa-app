@@ -48,6 +48,8 @@ class NotificationsProvider extends ChangeNotifier {
 
   NotificationsReadFilter _filter = NotificationsReadFilter.all;
 
+  final Set<int> _marking = <int>{};
+
   bool get loading => _loading;
   bool get loadingMore => _loadingMore;
   bool get hasMore => _hasMore;
@@ -144,6 +146,54 @@ class NotificationsProvider extends ChangeNotifier {
     } finally {
       _loadingMore = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> markRead(int id) async {
+    if (_marking.contains(id)) return;
+
+    final idx = _items.indexWhere((e) => e.id == id);
+    if (idx == -1) return;
+
+    final old = _items[idx];
+    if (old.isRead) return;
+
+    _marking.add(id);
+
+
+    final updated = old.copyWith(isRead: true, readAt: DateTime.now());
+    if (_filter == NotificationsReadFilter.unread) {
+      _items.removeAt(idx);
+    } else {
+      _items[idx] = updated;
+    }
+    notifyListeners();
+
+    try {
+      await repo.markRead(id);
+    } on ApiException catch (e) {
+      _rollbackMarkRead(idx, old);
+      _error = e.message;
+      notifyListeners();
+    } catch (_) {
+      _rollbackMarkRead(idx, old);
+      _error = 'Не удалось отметить как прочитанное';
+      notifyListeners();
+    } finally {
+      _marking.remove(id);
+    }
+  }
+
+  void _rollbackMarkRead(int idx, AppNotificationModel old) {
+    if (_filter == NotificationsReadFilter.unread) {
+      final insertAt = idx <= _items.length ? idx : _items.length;
+      _items.insert(insertAt, old);
+    } else {
+      if (idx < _items.length) {
+        _items[idx] = old;
+      } else {
+        _items.add(old);
+      }
     }
   }
 }

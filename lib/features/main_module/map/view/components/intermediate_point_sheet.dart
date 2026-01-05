@@ -1,3 +1,4 @@
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
@@ -26,9 +27,6 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
   @override
   void initState() {
     super.initState();
@@ -52,10 +50,8 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: SafeArea(
           top: false,
           child: Padding(
@@ -65,33 +61,33 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Промежуточная точка',
                     style: TextStyle(
                       fontSize: 28,
                       height: 1.1,
                       fontWeight: FontWeight.w800,
-                      color: Colors.black,
+                      color: AppColors.black,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     widget.addressLine,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       height: 1.2,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black,
+                      color: AppColors.black,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     widget.placeLine,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       height: 1.2,
                       fontWeight: FontWeight.w600,
-                      color: _greyText,
+                      color: AppColors.grey,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -104,7 +100,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: _tileBorder, width: 1),
+                            border: Border.all(color: AppColors.tileBorder, width: 1),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
@@ -114,7 +110,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                 width: 20,
                                 height: 20,
                                 colorFilter: const ColorFilter.mode(
-                                  _accent,
+                                  AppColors.accent,
                                   BlendMode.srcIn,
                                 ),
                               ),
@@ -130,10 +126,10 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                     hintStyle: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFFC7CFD9),
+                                      color: AppColors.chev,
                                     ),
                                   ),
-                                  cursorColor: Colors.black,
+                                  cursorColor: AppColors.black,
                                   textInputAction: TextInputAction.next,
                                   onChanged: context
                                       .read<DeliveryAutocompleteProvider>()
@@ -149,22 +145,33 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                         borderRadius: BorderRadius.circular(16),
                         onTap: () async {
                           FocusScope.of(context).unfocus();
-                          context.read<DeliveryAutocompleteProvider>().clearSuggestions();
+                          context
+                              .read<DeliveryAutocompleteProvider>()
+                              .clearSuggestions();
 
-                          final p = await Navigator.of(context).push<DeliveryPoint>(
-                            MaterialPageRoute(
-                              builder: (_) => MultiProvider(
-                                providers: [
-                                  ChangeNotifierProvider.value(value: context.read<DeliveryAddressProvider>()),
-                                  ChangeNotifierProvider.value(value: context.read<DeliveryAutocompleteProvider>()),
-                                ],
-                                child: const MapPickerScreen(
-                                  initial: LatLng(42.8746, 74.6122),
-                                  title: 'Промежуточная точка',
+                          final p = await Navigator.of(context)
+                              .push<DeliveryPoint>(
+                                MaterialPageRoute(
+                                  builder: (_) => MultiProvider(
+                                    providers: [
+                                      ChangeNotifierProvider.value(
+                                        value: context
+                                            .read<DeliveryAddressProvider>(),
+                                      ),
+                                      ChangeNotifierProvider.value(
+                                        value: context
+                                            .read<
+                                              DeliveryAutocompleteProvider
+                                            >(),
+                                      ),
+                                    ],
+                                    child: const MapPickerScreen(
+                                      initial: LatLng(42.8746, 74.6122),
+                                      title: 'Промежуточная точка',
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          );
+                              );
 
                           if (p != null && mounted) {
                             Navigator.of(context).pop(p);
@@ -178,7 +185,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                               Icon(
                                 Icons.near_me_rounded,
                                 size: 20,
-                                color: _accent,
+                                color: AppColors.accent,
                               ),
                               SizedBox(width: 4),
                               Text(
@@ -186,7 +193,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: _accent,
+                                  color: AppColors.accent,
                                 ),
                               ),
                             ],
@@ -210,10 +217,8 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: autocomplete.items.length,
-                        separatorBuilder: (_, __) => const Divider(
-                          height: 1,
-                          color: _tileBorder,
-                        ),
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: AppColors.tileBorder),
                         itemBuilder: (context, index) {
                           final item = autocomplete.items[index];
                           return ListTile(
@@ -231,7 +236,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: _greyText,
+                                color: AppColors.grey,
                               ),
                             ),
                             onTap: () {
@@ -250,11 +255,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                   ],
 
                   const SizedBox(height: 22),
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: _tileBorder,
-                  ),
+                  const Divider(height: 1, thickness: 1, color: AppColors.tileBorder),
                   const SizedBox(height: 18),
                   Row(
                     children: const [
@@ -281,7 +282,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                       onPressed: null,
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
-                        backgroundColor: _accent,
+                        backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -305,10 +306,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
 }
 
 class _TagButton extends StatelessWidget {
-  const _TagButton({
-    required this.title,
-    required this.iconAsset,
-  });
+  const _TagButton({required this.title, required this.iconAsset});
 
   final String title;
   final String iconAsset;
@@ -333,10 +331,7 @@ class _TagButton extends StatelessWidget {
             iconAsset,
             width: 20,
             height: 20,
-            colorFilter: const ColorFilter.mode(
-              _accent,
-              BlendMode.srcIn,
-            ),
+            colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
           ),
           const SizedBox(width: 8),
           Text(

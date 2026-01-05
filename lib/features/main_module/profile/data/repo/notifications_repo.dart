@@ -42,7 +42,9 @@ class NotificationsRepository {
       if (d is Map && d.isNotEmpty) {
         final firstKey = d.keys.first;
         final v = d[firstKey];
-        if (v is List && v.isNotEmpty) throw ApiException(v.first.toString(), statusCode: status);
+        if (v is List && v.isNotEmpty) {
+          throw ApiException(v.first.toString(), statusCode: status);
+        }
         if (v != null) throw ApiException(v.toString(), statusCode: status);
       }
       if (d is String && d.isNotEmpty) {
@@ -51,6 +53,31 @@ class NotificationsRepository {
       throw ApiException('Не удалось загрузить уведомления', statusCode: status);
     } catch (_) {
       throw ApiException('Не удалось загрузить уведомления');
+    }
+  }
+
+  Future<void> markRead(int id) async {
+    try {
+      await _api.dio.post<dynamic>(
+        'fcm/notifications/$id/read/',
+      );
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final d = e.response?.data;
+      if (d is Map && d.isNotEmpty) {
+        final firstKey = d.keys.first;
+        final v = d[firstKey];
+        if (v is List && v.isNotEmpty) {
+          throw ApiException(v.first.toString(), statusCode: status);
+        }
+        if (v != null) throw ApiException(v.toString(), statusCode: status);
+      }
+      if (d is String && d.isNotEmpty) {
+        throw ApiException(d, statusCode: status);
+      }
+      throw ApiException('Не удалось отметить как прочитанное', statusCode: status);
+    } catch (_) {
+      throw ApiException('Не удалось отметить как прочитанное');
     }
   }
 }

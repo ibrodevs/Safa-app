@@ -54,8 +54,8 @@ class _InactiveDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 8,
-      height: 8,
+      width: 10,
+      height: 10,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         color: RegisterDotsIndicator._inactiveColor,
@@ -101,8 +101,8 @@ class _ActiveDotState extends State<_ActiveDot>
     return ScaleTransition(
       scale: _scale,
       child: Container(
-        width: 8,
-        height: 8,
+        width: 10,
+        height: 10,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           color: RegisterDotsIndicator._activeColor,

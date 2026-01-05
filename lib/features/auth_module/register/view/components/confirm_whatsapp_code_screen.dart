@@ -4,6 +4,7 @@ import 'package:dogo/core/widgets/primary_button.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -76,6 +77,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     final loading = context.watch<AuthProvider>().loading;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -109,6 +111,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                     ShadowField(
                       child: AppTextField(
                         controller: _code,
+                        keyboardType: TextInputType.number,
                         hint: 'Введите код с Whatsapp',
                         prefixText: '  ',
                       ),
@@ -132,16 +135,17 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                           child: Text(
                             'Отменить регистрацию',
                             style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 17,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 15,
                               height: 1.2,
-                              color: AppColors.white,
+                              fontFamily: 'SFProDisplay',
+                              color: AppColors.grey3,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 405),
                   ],
                 ),
               ),
@@ -149,7 +153,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 30,
+              bottom: bottomPadding ,
               child: const Center(
                 child: Hero(
                   tag: 'register_dots',

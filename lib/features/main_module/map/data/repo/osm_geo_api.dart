@@ -27,7 +27,6 @@ class OsmGeoApi {
     final sc = r.statusCode ?? -1;
     final t = r.data.runtimeType.toString();
     final preview = _preview(r.data);
-    // ignore: avoid_print
     print('PHOTON_AUTOCOMPLETE sc=$sc type=$t body=$preview');
 
     if (sc != 200) return const [];

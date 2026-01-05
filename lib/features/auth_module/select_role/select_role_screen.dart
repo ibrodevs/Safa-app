@@ -117,21 +117,21 @@ class _RoleCard extends StatelessWidget {
   final String subtitle;
   final VoidCallback? onTap;
 
-  static const double _avatarBoxSize = 120.0;
+  static const double _avatarBoxSize = 110.0;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+          padding: const EdgeInsets.fromLTRB(6,24,10,24),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFE9EDF2), width: 1),
           ),
           child: Row(
@@ -146,7 +146,7 @@ class _RoleCard extends StatelessWidget {
                   alignment: Alignment.bottomCenter,
                 ),
               ),
-              const SizedBox(width: 24),
+              const SizedBox(width: 12),
               const Expanded(child: _RoleTexts()),
             ],
           ),
@@ -184,7 +184,7 @@ class _TopPattern extends StatelessWidget {
       right: 0,
       child: Image.asset(
         'assets/images/img_tunduk.png',
-        width: 140,
+        width: 130,
         fit: BoxFit.cover,
       ),
     );

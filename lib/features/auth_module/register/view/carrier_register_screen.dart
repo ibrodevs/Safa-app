@@ -221,6 +221,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 28),
             ],
           ),
         ),

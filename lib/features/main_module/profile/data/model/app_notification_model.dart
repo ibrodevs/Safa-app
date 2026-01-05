@@ -37,4 +37,21 @@ class AppNotificationModel {
       readAt: read,
     );
   }
+  AppNotificationModel copyWith({
+    bool? isRead,
+    DateTime? readAt,
+  }) {
+    return AppNotificationModel(
+      id: id,
+      type: type,
+      channel: channel,
+      title: title,
+      body: body,
+      data: data,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt,
+      readAt: readAt ?? this.readAt,
+    );
+  }
+
 }

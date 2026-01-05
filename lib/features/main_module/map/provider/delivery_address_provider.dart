@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-
 import '../data/model/delivery_reverse_geo.dart';
 import '../data/repo/delivery_geo_repository.dart';
 
@@ -8,32 +7,97 @@ class DeliveryAddressProvider extends ChangeNotifier {
 
   DeliveryAddressProvider(this._repo);
 
-  DeliveryReverseGeo? _here;
-  bool _loading = false;
-  String? _error;
+  DeliveryReverseGeo? _gpsHere;
+  bool _gpsLoading = false;
+  String? _gpsError;
 
-  DeliveryReverseGeo? get here => _here;
-  String? get hereAddress => _here?.address;
-  bool get loading => _loading;
-  String? get error => _error;
+  DeliveryReverseGeo? _pickerHere;
+  bool _pickerLoading = false;
+  String? _pickerError;
 
-  Future<void> fetchHereAddress({required double lat, required double lon}) async {
-    _loading = true;
-    _error = null;
+  String? _fromAddress;
+  double? _fromLat;
+  double? _fromLon;
+
+  DeliveryReverseGeo? get gpsHere => _gpsHere;
+  String? get gpsHereAddress => _gpsHere?.address;
+  bool get gpsLoading => _gpsLoading;
+  String? get gpsError => _gpsError;
+
+  DeliveryReverseGeo? get pickerHere => _pickerHere;
+  String? get pickerHereAddress => _pickerHere?.address;
+  bool get pickerLoading => _pickerLoading;
+  String? get pickerError => _pickerError;
+
+  String? get fromAddress => _fromAddress;
+  double? get fromLat => _fromLat;
+  double? get fromLon => _fromLon;
+
+  void setFromAddress({
+    required String address,
+    double? lat,
+    double? lon,
+  }) {
+    final a = address.trim();
+    if (a.isEmpty) {
+      clearFromAddress();
+      return;
+    }
+    _fromAddress = a;
+    _fromLat = lat;
+    _fromLon = lon;
+    notifyListeners();
+  }
+
+  void clearFromAddress() {
+    _fromAddress = null;
+    _fromLat = null;
+    _fromLon = null;
+    notifyListeners();
+  }
+
+  Future<void> fetchGpsHereAddress({required double lat, required double lon}) async {
+    _gpsLoading = true;
+    _gpsError = null;
     notifyListeners();
     try {
-      debugPrint('reverse request: lat=$lat lon=$lon');
+      debugPrint('reverse GPS: lat=$lat lon=$lon');
       final result = await _repo.getAddress(lat: lat, lon: lon);
-      debugPrint('reverse response: ${result.address}');
-      _here = result;
+      debugPrint('reverse GPS ok: ${result.address}');
+      _gpsHere = result;
     } catch (e, st) {
-      _error = e.toString();
-      debugPrint('fetchHereAddress error: $e\n$st');
-      _here = null;
+      _gpsError = e.toString();
+      debugPrint('fetchGpsHereAddress error: $e\n$st');
+      _gpsHere = null;
     } finally {
-      _loading = false;
+      _gpsLoading = false;
       notifyListeners();
     }
   }
 
+  Future<void> fetchPickerHereAddress({required double lat, required double lon}) async {
+    _pickerLoading = true;
+    _pickerError = null;
+    notifyListeners();
+    try {
+      debugPrint('reverse PICKER: lat=$lat lon=$lon');
+      final result = await _repo.getAddress(lat: lat, lon: lon);
+      debugPrint('reverse PICKER ok: ${result.address}');
+      _pickerHere = result;
+    } catch (e, st) {
+      _pickerError = e.toString();
+      debugPrint('fetchPickerHereAddress error: $e\n$st');
+      _pickerHere = null;
+    } finally {
+      _pickerLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearPickerHere() {
+    _pickerHere = null;
+    _pickerError = null;
+    _pickerLoading = false;
+    notifyListeners();
+  }
 }
