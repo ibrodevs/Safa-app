@@ -90,12 +90,17 @@ class ShipmentsListItemDto {
         final title = (m['title'] ?? '').toString();
         final bazar = m['bazar']?.toString();
         final passage = m['passage']?.toString();
+        final containerRaw = m['container']?.toString();
 
         final containerNumber = m['container_number']?.toString();
         final containerLabel = m['container_label']?.toString();
-        final container = (containerNumber?.isNotEmpty == true)
+
+        final container = (containerRaw?.trim().isNotEmpty == true)
+            ? containerRaw
+            : (containerNumber?.trim().isNotEmpty == true)
             ? containerNumber
-            : (containerLabel?.isNotEmpty == true ? containerLabel : null);
+            : (containerLabel?.trim().isNotEmpty == true ? containerLabel : null);
+
 
         final lat = _toDouble(m['lat']);
         final lon = _toDouble(m['lon']);

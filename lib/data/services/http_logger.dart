@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 class HttpLoggerInterceptor extends Interceptor {
   HttpLoggerInterceptor({
     this.tag = 'HTTP',
-    this.maxBody = 4000,
+    this.maxBody = 400000,
     this.alsoPrint = true,
   });
 
@@ -23,12 +24,21 @@ class HttpLoggerInterceptor extends Interceptor {
   }
 
   @override
+  @override
   void onResponse(Response r, ResponseInterceptorHandler h) {
-    final msg = _fmtResponse(r);
-    dev.log(msg, name: tag);
-    if (alsoPrint) print('[$tag]\n$msg');
+    final full = _pretty(r.data);
+    dev.log(
+      '← ${r.statusCode} ${r.requestOptions.uri}\n$full',
+      name: tag,
+    );
+
+    if (alsoPrint) {
+      print('[$tag] body: ${_short(full)}');
+    }
+
     h.next(r);
   }
+
 
   @override
   void onError(DioException e, ErrorInterceptorHandler h) {
@@ -69,8 +79,23 @@ class HttpLoggerInterceptor extends Interceptor {
   }
 
   String _short(String s) {
-    if (s.length <= maxBody) return s;
-    return '${s.substring(0, maxBody)}…(truncated ${s.length - maxBody})';
+    if (kReleaseMode) {
+      if (s.length <= maxBody) return s;
+      return '${s.substring(0, maxBody)}…(truncated ${s.length - maxBody})';
+    }
+    return s;
+  }
+  void _logLong(String text) {
+    const chunkSize = 800;
+    for (var i = 0; i < text.length; i += chunkSize) {
+      dev.log(
+        text.substring(
+          i,
+          i + chunkSize > text.length ? text.length : i + chunkSize,
+        ),
+        name: tag,
+      );
+    }
   }
 
   String _pretty(dynamic v) {
