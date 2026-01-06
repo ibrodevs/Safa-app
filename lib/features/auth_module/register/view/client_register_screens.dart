@@ -88,6 +88,7 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
     final loading = context.watch<AuthProvider>().loading;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.white,
       body: SafeArea(
         bottom: false,
