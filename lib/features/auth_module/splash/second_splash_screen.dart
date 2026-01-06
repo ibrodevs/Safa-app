@@ -166,7 +166,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       'Кыргызский сервис\nнового поколения —',
                       style: _titleBlackStyle,
                     ),
-                    const SizedBox(height: 8),
                     const Text(
                       'всё, что нужно,\nв одном приложении',
                       style: _titleGreyStyle,
