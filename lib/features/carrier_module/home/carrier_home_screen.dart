@@ -52,7 +52,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
   final MapController _mapController = MapController();
 
-  // my location
   double _myLat = 42.8746;
   double _myLon = 74.6122;
   double _centerLat = 42.8746;
@@ -60,11 +59,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   StreamSubscription<Position>? _posSub;
 
-  // UI states
   bool _loadingOnline = false;
   bool _showWelcome = true;
 
-  // nearby flow
   List<NearbyShipment> _nearby = const [];
   int _nearbyIndex = 0;
   NearbyShipment? get _currentNearby =>
@@ -72,7 +69,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
           ? _nearby[_nearbyIndex]
           : null;
 
-  // active shipment after accept
   int? _activeId;
   String _activePublicCode = '';
   ShipmentStatus _activeStatus = ShipmentStatus.unknown;
@@ -83,7 +79,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   Timer? _pollTimer;
 
-  // routing
   bool _routing = false;
   bool _didFitOnce = false;
   String? _routeSignature;
@@ -107,9 +102,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     super.dispose();
   }
 
-  // ---------------------------
-  // LOCATION
-  // ---------------------------
   Future<void> _initLocation() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -145,7 +137,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       });
       _moveMap(LatLng(_myLat, _myLon), zoom: 15);
 
-      // лёгкий стрим, чтобы обновлять дистанцию/маркер (можно убрать)
       _posSub?.cancel();
       _posSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -185,9 +176,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
-  // ---------------------------
-  // API (RAW MAP) helpers
-  // ---------------------------
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
@@ -211,9 +199,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return _asMap(resp.data);
   }
 
-  // ---------------------------
-  // PARSING active shipment
-  // ---------------------------
   _ActiveUi _parseActive(Map<String, dynamic> j, {int? fallbackIndex}) {
     final id = (j['id'] as num?)?.toInt() ?? 0;
     final statusRaw = (j['status'] ?? '').toString();
@@ -247,7 +232,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       }
     }
 
-    // на всякий: не вылетать по индексу
     if (stops.isNotEmpty) {
       idx = idx.clamp(0, stops.length - 1);
     } else {
@@ -264,9 +248,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     );
   }
 
-  // ---------------------------
-  // FLOW: go online -> nearby
-  // ---------------------------
   Future<void> _goOnline() async {
     if (_loadingOnline) return;
 
@@ -332,9 +313,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     _syncRouteAndCameraForNearby();
   }
 
-  // ---------------------------
-  // FLOW: accept -> active + polling
-  // ---------------------------
   Future<void> _acceptCurrent() async {
     final s = _currentNearby;
     if (s == null) return;
@@ -392,7 +370,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeFare = parsed.fare;
       });
 
-      // если завершён/отменён — показываем финал (или возвращаемся на welcome)
       if (parsed.status == ShipmentStatus.canceled) {
         _stopActiveAndBackToWelcome(message: 'Заказ отменён');
         return;
@@ -426,9 +403,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
   }
 
-  // ---------------------------
-  // advance (intermediate + finish)
-  // ---------------------------
   Future<void> _advance() async {
     final id = _activeId;
     if (id == null) return;
@@ -447,7 +421,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
 
-        _didFitOnce = false; // после advance можно слегка обновить fit
+        _didFitOnce = false;
         _routeSignature = null;
         _routePoints = const [];
       });
@@ -455,8 +429,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForActive();
 
       if (parsed.status == ShipmentStatus.completed) {
-        // показать "Заказ выполнен" как на скрине, а потом можно вернуться на welcome
-        // (я оставляю на этом экране кнопку "Выполнено", ты можешь сделать авто-возврат)
       }
     } catch (e) {
       if (!mounted) return;
@@ -560,7 +532,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   void _fitToPoints(List<LatLng> pts) {
     if (pts.isEmpty) return;
 
-    // фильтр от NaN/Infinity и некорректных координат
     final clean = pts.where((p) {
       final lat = p.latitude;
       final lon = p.longitude;
@@ -574,7 +545,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     if (clean.isEmpty) return;
 
-    // если 1 точка — нельзя fit bounds (часто дает Infinity zoom)
     if (clean.length == 1) {
       _mapController.move(clean.first, 15);
       return;
@@ -582,7 +552,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     final bounds = LatLngBounds.fromPoints(clean);
 
-    // если bounds выродились (все точки одинаковые/слишком близко)
     const eps = 1e-6;
     final degenerate =
         (bounds.north - bounds.south).abs() < eps &&
@@ -658,9 +627,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
   }
 
-  // ---------------------------
-  // UI helpers
-  // ---------------------------
   int _distanceToCurrentStopMeters() {
     if (!_hasActive || _activeStops.isEmpty) return 0;
     final i = _activeCurrentStopIndex.clamp(0, _activeStops.length - 1);
@@ -684,7 +650,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     final myPoint = LatLng(_myLat, _myLon);
 
-    // markers
     final markers = <Marker>[
       Marker(
         point: myPoint,
@@ -780,7 +745,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
               ),
 
               if (_routePoints.isNotEmpty) ...[
-                // чёрный "контур"
                 PolylineLayer(
                   polylines: [
                     Polyline(
@@ -790,7 +754,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                     ),
                   ],
                 ),
-                // белая линия сверху
                 PolylineLayer(
                   polylines: [
                     Polyline(
@@ -843,9 +806,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 }
 
-// ---------------------------
-// UI widgets
-// ---------------------------
 
 class _MeDot extends StatelessWidget {
   const _MeDot();
@@ -873,7 +833,6 @@ class _MeDot extends StatelessWidget {
   }
 }
 
-/// маркер как на скрине: светло-персиковый кружок + белая обводка
 class _StopDot extends StatelessWidget {
   const _StopDot();
 
@@ -976,7 +935,6 @@ class _WelcomeCard extends StatelessWidget {
   }
 }
 
-/// 1 экран: nearby (как слева снизу на скрине)
 class _ShipmentSheet extends StatelessWidget {
   const _ShipmentSheet({
     required this.shipment,
@@ -1113,7 +1071,6 @@ class _ShipmentSheet extends StatelessWidget {
   }
 }
 
-/// 2/3 экран: assigned / in_transit / кнопка advance
 class _ActiveProgressSheet extends StatelessWidget {
   const _ActiveProgressSheet({
     required this.accent,
@@ -1145,7 +1102,6 @@ class _ActiveProgressSheet extends StatelessWidget {
         ? 'На месте'
         : (isLast ? 'Выполнено' : 'Следующая точка');
 
-    // показываем “предыдущая + текущая” как на скрине
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {
       final ci = currentIndex.clamp(0, stops.length - 1);
@@ -1206,7 +1162,6 @@ class _ActiveProgressSheet extends StatelessWidget {
               ),
             const SizedBox(height: 14),
           ] else ...[
-            // in_transit: карточка точек как на скрине
             if (items.isNotEmpty) _TwoStopsCard(items: items, currentIndex: currentIndex),
             const SizedBox(height: 14),
           ],
@@ -1245,7 +1200,6 @@ class _TwoStopsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // item[0] = previous (если есть), item[1] = current
     final prev = items.length >= 2 ? items[0] : null;
     final cur = items.isNotEmpty ? items.last : null;
 
@@ -1361,7 +1315,6 @@ class _ArrowDown extends StatelessWidget {
   }
 }
 
-/// экран "Заказ выполнен" (упрощённо, но в стиле скрина)
 class _CompletedSheet extends StatelessWidget {
   const _CompletedSheet({
     required this.publicCode,

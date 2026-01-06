@@ -97,7 +97,6 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Кыргызский сервис\nнового поколения —',  style: AppTextStyles.titleBlackStyle,),
-        const SizedBox(height: 12),
         Text('всё, что нужно,\nв одном приложении',  style: AppTextStyles.titleGreyStyle,),
       ],
     );

@@ -94,7 +94,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       ),
     );
 
-    // порядок профилей: пешком -> walking -> (fallback) driving
     const profiles = <String>['foot', 'walking', 'driving'];
 
     final coords = '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
