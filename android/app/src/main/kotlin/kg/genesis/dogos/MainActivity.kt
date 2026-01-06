@@ -1,4 +1,4 @@
-package kg.genesis.dogo
+package kg.genesis.dogos
 
 import io.flutter.embedding.android.FlutterActivity
 

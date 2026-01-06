@@ -46,6 +46,11 @@ class NearbyShipment {
 class NearbyShipmentStop {
   final int position;
   final String title;
+
+  final String? bazar;
+  final String? passage;
+  final String? container;
+
   final double lat;
   final double lon;
 
@@ -54,14 +59,53 @@ class NearbyShipmentStop {
     required this.title,
     required this.lat,
     required this.lon,
+    this.bazar,
+    this.passage,
+    this.container,
   });
+
+  static String? _pickContainer(Map<String, dynamic> json) {
+    final a = json['container_number']?.toString();
+    if (a != null && a.trim().isNotEmpty) return a.trim();
+    final b = json['container_label']?.toString();
+    if (b != null && b.trim().isNotEmpty) return b.trim();
+    final c = json['container']?.toString();
+    if (c != null && c.trim().isNotEmpty) return c.trim();
+    return null;
+  }
 
   factory NearbyShipmentStop.fromJson(Map<String, dynamic> json) {
     return NearbyShipmentStop(
       position: json['position'] as int? ?? 0,
       title: json['title']?.toString() ?? '',
+      bazar: json['bazar']?.toString(),
+      passage: json['passage']?.toString(),
+      container: _pickContainer(json),
       lat: double.tryParse(json['lat']?.toString() ?? '') ?? 0,
       lon: double.tryParse(json['lon']?.toString() ?? '') ?? 0,
     );
+  }
+
+  String get headerLine {
+    final c = (container ?? '').trim();
+    final p = (passage ?? '').trim();
+    if (c.isNotEmpty && p.isNotEmpty) return 'Контейнер $c, $p проход';
+    if (c.isNotEmpty) return 'Контейнер $c';
+    if (p.isNotEmpty) return '$p проход';
+    return title.isNotEmpty ? title : 'Точка';
+  }
+
+  String get subLine {
+    final b = (bazar ?? '').trim();
+    return b.isNotEmpty ? b : '';
+  }
+
+  String get shortHint {
+    final p = (passage ?? '').trim();
+    final c = (container ?? '').trim();
+    final parts = <String>[];
+    if (p.isNotEmpty) parts.add('$p проход');
+    if (c.isNotEmpty) parts.add('$c контейнер');
+    return parts.join(', ');
   }
 }

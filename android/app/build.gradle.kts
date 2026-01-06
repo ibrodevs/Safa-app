@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "kg.genesis.dogo"
+    namespace = "kg.genesis.dogos"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "kg.genesis.dogo"
+        applicationId = "kg.genesis.dogos"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -827,6 +827,17 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+  Future<ShipmentDetail> advanceShipment(int id) async {
+    try {
+      final resp = await _dio.post('delivery/shipments/$id/advance/');
+      final map = _asMap(resp.data);
+      return ShipmentDetail.fromJson(map);
+    }/* on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось перейти к следующей точке');
+    } */catch (_) {
+      throw ApiException('');
+    }
+  }
   Future<ShipmentDetail> acceptShipment(int id) async {
     try {
       final resp = await _dio.post('delivery/shipments/$id/accept/');
