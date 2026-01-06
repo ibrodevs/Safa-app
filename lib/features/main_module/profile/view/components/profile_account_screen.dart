@@ -185,32 +185,10 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Безопасность',
-                      style: TextStyle(
-                        fontSize: 17,
-                        height: 1.1,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black,
-                      ),
-                    ),
                     const SizedBox(height: 12),
                     _Card(
                       child: Column(
                         children: [
-                          _AccountTile(
-                            label: 'Сменить пароль',
-                            value: 'Рекомендуется',
-                            valueStyle: const TextStyle(
-                              fontSize: 13,
-                              color: ProfileAccountScreen._greyText,
-                              fontWeight: FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            onTap: () => _showSnack(context, 'Сделаем позже.'),
-                          ),
-                          const _AccountDivider(),
                           _AccountTile(
                             label: 'Выйти из аккаунта',
                             value: 'при выходе все данные сохранятся',

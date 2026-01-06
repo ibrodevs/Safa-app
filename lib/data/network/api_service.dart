@@ -749,6 +749,22 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+  Future<void> patchShipmentStatus(int id, {required String status}) async {
+    try {
+      await _dio.patch(
+        'delivery/shipments/$id/',
+        data: {'status': status},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось отменить доставку',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
   Future<ShipmentHistoryPage> getShipmentHistory({
     required int page,
     required int pageSize,
@@ -853,6 +869,15 @@ final class ApiService {
         'FCM_REGISTER_${status ?? 'ERR'} @ $uri: ${body is String ? body : (e.message ?? 'Ошибка сети')}',
       );
     }
+  }
+  Future<Map<String, dynamic>> getShipments({int page = 1, int pageSize = 20}) async {
+    final resp = await dio.get(
+      'delivery/shipments/',
+      queryParameters: {'page': page, 'page_size': pageSize},
+    );
+    if (resp.data is Map<String, dynamic>) return resp.data as Map<String, dynamic>;
+    if (resp.data is Map) return Map<String, dynamic>.from(resp.data as Map);
+    throw Exception('Некорректный ответ delivery/shipments/');
   }
 
   String? get currentAccessToken {

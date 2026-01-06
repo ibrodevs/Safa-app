@@ -179,7 +179,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             ),
           ),
 
-          // Подсказки поиска
           if (autocomplete.loading || autocomplete.items.isNotEmpty)
             Positioned(
               left: 16,
@@ -273,6 +272,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                             subtitle: hereAddress,
                             lat: _center.latitude,
                             lon: _center.longitude,
+                            bazar: '',
+                            container: '',
+                            passage: '',
+                            q: '',
                           );
                           Navigator.of(context).pop(p);
                         },

@@ -7,18 +7,40 @@ import '../../map/data/model/delivery_point_model.dart';
 import '../data/model/cargo_segment_model.dart';
 import '../data/repo/cargo_segments_repo.dart';
 import '../provider/cargo_segments_provider.dart';
+
+import '../../payments/data/repo/finik_payments_repository.dart';
+import '../../payments/data/repo/shipments_repository.dart';
+import '../../payments/provider/finik_payment_flow_provider.dart';
+import '../../payments/view/finik_payment_screen.dart';
+
 class CargoRouteArgs {
   final List<DeliveryPoint> stops;
   const CargoRouteArgs({required this.stops});
 }
+
+class CargoTypePaidResult {
+  final int shipmentId;
+  final String paymentId;
+  const CargoTypePaidResult({required this.shipmentId, required this.paymentId});
+}
+
 class CargoTypeScreen extends StatelessWidget {
   const CargoTypeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) =>
-      CargoSegmentsProvider(CargoSegmentsRepository())..refresh(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => CargoSegmentsProvider(CargoSegmentsRepository())..refresh(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => FinikPaymentFlowProvider(
+            shipmentsRepo: ShipmentsRepository(),
+            paymentsRepo: FinikPaymentsRepository(),
+          ),
+        ),
+      ],
       child: const _CargoTypeBody(),
     );
   }
@@ -38,6 +60,7 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
 
   int? _selectedIndex;
   int _qty = 5;
+  bool _busy = false;
 
   String _selectedName(List<CargoSegment> segments) {
     final i = _selectedIndex;
@@ -45,10 +68,77 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
     return segments[i].name;
   }
 
+  List<Map<String, dynamic>> _toStopsPayload(List<DeliveryPoint> stops) {
+    return stops.map((p) => p.toStopJson()).toList(growable: false);
+  }
+
+  Future<void> _onPayAndContinue({
+    required List<CargoSegment> segments,
+    required List<DeliveryPoint> stops,
+  }) async {
+    final idx = _selectedIndex;
+    if (idx == null) return;
+    if (stops.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Маршрут не выбран')));
+      return;
+    }
+    if (_busy) return;
+
+    setState(() => _busy = true);
+
+    try {
+      final seg = segments[idx];
+
+
+      final flow = context.read<FinikPaymentFlowProvider>();
+      flow.reset();
+
+      await flow.createShipmentAndStartPayment(
+        title: 'Доставка',
+        segmentId: seg.id,
+        quantity: _qty,
+        stops: _toStopsPayload(stops),
+      );
+
+      if (!mounted) return;
+
+      if (flow.status == FinikFlowStatus.failed) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(flow.errorText ?? 'Ошибка')));
+        return;
+      }
+
+
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider.value(
+            value: flow,
+            child: const FinikPaymentScreen(),
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (ok == true && flow.status == FinikFlowStatus.succeeded) {
+        final shipmentId = flow.shipmentId!;
+        final paymentId = flow.init!.paymentId;
+        context.pop(CargoTypePaidResult(shipmentId: shipmentId, paymentId: paymentId));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Оплата не завершена')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CargoSegmentsProvider>();
     final segments = provider.items;
+
     final extra = GoRouterState.of(context).extra;
     final routeArgs = extra is CargoRouteArgs ? extra : null;
     final stops = routeArgs?.stops ?? const <DeliveryPoint>[];
@@ -67,8 +157,7 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
                 children: [
                   InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () =>
-                    context.canPop() ? context.pop() : null,
+                    onTap: () => context.canPop() ? context.pop() : null,
                     child: const Padding(
                       padding: EdgeInsets.only(right: 8),
                       child: Icon(
@@ -98,17 +187,10 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
 
               if (stops.isNotEmpty) ...[
                 for (int i = 0; i < stops.length; i++) ...[
-                  _PlaceLine(
-                    title: stops[i].title,
-                    subtitle: stops[i].subtitle,
-                  ),
+                  _PlaceLine(title: stops[i].title, subtitle: stops[i].subtitle),
                   if (i != stops.length - 1) ...[
                     const SizedBox(height: 6),
-                    const Icon(
-                      Icons.arrow_downward_rounded,
-                      size: 28,
-                      color: Colors.black,
-                    ),
+                    const Icon(Icons.arrow_downward_rounded, size: 28, color: Colors.black),
                     const SizedBox(height: 6),
                   ],
                 ],
@@ -134,42 +216,23 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
                   padding: const EdgeInsets.only(top: 40),
                   child: Text(
                     provider.error!,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Colors.red,
-                    ),
+                    style: const TextStyle(fontSize: 15, color: Colors.red),
                   ),
                 )
               else if (segments.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
-                    child: Text(
-                      'Типы груза не найдены',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: _grey,
-                      ),
-                    ),
+                    child: Text('Типы груза не найдены', style: TextStyle(fontSize: 15, color: _grey)),
                   )
                 else ...[
                     for (var i = 0; i < segments.length; i += 2) ...[
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: _tile(
-                              index: i,
-                              segment: segments[i],
-                            ),
-                          ),
+                          Expanded(child: _tile(index: i, segment: segments[i])),
                           const SizedBox(width: 18),
                           if (i + 1 < segments.length)
-                            Expanded(
-                              child: _tile(
-                                index: i + 1,
-                                segment: segments[i + 1],
-                              ),
-                            )
+                            Expanded(child: _tile(index: i + 1, segment: segments[i + 1]))
                           else
                             const Expanded(child: SizedBox.shrink()),
                         ],
@@ -217,64 +280,34 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
                               height: 64,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius:
-                                BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _tileBorder,
-                                  width: 1,
-                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _tileBorder, width: 1),
                                 boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x11000000),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                  BoxShadow(
-                                    color: Color(0x08000000),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
+                                  BoxShadow(color: Color(0x11000000), blurRadius: 20, offset: Offset(0, 8)),
+                                  BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
                                 ],
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: Row(
                                 children: [
                                   SvgPicture.asset(
                                     'assets/icons/ic_box.svg',
                                     width: 36,
                                     height: 36,
-                                    colorFilter:
-                                    const ColorFilter.mode(
-                                      _accent,
-                                      BlendMode.srcIn,
-                                    ),
+                                    colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
                                   ),
                                   const SizedBox(width: 14),
                                   Text(
                                     '$_qty',
-                                    style: const TextStyle(
-                                      fontSize: 21,
-                                      height: 1.0,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.black,
-                                    ),
+                                    style: const TextStyle(fontSize: 21, height: 1.0, fontWeight: FontWeight.w900, color: Colors.black),
                                   ),
                                   const SizedBox(width: 10),
                                   Flexible(
                                     child: Text(
                                       _selectedName(segments),
                                       maxLines: 1,
-                                      overflow:
-                                      TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        height: 1.0,
-                                        fontWeight:
-                                        FontWeight.w800,
-                                        color: Colors.black,
-                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 15, height: 1.0, fontWeight: FontWeight.w800, color: Colors.black),
                                     ),
                                   ),
                                 ],
@@ -284,16 +317,12 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
                           const SizedBox(width: 16),
                           _roundBtn(
                             icon: Icons.remove,
-                            onTap: () => setState(() {
-                              _qty = (_qty - 1).clamp(0, 999);
-                            }),
+                            onTap: () => setState(() => _qty = (_qty - 1).clamp(0, 999)),
                           ),
                           const SizedBox(width: 12),
                           _roundBtn(
                             icon: Icons.add,
-                            onTap: () => setState(() {
-                              _qty = (_qty + 1).clamp(0, 999);
-                            }),
+                            onTap: () => setState(() => _qty = (_qty + 1).clamp(0, 999)),
                           ),
                         ],
                       ),
@@ -302,35 +331,19 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
                         height: 64,
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _selectedIndex == null
-                              ? null
-                              : () {
-                            final seg = segments[_selectedIndex!];
-                            context.pop(
-                              CargoTypeResult(
-                                segmentId: seg.id,
-                                quantity: _qty,
-                              ),
-                            );
-                          },
+                          onPressed: (_selectedIndex == null || _busy) ? null : () => _onPayAndContinue(segments: segments, stops: stops),
                           style: const ButtonStyle(
                             backgroundColor: WidgetStatePropertyAll(_accent),
                             foregroundColor: WidgetStatePropertyAll(Colors.white),
                             elevation: WidgetStatePropertyAll(0),
                             shape: WidgetStatePropertyAll(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(12)),
-                              ),
+                              RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                             ),
                             textStyle: WidgetStatePropertyAll(
-                              TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                height: 1.0,
-                              ),
+                              TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.0),
                             ),
                           ),
-                          child: const Text('Далее'),
+                          child: Text(_busy ? 'Оплата…' : 'Далее'),
                         ),
                       ),
                     ],
@@ -344,10 +357,7 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
     );
   }
 
-  Widget _tile({
-    required int index,
-    required CargoSegment segment,
-  }) {
+  Widget _tile({required int index, required CargoSegment segment}) {
     final selected = _selectedIndex == index;
 
     return _CargoTile(
@@ -355,18 +365,11 @@ class _CargoTypeBodyState extends State<_CargoTypeBody> {
       title: segment.name,
       subtitle: segment.description,
       selected: selected,
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
+      onTap: () => setState(() => _selectedIndex = index),
     );
   }
 
-  Widget _roundBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+  Widget _roundBtn({required IconData icon, required VoidCallback onTap}) {
     return SizedBox(
       height: 64,
       width: 64,
@@ -405,12 +408,7 @@ class _PlaceLine extends StatelessWidget {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 17,
-            height: 1.15,
-            fontWeight: FontWeight.w800,
-            color: Colors.black,
-          ),
+          style: const TextStyle(fontSize: 17, height: 1.15, fontWeight: FontWeight.w800, color: Colors.black),
         ),
         if (hasSub) ...[
           const SizedBox(height: 2),
@@ -418,12 +416,7 @@ class _PlaceLine extends StatelessWidget {
             subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF9FA4AD),
-            ),
+            style: const TextStyle(fontSize: 15, height: 1.2, fontWeight: FontWeight.w600, color: Color(0xFF9FA4AD)),
           ),
         ],
       ],
@@ -465,23 +458,14 @@ class _CargoTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _tileBorder, width: 1),
               boxShadow: const [
-                BoxShadow(
-                  color: Color(0x11000000),
-                  blurRadius: 20,
-                  offset: Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Color(0x08000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
+                BoxShadow(color: Color(0x11000000), blurRadius: 20, offset: Offset(0, 8)),
+                BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
               ],
             ),
             child: Stack(
               children: [
                 Padding(
-                  padding:
-                  const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -489,34 +473,21 @@ class _CargoTile extends StatelessWidget {
                         iconAsset,
                         width: 36,
                         height: 36,
-                        colorFilter: const ColorFilter.mode(
-                          _accent,
-                          BlendMode.srcIn,
-                        ),
+                        colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
                       ),
                       const Spacer(),
                       Text(
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.2,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                        ),
+                        style: const TextStyle(fontSize: 15, height: 1.2, fontWeight: FontWeight.w800, color: Colors.black),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF9FA4AD),
-                        ),
+                        style: const TextStyle(fontSize: 13, height: 1.25, fontWeight: FontWeight.w600, color: Color(0xFF9FA4AD)),
                       ),
                     ],
                   ),
@@ -528,23 +499,13 @@ class _CargoTile extends StatelessWidget {
                       ? Container(
                     width: 24,
                     height: 24,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4CAF50),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      size: 18,
-                      color: Colors.white,
-                    ),
+                    decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle),
+                    child: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
                   )
                       : Container(
                     width: 22,
                     height: 22,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEDEFF1),
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(color: Color(0xFFEDEFF1), shape: BoxShape.circle),
                   ),
                 ),
               ],
@@ -554,13 +515,4 @@ class _CargoTile extends StatelessWidget {
       ),
     );
   }
-}
-class CargoTypeResult {
-  final int segmentId;
-  final int quantity;
-
-  const CargoTypeResult({
-    required this.segmentId,
-    required this.quantity,
-  });
 }

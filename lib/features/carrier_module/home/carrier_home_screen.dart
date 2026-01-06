@@ -264,66 +264,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                 child: SizedBox.shrink(),
               ),
             ),
-
-          Positioned(
-            top: padding.top + 10,
-            left: 16,
-            right: 16,
-            child: Row(
-              children: [
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      _showWelcome ? 'Курьер' : 'На линии',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        height: 1.0,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x1A000000),
-                        blurRadius: 12,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: IconButton(
-                    onPressed: () {
-                      _moveMap(LatLng(_myLat, _myLon), zoom: 15);
-                    },
-                    icon: const Icon(Icons.my_location_rounded, size: 18, color: Colors.black),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
