@@ -161,20 +161,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<Position> _getCurrentPositionOrThrow() async {
-    var serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) throw Exception('Службы геолокации выключены');
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw Exception('Нет доступа к геолокации');
+    final ok = await _ensureLocationPermission();
+    if (!ok) {
+      throw Exception('Нужен доступ к геолокации, чтобы показать ближайшие заказы');
     }
 
     return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
+
 
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
@@ -247,10 +241,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       fare: fare,
     );
   }
-
   Future<void> _goOnline() async {
     if (_loadingOnline) return;
-
     setState(() => _loadingOnline = true);
 
     try {
@@ -293,13 +285,23 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForNearby();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Разрешите геолокацию в настройках приложения')),
+        );
+        // await Geolocator.openAppSettings();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loadingOnline = false);
     }
   }
+
 
   void _rejectNearby() {
     if (_nearby.isEmpty) return;
@@ -454,6 +456,27 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   String _signature(List<LatLng> pts) {
     String f(double v) => v.toStringAsFixed(6);
     return pts.map((p) => '${f(p.latitude)},${f(p.longitude)}').join('|');
+  }
+  Future<bool> _ensureLocationPermission() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return false;
+    }
+
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+
+    if (perm == LocationPermission.denied) {
+      return false;
+    }
+
+    if (perm == LocationPermission.deniedForever) {
+      return false;
+    }
+
+    return perm == LocationPermission.always || perm == LocationPermission.whileInUse;
   }
 
   Future<List<LatLng>> _buildOsrmLegRoute({

@@ -32,7 +32,14 @@ class CarrierProfileScreen extends StatelessWidget {
 
 class _CarrierProfileBody extends StatelessWidget {
   const _CarrierProfileBody();
-
+  void _showSoonSnack(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+        Text('Интеграция будет добавлена позже.'),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CarrierProfileProvider>();
@@ -162,13 +169,13 @@ class _CarrierProfileBody extends StatelessWidget {
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_wallet.svg',
                         title: 'Пополнить счет',
-                        onTap: () => context.push('/profile/topup'),
+                        onTap: () =>  _showSoonSnack(context),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_clock.svg',
                         title: 'История пополнений/трат',
-                        onTap: () => context.push('/profile/balance-history'),
+                        onTap: () =>  _showSoonSnack(context),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(
@@ -180,7 +187,6 @@ class _CarrierProfileBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,

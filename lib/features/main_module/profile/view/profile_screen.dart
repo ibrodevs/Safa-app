@@ -123,7 +123,7 @@ class _ProfileBody extends StatelessWidget {
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_clock.svg',
                         title: 'История пополнений/трат',
-                        onTap: () => context.push('/profile/balance-history'),
+                        onTap: () =>  _showSoonSnack(context),
                       ),
                       const SizedBox(height: 2),
                       _ProfileTile(
@@ -150,6 +150,14 @@ class _ProfileBody extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+  void _showSoonSnack(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+        Text('Интеграция будет добавлена позже.'),
       ),
     );
   }

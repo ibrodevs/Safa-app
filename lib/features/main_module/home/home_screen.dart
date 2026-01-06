@@ -94,7 +94,7 @@ class _HomeBodyState extends State<_HomeBody> {
                   title: 'Доставка грузов',
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                   tagText: 'Внутри Дордоя',
-                  imageAsset: 'assets/images/img_home_boxes.png',
+                  imageAsset: 'assets/images/boxes2.png',
                   onTap: () => context.go('/map'),
                 ),
                 const SizedBox(height: 18),
@@ -102,7 +102,7 @@ class _HomeBodyState extends State<_HomeBody> {
                   title: 'Такси',
                   subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                   tagText: 'Внутри Дордоя',
-                  imageAsset: 'assets/images/img_home_car.png',
+                  imageAsset: 'assets/images/img_home_car2.png',
                   onTap: () {},
                 ),
                 const SizedBox(height: 18),
@@ -113,10 +113,13 @@ class _HomeBodyState extends State<_HomeBody> {
                       Expanded(
                         child: SmallFeatureCard(
                           title: 'Аманат',
-                          subtitle:
-                              'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                           tagText: 'По всему КР',
                           imageAsset: 'assets/images/img_home_amanat.png',
+                          imageHeight: 55,
+                          imageScale: 0.9,
+                          imagePadding: 18,
+                          imagePadding2: 8,
                           onTap: () {},
                         ),
                       ),
@@ -124,8 +127,7 @@ class _HomeBodyState extends State<_HomeBody> {
                       Expanded(
                         child: SmallFeatureCard(
                           title: 'Специалисты',
-                          subtitle:
-                              'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
                           tagText: 'Внутри Дордоя',
                           imageAsset: 'assets/images/img_home_specialists.png',
                           onTap: () {},

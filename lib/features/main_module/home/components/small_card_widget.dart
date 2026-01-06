@@ -10,7 +10,11 @@ class SmallFeatureCard extends StatelessWidget {
     required this.subtitle,
     required this.tagText,
     required this.imageAsset,
+    this.imagePadding = 10,
+    this.imagePadding2 = 0,
     required this.onTap,
+    this.imageHeight = 70,
+    this.imageScale = 1.0,
   });
 
   final String title;
@@ -18,6 +22,11 @@ class SmallFeatureCard extends StatelessWidget {
   final String tagText;
   final String imageAsset;
   final VoidCallback onTap;
+
+  final double imageHeight;
+  final double imagePadding;
+  final double imagePadding2;
+  final double imageScale;
 
   static const double _radius = 20;
 
@@ -39,14 +48,19 @@ class SmallFeatureCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              SizedBox(height:imagePadding2),
               Align(
-                alignment: Alignment.topRight,
+                alignment: Alignment.topLeft,
                 child: SizedBox(
-                  height: 70,
-                  child: Image.asset(imageAsset, fit: BoxFit.contain),
+                  height: imageHeight,
+                  child: Transform.scale(
+                    scale: imageScale,
+                    alignment: Alignment.topLeft,
+                    child: Image.asset(imageAsset, fit: BoxFit.contain),
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height:imagePadding),
               Text(
                 title,
                 maxLines: 2,

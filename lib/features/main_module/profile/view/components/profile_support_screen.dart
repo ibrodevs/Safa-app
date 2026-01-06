@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileSupportScreen extends StatelessWidget {
   const ProfileSupportScreen({super.key});
@@ -6,10 +7,43 @@ class ProfileSupportScreen extends StatelessWidget {
   static const _accent = Color(0xFFFF8A00);
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
+  Future<void> _launchUri(BuildContext context, Uri uri) async {
+    final ok = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось открыть приложение.')),
+      );
+    }
+  }
+
+  Future<void> _callSupport(BuildContext context, String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    await _launchUri(context, uri);
+  }
+
+  Future<void> _openWhatsApp(BuildContext context, String phoneE164Digits) async {
+    final uri = Uri.parse('https://wa.me/$phoneE164Digits');
+    await _launchUri(context, uri);
+  }
+
+  Future<void> _openTelegram(BuildContext context, String phoneE164Digits) async {
+    final tgUri = Uri.parse('tg://resolve?phone=$phoneE164Digits');
+    if (await canLaunchUrl(tgUri)) {
+      await _launchUri(context, tgUri);
+      return;
+    }
+
+    final webUri = Uri.parse('https://t.me/+${phoneE164Digits}');
+    await _launchUri(context, webUri);
+  }
 
   @override
   Widget build(BuildContext context) {
-    const phone = '+996 XXX XX XX XX';
+    const phoneDisplay = '+996 509 10 67 88';
+    const phoneDigits = '996509106788'; // E.164 digits
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -104,7 +138,7 @@ class ProfileSupportScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            phone,
+                            phoneDisplay,
                             style: const TextStyle(
                               fontSize: 20,
                               height: 1.1,
@@ -137,8 +171,7 @@ class ProfileSupportScreen extends StatelessWidget {
                                 ),
                               ),
                               onPressed: () {
-                                _showSoonSnack(context);
-                                // Тут позже добавишь запуск звонка через url_launcher.
+                                _callSupport(context, phoneDisplay);
                               },
                               child: const Text(
                                 'Позвонить в поддержку',
@@ -167,13 +200,13 @@ class ProfileSupportScreen extends StatelessWidget {
                     _SupportButton(
                       label: 'Написать в WhatsApp',
                       icon: Icons.chat_bubble_rounded,
-                      onTap: () => _showSoonSnack(context),
+                      onTap: () => _openWhatsApp(context, phoneDigits),
                     ),
                     const SizedBox(height: 8),
                     _SupportButton(
                       label: 'Чат в Telegram',
                       icon: Icons.telegram,
-                      onTap: () => _showSoonSnack(context),
+                      onTap: () => _openTelegram(context, phoneDigits),
                     ),
                     const SizedBox(height: 24),
                     const Text(

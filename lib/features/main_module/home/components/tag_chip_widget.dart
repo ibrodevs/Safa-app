@@ -11,14 +11,14 @@ class TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = compact ? 32.0 : 36.0;
-    final horizontalPadding = compact ? 4.0 : 4.0;
+    final height = compact ? 26.0 : 26.0;
+    final horizontalPadding = compact ? 1.0 : 1.0;
 
     return Container(
       height: height,
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1E5),
+        color: const Color(0xFFfddec6),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -34,8 +34,8 @@ class TagChip extends StatelessWidget {
             child: Center(
               child: SvgPicture.asset(
                 'assets/icons/ic_box.svg',
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 colorFilter: const ColorFilter.mode(
                   AppColors.accent,
                   BlendMode.srcIn,
@@ -43,14 +43,13 @@ class TagChip extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
-              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: compact ? 11 : 13,
+                fontSize: compact ? 10 : 13,
                 height: 1.1,
                 fontWeight: FontWeight.w700,
                 color: AppColors.accent,
