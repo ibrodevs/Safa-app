@@ -62,11 +62,6 @@ class InputTile extends StatelessWidget {
                   style: style,
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color: AppColors.chev,
-              ),
             ],
           ),
         ),

@@ -100,7 +100,7 @@ class _CaptureBox extends StatelessWidget {
       child: Stack(
         children: [
           Align(
-            alignment: const Alignment(0, 0.35),
+            alignment: Alignment.center,
             child: Image.asset(
               'assets/images/img_id_card.png',
               width: 140,

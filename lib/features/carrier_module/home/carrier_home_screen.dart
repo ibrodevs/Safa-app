@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -921,13 +922,16 @@ class _WelcomeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Нажмите “На линию”, чтобы увидеть ближайшие заказы',
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.3,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF9FA4AD),
+              const Center(
+                child: Text(
+                  'Сатурн — шестая планета по удалённости от \nСолнца и вторая по размерам планета',
+                  style: TextStyle(
+                    fontSize: 16,
+                    letterSpacing: -0.4,
+                    height: 1.3,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.grey,
+                  ),
                 ),
               ),
               const SizedBox(height: 22),

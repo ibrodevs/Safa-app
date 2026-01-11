@@ -40,6 +40,31 @@ class _CarrierProfileBody extends StatelessWidget {
       ),
     );
   }
+  String formatKgPhone(String? input) {
+    if (input == null) return '—';
+
+    var digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '—';
+
+    if (digits.startsWith('0') && digits.length == 10) {
+      digits = digits.substring(1);
+    }
+
+    if (digits.length == 9) {
+      digits = '996$digits';
+    }
+
+    if (digits.length == 12 && digits.startsWith('996')) {
+      final op = digits.substring(3, 6);   // 997
+      final a = digits.substring(6, 8);    // 91
+      final b = digits.substring(8, 10);   // 91
+      final c = digits.substring(10, 12);  // 70
+      return '+996 $op $a-$b-$c';
+    }
+
+    return input.trim().startsWith('+') ? input.trim() : '+$digits';
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CarrierProfileProvider>();
@@ -70,6 +95,7 @@ class _CarrierProfileBody extends StatelessWidget {
     final avatar = profile?.avatar;
     final rate = profile?.rate ?? 0;
     final clientRateCount = profile?.clientRateCount ?? 0;
+    final phone = formatKgPhone(profile?.phoneNumber);
 
     return Scaffold(
       backgroundColor: Color(0xFFFFFFFF),
@@ -124,7 +150,7 @@ class _CarrierProfileBody extends StatelessWidget {
                     Expanded(
                       child: _HeaderInfo(
                         name: name.isEmpty ? '—' : name,
-                        phone: '+${profile?.phoneNumber ?? '—'}',
+                        phone: phone,
                         city: city.isEmpty ? '—' : city,
                       ),
                     ),

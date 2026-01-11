@@ -1,3 +1,4 @@
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class AddAddressButton extends StatelessWidget {
@@ -23,7 +24,7 @@ class AddAddressButton extends StatelessWidget {
           backgroundColor: Colors.white,
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
-        child: const Text('+ Адрес', style: TextStyle(color: Colors.black)),
+        child: Text('+ Адрес', style: TextStyle(color: AppColors.grey)),
       ),
     );
   }

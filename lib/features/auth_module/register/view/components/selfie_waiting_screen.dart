@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -106,12 +107,8 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 3),
-              const Center(
-                child: Icon(
-                  Icons.access_time_rounded,
-                  size: 96,
-                  color: _accent,
-                ),
+              Center(
+                child: SvgPicture.asset('assets/icons/ic_clock1.svg'),
               ),
               const SizedBox(height: 32),
               const Center(
@@ -129,14 +126,15 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
               const SizedBox(height: 12),
               const Center(
                 child: Text(
-                  'Сатурн—шестая планета по удалённости от '
+                  'Сатурн — шестая планета по удалённости от '
                       'Солнца и вторая по размерам планета',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
+                    letterSpacing: -0.4,
                     height: 1.3,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
                   ),
                 ),
               ),

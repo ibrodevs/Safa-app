@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../data/model/delivery_point_model.dart';
+import '../widgets/sheet_back_pill.dart';
 import 'map_picker_screen.dart';
 
 class IntermediatePointSheet extends StatefulWidget {
@@ -83,187 +84,233 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Material(
-        color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 24, 24, 16 + bottom),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Промежуточная точка',
-                    style: TextStyle(
-                      fontSize: 28,
-                      height: 1.1,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.black,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(color: const Color(0x33000000)),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            width: double.infinity,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 60),
+                  child: Material(
+                    color: AppColors.white,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.addressLine,
-                    style: TextStyle(
-                      fontSize: 20,
-                      height: 1.2,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.placeLine,
-                    style: TextStyle(
-                      fontSize: 17,
-                      height: 1.2,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.tileBorder, width: 1),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        SvgPicture.asset(
-                          'assets/icons/ic_box.svg',
-                          width: 20,
-                          height: 20,
-                          colorFilter: const ColorFilter.mode(
-                            AppColors.accent,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _bazarCtrl,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              border: InputBorder.none,
-                              hintText: 'Откуда отправка',
-                              hintStyle: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.chev,
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(24, 24, 24, 16 + bottom),
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Промежуточная точка',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.black,
+                                ),
                               ),
-                            ),
-                            cursorColor: AppColors.black,
-                            textInputAction: TextInputAction.next,
+                              const SizedBox(height: 6),
+                              Text(
+                                widget.addressLine,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.placeLine,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              Container(
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.tileBorder,
+                                    width: 1,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: Row(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/ic_box.svg',
+                                      width: 20,
+                                      height: 20,
+                                      colorFilter: const ColorFilter.mode(
+                                        AppColors.accent,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _bazarCtrl,
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          border: InputBorder.none,
+                                          hintText: 'Откуда отправка',
+                                          hintStyle: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.chev,
+                                          ),
+                                        ),
+                                        cursorColor: AppColors.black,
+                                        textInputAction: TextInputAction.next,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 22),
+                              const Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: AppColors.tileBorder,
+                              ),
+                              const SizedBox(height: 18),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _TagField(
+                                      hint: 'Контейнер',
+                                      controller: _containerCtrl,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _TagField(
+                                      hint: 'Проход',
+                                      controller: _passageCtrl,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 56,
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    final p = await Navigator.of(context)
+                                        .push<DeliveryPoint>(
+                                          MaterialPageRoute(
+                                            builder: (_) => MapPickerScreen(
+                                              initial: LatLng(
+                                                widget.lat,
+                                                widget.lon,
+                                              ),
+                                              title: 'Точка отправки',
+                                            ),
+                                          ),
+                                        );
+                                    if (!mounted || p == null) return;
+
+                                    setState(() {
+                                      _pickedOnMap = p;
+                                      _bazarCtrl.clear();
+                                      _containerCtrl.clear();
+                                      _passageCtrl.clear();
+                                    });
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: AppColors.grey),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    foregroundColor: Colors.black,
+                                    textStyle: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  child: const Text('Карта'),
+                                ),
+                              ),
+
+                              const SizedBox(height: 28),
+                              SizedBox(
+                                height: 56,
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    elevation: 0,
+                                    backgroundColor: AppColors.accent,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Text('Далее'),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 22),
-                  const Divider(height: 1, thickness: 1, color: AppColors.tileBorder),
-                  const SizedBox(height: 18),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _TagField(
-                          hint: 'Контейнер',
-                          controller: _containerCtrl,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _TagField(
-                          hint: 'Проход',
-                          controller: _passageCtrl,
-                        ),
-                      ),
-                    ],
+                Positioned(
+                  right: 16,
+                  top: 12,
+                  child: SheetBackPill(
+                    onTap: () => Navigator.of(context).pop(),
                   ),
-
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 56,
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        final p = await Navigator.of(context).push<DeliveryPoint>(
-                          MaterialPageRoute(
-                            builder: (_) => MapPickerScreen(
-                              initial: LatLng(widget.lat, widget.lon),
-                              title: 'Точка отправки',
-                            ),
-                          ),
-                        );
-                        if (!mounted || p == null) return;
-
-                        setState(() {
-                          _pickedOnMap = p;
-                          _bazarCtrl.clear();
-                          _containerCtrl.clear();
-                          _passageCtrl.clear();
-                        });
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppColors.grey),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        foregroundColor: Colors.black,
-                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
-                      child: const Text('Карта'),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    height: 56,
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      child: const Text('Далее'),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
 class _TagField extends StatelessWidget {
-  const _TagField({
-    required this.hint,
-    required this.controller,
-  });
+  const _TagField({required this.hint, required this.controller});
 
   final String hint;
   final TextEditingController controller;

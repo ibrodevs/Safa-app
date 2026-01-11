@@ -23,6 +23,30 @@ class ProfileScreen extends StatelessWidget {
 
 class _ProfileBody extends StatelessWidget {
   const _ProfileBody();
+  String formatKgPhone(String? input) {
+    if (input == null) return '—';
+
+    var digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '—';
+
+    if (digits.startsWith('0') && digits.length == 10) {
+      digits = digits.substring(1);
+    }
+
+    if (digits.length == 9) {
+      digits = '996$digits';
+    }
+
+    if (digits.length == 12 && digits.startsWith('996')) {
+      final op = digits.substring(3, 6);   // 997
+      final a = digits.substring(6, 8);    // 91
+      final b = digits.substring(8, 10);   // 91
+      final c = digits.substring(10, 12);  // 70
+      return '+996 $op $a-$b-$c';
+    }
+
+    return input.trim().startsWith('+') ? input.trim() : '+$digits';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +57,7 @@ class _ProfileBody extends StatelessWidget {
         ? profile.firstName
         : (state.loading ? 'Загрузка...' : '—');
 
-    final rawPhone = profile?.phoneNumber ?? '';
-    final phone = rawPhone.isEmpty
-        ? '—'
-        : (rawPhone.startsWith('+') ? rawPhone : '+$rawPhone');
+    final phone = state.loading ? '—' : formatKgPhone(profile?.phoneNumber);
 
     return Scaffold(
       backgroundColor: Colors.white,

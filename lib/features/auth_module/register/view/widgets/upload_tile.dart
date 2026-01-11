@@ -28,7 +28,7 @@ class UploadTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          height: 152,
+          height: 140,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -95,9 +95,10 @@ class UploadTile extends StatelessWidget {
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              SizedBox(height: 30),
               Container(
-                width: 44,
-                height: 32,
+                width: 26,
+                height: 20,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE5E9EF),
@@ -110,7 +111,7 @@ class UploadTile extends StatelessWidget {
                   fit: BoxFit.contain,
                 ),
               ),
-              const Spacer(),
+              SizedBox(height: 10),
               Text(
                 title,
                 maxLines: 2,

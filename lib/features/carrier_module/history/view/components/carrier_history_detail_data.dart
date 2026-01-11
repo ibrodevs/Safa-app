@@ -108,12 +108,10 @@ class _HistoryDetailsBody extends StatelessWidget {
         }
 
         final ShipmentDetail d = state.detail!;
-
         final titleNumber = d.publicCode.isNotEmpty
             ? 'Посылка №${d.publicCode}'
             : 'Посылка #${d.id}';
         final statusText = _mapStatus(d.status);
-
         final chips = <_DetailChip>[
           _DetailChip(
             'assets/icons/ic_box.svg',
@@ -354,7 +352,7 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
+      padding: EdgeInsets.fromLTRB(20, 2, 20, 2),
       child: Divider(
         height: 1,
         thickness: 1,

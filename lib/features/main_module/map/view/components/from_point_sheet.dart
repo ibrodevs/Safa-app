@@ -1,3 +1,4 @@
+import 'package:dogo/features/main_module/map/view/widgets/sheet_back_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:latlong2/latlong.dart';
@@ -30,31 +31,55 @@ class FromPointSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
-        color: const Color(0x33000000),
-        child: Align(
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(color: const Color(0x33000000)),
+          ),
+        ),
+
+        Align(
           alignment: Alignment.bottomCenter,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottom),
-              child: _FromPointContent(
-                mainTitle: mainTitle,
-                bazarTitle: bazarTitle,
-                lat: lat,
-                lon: lon,
-                subtitle: subtitle,
-              ),
+          child: SizedBox(
+            width: double.infinity,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 60),
+                  child: SafeArea(
+                    top: false,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottom),
+                      child: _FromPointContent(
+                        mainTitle: mainTitle,
+                        bazarTitle: bazarTitle,
+                        lat: lat,
+                        lon: lon,
+                        subtitle: subtitle,
+                      ),
+                    ),
+                  ),
+                ),
+
+                Positioned(
+                  right: 16,
+                  top: 12,
+                  child: SheetBackPill(
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -83,6 +108,7 @@ class _FromPointContentState extends State<_FromPointContent> {
   final TextEditingController _containerCtrl = TextEditingController();
   final TextEditingController _passageCtrl = TextEditingController();
   DeliveryPoint? _pickedOnMap;
+
   @override
   void dispose() {
     _bazarCtrl.dispose();
@@ -175,10 +201,7 @@ class _FromPointContentState extends State<_FromPointContent> {
           ),
           const SizedBox(height: 24),
 
-          _MainInput(
-            controller: _bazarCtrl,
-            hint: 'Откуда отправка',
-          ),
+          _MainInput(controller: _bazarCtrl, hint: 'Откуда отправка'),
 
           const SizedBox(height: 22),
           const Divider(height: 1, color: FromPointSheet._tileBorder),
@@ -194,10 +217,7 @@ class _FromPointContentState extends State<_FromPointContent> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _ChipField(
-                  hint: 'Проход',
-                  controller: _passageCtrl,
-                ),
+                child: _ChipField(hint: 'Проход', controller: _passageCtrl),
               ),
             ],
           ),
@@ -226,9 +246,14 @@ class _FromPointContentState extends State<_FromPointContent> {
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: FromPointSheet._tileBorder),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 foregroundColor: Colors.black,
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               child: const Text('Карта'),
             ),
@@ -261,10 +286,7 @@ class _FromPointContentState extends State<_FromPointContent> {
 }
 
 class _MainInput extends StatelessWidget {
-  const _MainInput({
-    required this.controller,
-    required this.hint,
-  });
+  const _MainInput({required this.controller, required this.hint});
 
   final TextEditingController controller;
   final String hint;
@@ -320,10 +342,7 @@ class _MainInput extends StatelessWidget {
 }
 
 class _ChipField extends StatelessWidget {
-  const _ChipField({
-    required this.hint,
-    required this.controller,
-  });
+  const _ChipField({required this.hint, required this.controller});
 
   final String hint;
   final TextEditingController controller;
