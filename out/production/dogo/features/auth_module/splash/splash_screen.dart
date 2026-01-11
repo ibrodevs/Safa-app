@@ -108,7 +108,7 @@ class _SplashScreenState extends State<SplashScreen>
                 FadeTransition(
                   opacity: _textOpacity,
                   child: const Text(
-                    'SafaApp',
+                    'DoGo',
                     style: TextStyle(
                       fontFamily: 'SFProText',
                       fontWeight: FontWeight.w600,

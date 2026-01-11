@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
+import '../../features/carrier_module/home/data/model/nearby_shipment.dart';
 import '../../features/carrier_module/home/data/model/nearby_shipments_page.dart';
 import '../../features/carrier_module/profile/data/model/carrier_day_stats.dart';
 import '../../features/carrier_module/profile/data/model/carrier_profile_model.dart';
