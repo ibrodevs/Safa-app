@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -94,8 +95,13 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 FadeTransition(
                   opacity: _logoOpacity,
-                  child: Image.asset(
-                    'assets/images/img_splash.png',
+                  child: SizedBox(
+                    width: 110,
+                    height: 110,
+                    child: SvgPicture.asset(
+                      'assets/icons/new_icon.svg',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
