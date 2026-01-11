@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "kg.genesis.dogos"
+    namespace = "kg.genesis.safa_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "kg.genesis.dogos"
+        applicationId = "kg.genesis.safa_app"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
