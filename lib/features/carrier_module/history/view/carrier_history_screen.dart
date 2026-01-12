@@ -210,7 +210,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                   chips: chips,
                   onDetails: () {
                     context.push(
-                      '/history/detail',
+                      '/history-carrier/detail',
                       extra: item.id,
                     );
                   },

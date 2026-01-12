@@ -123,7 +123,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               const Center(
                 child: Text(
                   'Сатурн — шестая планета по удалённости от '

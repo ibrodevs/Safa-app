@@ -303,50 +303,6 @@ class _HistoryDetailsBody extends StatelessWidget {
               ),
             ],
           ),
-
-          bottomNavigationBar: SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 18,
-                    offset: Offset(0, -6),
-                    color: Color(0x14000000),
-                  ),
-                ],
-              ),
-              child: SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => context.push('/profile/support'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.support_agent_rounded, size: 20),
-                      SizedBox(width: 10),
-                      Text('Поддержка'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
         );
       },
     );

@@ -260,13 +260,13 @@ class _CarrierProfileBody extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 26),
                       Container(
-                        width: 1,
+                        width: 1.5,
                         height: 30,
-                        color: _tileBorder,
+                        color: Colors.black,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Text(
                         'От $clientRateCount клиентов',
                         style: const TextStyle(
@@ -280,7 +280,6 @@ class _CarrierProfileBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-
                 if (profile != null)
                   _StatisticsCard(createdAt: profile.createdAt),
               ],

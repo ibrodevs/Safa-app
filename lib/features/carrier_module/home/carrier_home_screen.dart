@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -729,6 +730,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
           fare: _activeFare,
           accent: _accent,
           onDone: () => _stopActiveAndBackToWelcome(),
+          stops: _activeStops,
         );
       } else {
         final dist = _distanceToCurrentStopMeters();
@@ -1027,25 +1029,25 @@ class _ShipmentSheet extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Chip(icon: Icons.inventory_2_outlined, label: 'Большие мешки'),
+              _Chip(icon: 'assets/icons/ic_box.svg', label: 'Большие мешки'),
               const SizedBox(width: 8),
-              _Chip(icon: Icons.map_outlined, label: '$stopsCount точки'),
+              _Chip(icon: 'assets/icons/ic_map.svg', label: '$stopsCount точки'),
             ],
           ),
           const SizedBox(height: 18),
-          Text(
-            '${shipment.estimatedFare} сом',
-            style: const TextStyle(
-              fontSize: 22,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
           Row(
-            children: const [
-              Icon(Icons.add, size: 16, color: Color(0xFF22C55E)),
+            children:  [
+              Text(
+                '${shipment.estimatedFare} сом',
+                style: const TextStyle(
+                  fontSize: 22,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(width: 150),
+              SvgPicture.asset('assets/icons/ic_add_raiting.svg'),
               SizedBox(width: 2),
               Text(
                 '+1 рейтинг',
@@ -1348,6 +1350,7 @@ class _CompletedSheet extends StatelessWidget {
     required this.fare,
     required this.accent,
     required this.onDone,
+    required this.stops,
   });
 
   final String publicCode;
@@ -1355,20 +1358,29 @@ class _CompletedSheet extends StatelessWidget {
   final Color accent;
   final VoidCallback onDone;
 
+  final List<_StopUi> stops;
+
   @override
   Widget build(BuildContext context) {
+    final orderedStops = stops;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
         boxShadow: const [
-          BoxShadow(color: Color(0x26000000), blurRadius: 18, offset: Offset(0, -4)),
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 18,
+            offset: Offset(0, -4),
+          ),
         ],
       ),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -1385,31 +1397,48 @@ class _CompletedSheet extends StatelessWidget {
               if (publicCode.isNotEmpty)
                 Text(
                   '#$publicCode',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF9AA0A6)),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF9AA0A6),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  big: '+$fare',
-                  small: 'Сомов заработано',
-                  icon: Icons.credit_card,
-                  iconColor: const Color(0xFF22C55E),
+
+          if (orderedStops.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _StopsTimeline(stops: orderedStops),
+            const SizedBox(height: 12),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 12),
+          ] else ...[
+            const SizedBox(height: 12),
+          ],
+
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Flexible(
+                  flex: 3,
+                  child: _StatCard(
+                    big: '+$fare',
+                    small: 'Сомов заработано',
+                    icon: 'assets/icons/ic_wallet.svg',
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: _StatCard(
-                  big: '+1',
-                  small: 'К рейтингу',
-                  icon: Icons.emoji_events_outlined,
-                  iconColor: Color(0xFF22C55E),
+                const SizedBox(width: 16),
+                const Flexible(
+                  flex: 2, // уже
+                  child: _StatCard(
+                    big: '+1',
+                    small: 'К рейтингу',
+                    icon: 'assets/icons/ic_rait.svg',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -1421,9 +1450,14 @@ class _CompletedSheet extends StatelessWidget {
                 backgroundColor: accent,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: const Text('Выполнено', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Выполнено',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
@@ -1432,44 +1466,154 @@ class _CompletedSheet extends StatelessWidget {
   }
 }
 
+class _StopsTimeline extends StatelessWidget {
+  const _StopsTimeline({required this.stops});
+
+  final List<_StopUi> stops;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.42;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(stops.length, (i) {
+        final s = stops[i];
+        final isLast = i == stops.length - 1;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StopTile(stop: s),
+            if (!isLast) ...[
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.only(left: 2),
+                child: Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 34,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+        );
+      }),
+    );
+
+    if (stops.length <= 4) return content;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(child: content),
+    );
+  }
+}
+
+class _StopTile extends StatelessWidget {
+  const _StopTile({required this.stop});
+
+  final _StopUi stop;
+
+  @override
+  Widget build(BuildContext context) {
+    final header = stop.headerLine;
+    final sub = stop.subLine;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          header,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: Colors.black,
+            height: 1.15,
+          ),
+        ),
+        if (sub.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            sub,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF9AA0A6),
+              height: 1.1,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.big,
     required this.small,
     required this.icon,
-    required this.iconColor,
   });
 
   final String big;
   final String small;
-  final IconData icon;
-  final Color iconColor;
+  final String icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      height: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 14, 16, 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: const [
-          BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 4)),
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(big, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
+          Text(
+            big,
+            style: const TextStyle(
+              fontSize: 35,
+              fontWeight: FontWeight.w900,
+              height: 1.0,
+              letterSpacing: -0.6,
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Icon(icon, size: 18, color: iconColor),
-              const SizedBox(width: 8),
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: SvgPicture.asset(
+                  icon,
+                  color: AppColors.green,
+                ),
+              ),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   small,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                    color: Colors.black,
+                  ),
                 ),
               ),
             ],
@@ -1483,7 +1627,7 @@ class _StatCard extends StatelessWidget {
 class _Chip extends StatelessWidget {
   const _Chip({required this.icon, required this.label});
 
-  final IconData icon;
+  final String icon;
   final String label;
 
   @override
@@ -1498,7 +1642,8 @@ class _Chip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFFFF8A00)),
+          SizedBox(height:18,width: 16,child: SvgPicture.asset(icon,color: AppColors.primary,),)
+          ,
           const SizedBox(width: 6),
           Text(
             label,

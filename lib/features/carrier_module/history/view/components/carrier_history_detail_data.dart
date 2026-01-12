@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../main_module/history/data/model/shipment_detail_model.dart';
@@ -291,6 +292,33 @@ class _HistoryDetailsBody extends StatelessWidget {
                   value: d.publicCode.isNotEmpty
                       ? 'Код: ${d.publicCode}\n$priceText'
                       : priceText,
+                ),
+              ),
+              const SliverToBoxAdapter(child: _Divider()),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: OutlinedButton(
+                      onPressed: () => context.push('/profile/support'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        side: const BorderSide(color: _accent, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                      ),
+                      child: const Text('Техподдержка'),
+                    ),
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
