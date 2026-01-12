@@ -134,6 +134,19 @@ class _HistoryDetailsBody extends StatelessWidget {
               'Тип: ${d.segment!.name}',
             ),
         ];
+        final flightNumberText =
+        d.publicCode.isNotEmpty ? d.publicCode : d.id.toString();
+
+        final orderCostText = (d.finalFare > 0)
+            ? '${d.finalFare} сом'
+            : (d.estimatedFare != null && d.estimatedFare! > 0)
+            ? '${d.estimatedFare} сом'
+            : '—';
+
+        final commissionValue = int.tryParse(d.commission) ?? 0;
+        final commissionText =
+        (d.commission.isNotEmpty && commissionValue > 0) ? '${d.commission} сом' : '—';
+
 
         final routeText = d.stops.isEmpty
             ? 'Маршрут не указан'
@@ -288,10 +301,28 @@ class _HistoryDetailsBody extends StatelessWidget {
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: _Section(
-                  title: 'Стоимость и код заказа:',
-                  value: d.publicCode.isNotEmpty
-                      ? 'Код: ${d.publicCode}\n$priceText'
-                      : priceText,
+                  title: 'Номер рейса',
+                  value: flightNumberText,
+                ),
+              ),
+              const SliverToBoxAdapter(child: _Divider()),
+              SliverToBoxAdapter(
+                child: _Section(
+                  title: 'Стоимость заказа',
+                  value: orderCostText,
+                ),
+              ),
+              const SliverToBoxAdapter(child: _Divider()),
+              SliverToBoxAdapter(
+                child: _Section(
+                  title: 'Стоимость комиссий',
+                  value: commissionText,
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height:
+                  32 + MediaQuery.viewPaddingOf(context).bottom,
                 ),
               ),
               const SliverToBoxAdapter(child: _Divider()),

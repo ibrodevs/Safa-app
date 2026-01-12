@@ -233,7 +233,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     } else {
       idx = 0;
     }
-
     return _ActiveUi(
       id: id,
       publicCode: publicCode,
@@ -293,7 +292,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Разрешите геолокацию в настройках приложения')),
         );
-        // await Geolocator.openAppSettings();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Произошла ошибка')),
@@ -334,15 +332,12 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeCurrentStopIndex = parsed.currentStopIndex;
         _activeStops = parsed.stops;
         _activeFare = parsed.fare;
-
         _nearby = const [];
         _nearbyIndex = 0;
-
         _didFitOnce = false;
         _routeSignature = null;
         _routePoints = const [];
       });
-
       _startPolling(parsed.id);
       await _syncRouteAndCameraForActive();
     } catch (e) {
@@ -370,12 +365,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
       });
-
       if (parsed.status == ShipmentStatus.canceled) {
         _stopActiveAndBackToWelcome(message: 'Заказ отменён');
         return;
       }
-
       await _syncRouteAndCameraForActive();
     } catch (_) {}
   }
@@ -1328,11 +1321,11 @@ class _ArrowDown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Align(
+    return  Align(
       alignment: Alignment.centerLeft,
       child: Padding(
         padding: EdgeInsets.only(left: 6),
-        child: Icon(Icons.arrow_downward_rounded, size: 28, color: Colors.black),
+        child: SvgPicture.asset('assets/icons/ic_arrow_long.svg')
       ),
     );
   }
@@ -1424,7 +1417,7 @@ class _CompletedSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 const Flexible(
-                  flex: 2, // уже
+                  flex: 2,
                   child: _StatCard(
                     big: '+1',
                     small: 'К рейтингу',
@@ -1481,13 +1474,9 @@ class _StopsTimeline extends StatelessWidget {
             _StopTile(stop: s),
             if (!isLast) ...[
               const SizedBox(height: 6),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(left: 2),
-                child: Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 34,
-                  color: Colors.black,
-                ),
+                child: SvgPicture.asset('assets/icons/ic_arrow_long.svg')
               ),
               const SizedBox(height: 10),
             ],
@@ -1495,9 +1484,7 @@ class _StopsTimeline extends StatelessWidget {
         );
       }),
     );
-
     if (stops.length <= 4) return content;
-
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: SingleChildScrollView(child: content),

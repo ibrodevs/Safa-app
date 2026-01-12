@@ -108,6 +108,19 @@ class _HistoryDetailsBody extends StatelessWidget {
         }
 
         final ShipmentDetail d = state.detail!;
+        final flightNumberText =
+        d.publicCode.isNotEmpty ? d.publicCode : d.id.toString();
+
+        final orderCostText = (d.finalFare > 0)
+            ? '${d.finalFare} сом'
+            : (d.estimatedFare != null && d.estimatedFare! > 0)
+            ? '${d.estimatedFare} сом'
+            : '—';
+
+        final commissionValue = int.tryParse(d.commission) ?? 0;
+        final commissionText =
+        (d.commission.isNotEmpty && commissionValue > 0) ? '${d.commission} сом' : '—';
+
 
         final titleNumber = d.publicCode.isNotEmpty
             ? 'Посылка №${d.publicCode}'
@@ -289,10 +302,23 @@ class _HistoryDetailsBody extends StatelessWidget {
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: _Section(
-                  title: 'Стоимость и код заказа:',
-                  value: d.publicCode.isNotEmpty
-                      ? 'Код: ${d.publicCode}\n$priceText'
-                      : priceText,
+                  title: 'Номер рейса',
+                  value: flightNumberText,
+                ),
+              ),
+              const SliverToBoxAdapter(child: _Divider()),
+              SliverToBoxAdapter(
+                child: _Section(
+                  title: 'Стоимость заказа',
+                  value: orderCostText,
+                ),
+              ),
+              const SliverToBoxAdapter(child: _Divider()),
+
+              SliverToBoxAdapter(
+                child: _Section(
+                  title: 'Стоимость комиссий',
+                  value: commissionText,
                 ),
               ),
               SliverToBoxAdapter(
@@ -350,13 +376,12 @@ class _Section extends StatelessWidget {
 
 class _Divider extends StatelessWidget {
   const _Divider();
-
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, 4),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
       child: Divider(
-        height: 1,
+        height: 0.5,
         thickness: 1,
         color: Color(0xFFE9EDF2),
       ),

@@ -67,7 +67,7 @@ class ShipmentDetail {
   final String description;
   final List<ShipmentStop> stops;
   final String stopsCount;
-  final int estimatedFare;
+  final int? estimatedFare;
   final int finalFare;
   final String commission;
   final String courierIncome;

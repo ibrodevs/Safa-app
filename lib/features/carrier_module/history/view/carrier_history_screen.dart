@@ -354,7 +354,7 @@ class _HistoryCard extends StatelessWidget {
                     ),
                   ),
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 6),
                     child: Text(
                       'Подробнее',
                       style: TextStyle(color: Colors.black),
