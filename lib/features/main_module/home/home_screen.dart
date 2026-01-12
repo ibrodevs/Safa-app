@@ -113,7 +113,7 @@ class _HomeBodyState extends State<_HomeBody> {
                       Expanded(
                         child: SmallFeatureCard(
                           title: 'Аманат',
-                          subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          subtitle: 'Узнайте размер и вес посылки для расчета прайса',
                           tagText: 'По всему КР',
                           imageAsset: 'assets/images/img_home_amanat.png',
                           imageHeight: 55,
@@ -127,7 +127,7 @@ class _HomeBodyState extends State<_HomeBody> {
                       Expanded(
                         child: SmallFeatureCard(
                           title: 'Специалисты',
-                          subtitle: 'Узнайте размер\nи вес посылки для\nрасчета прайса',
+                          subtitle: 'Узнайте размер и вес посылки для расчета прайса',
                           tagText: 'Внутри Дордоя',
                           imageAsset: 'assets/images/img_home_specialists.png',
                           onTap: () {},

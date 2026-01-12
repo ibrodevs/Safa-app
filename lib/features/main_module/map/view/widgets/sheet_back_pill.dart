@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class SheetBackPill extends StatelessWidget {
   const SheetBackPill({super.key, required this.onTap});
@@ -13,7 +14,7 @@ class SheetBackPill extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -27,13 +28,13 @@ class SheetBackPill extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.chevron_left_rounded, color: Color(0xFFB9BEC7), size: 22),
+            children:  [
+              SvgPicture.asset('assets/icons/ic_arrow.svg'),
               SizedBox(width: 6),
               Text(
                 'Назад',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFFB9BEC7),
                 ),

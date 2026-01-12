@@ -62,20 +62,9 @@ class SmallFeatureCard extends StatelessWidget {
               ),
               SizedBox(height:imagePadding),
               Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
                 subtitle,
                 maxLines: 3,
+                softWrap: true,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,

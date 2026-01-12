@@ -150,52 +150,100 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                               ),
                               const SizedBox(height: 24),
 
-                              Container(
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: AppColors.tileBorder,
-                                    width: 1,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Row(
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/ic_box.svg',
-                                      width: 20,
-                                      height: 20,
-                                      colorFilter: const ColorFilter.mode(
-                                        AppColors.accent,
-                                        BlendMode.srcIn,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: AppColors.tileBorder,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Row(
+                                        children: [
+                                          SvgPicture.asset(
+                                            'assets/icons/ic_box.svg',
+                                            width: 20,
+                                            height: 20,
+                                            colorFilter: const ColorFilter.mode(
+                                              AppColors.accent,
+                                              BlendMode.srcIn,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _bazarCtrl,
+                                              decoration: const InputDecoration(
+                                                isCollapsed: true, // ✅ чтобы было по центру по высоте
+                                                border: InputBorder.none,
+                                                hintText: 'Откуда отправка',
+                                                hintStyle: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.chev,
+                                                ),
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.black,
+                                              ),
+                                              cursorColor: AppColors.black,
+                                              textInputAction: TextInputAction.next,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _bazarCtrl,
-                                        decoration: const InputDecoration(
-                                          isDense: true,
-                                          border: InputBorder.none,
-                                          hintText: 'Откуда отправка',
-                                          hintStyle: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.chev,
+                                  ),
+
+                                  const SizedBox(width: 12),
+
+                                  TextButton.icon(
+                                    onPressed: () async {
+                                      FocusScope.of(context).unfocus();
+
+                                      final p = await Navigator.of(context).push<DeliveryPoint>(
+                                        MaterialPageRoute(
+                                          builder: (_) => MapPickerScreen(
+                                            initial: LatLng(widget.lat, widget.lon),
+                                            title: 'Точка отправки',
                                           ),
                                         ),
-                                        cursorColor: AppColors.black,
-                                        textInputAction: TextInputAction.next,
+                                      );
+                                      if (!mounted || p == null) return;
+
+                                      setState(() {
+                                        _pickedOnMap = p;
+
+                                        // чтобы было понятно, что выбрали
+                                        _bazarCtrl.text = p.title;
+
+                                        _containerCtrl.clear();
+                                        _passageCtrl.clear();
+                                      });
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      foregroundColor: AppColors.accent,
+                                      textStyle: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  ],
-                                ),
+                                    icon: const Icon(Icons.near_me_rounded, size: 20),
+                                    label: const Text('Карта'),
+                                  ),
+                                ],
                               ),
-
                               const SizedBox(height: 22),
                               const Divider(
                                 height: 1,
@@ -220,48 +268,6 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                     ),
                                   ),
                                 ],
-                              ),
-
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                height: 56,
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    final p = await Navigator.of(context)
-                                        .push<DeliveryPoint>(
-                                          MaterialPageRoute(
-                                            builder: (_) => MapPickerScreen(
-                                              initial: LatLng(
-                                                widget.lat,
-                                                widget.lon,
-                                              ),
-                                              title: 'Точка отправки',
-                                            ),
-                                          ),
-                                        );
-                                    if (!mounted || p == null) return;
-
-                                    setState(() {
-                                      _pickedOnMap = p;
-                                      _bazarCtrl.clear();
-                                      _containerCtrl.clear();
-                                      _passageCtrl.clear();
-                                    });
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: AppColors.grey),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    foregroundColor: Colors.black,
-                                    textStyle: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  child: const Text('Карта'),
-                                ),
                               ),
 
                               const SizedBox(height: 28),

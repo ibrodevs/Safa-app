@@ -296,7 +296,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         // await Geolocator.openAppSettings();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text('Произошла ошибка')),
         );
       }
     } finally {
@@ -347,9 +347,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForActive();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
     }
   }
 
@@ -403,7 +400,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     });
 
     if (message != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
     }
   }
 
@@ -437,7 +434,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text('Произошла ошибка')),
       );
     }
   }
@@ -676,13 +673,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final myPoint = LatLng(_myLat, _myLon);
 
     final markers = <Marker>[
-      Marker(
+      /*Marker(
         point: myPoint,
         width: 40,
         height: 40,
         alignment: Alignment.center,
         child: const _MeDot(),
-      ),
+      ),*/
     ];
 
     final stopPts = <LatLng>[];
@@ -790,11 +787,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   ],
                 ),
               ],
-
-              MarkerLayer(markers: markers),
             ],
           ),
-
           Positioned.fill(
             child: IgnorePointer(
               ignoring: true,
@@ -1046,7 +1040,7 @@ class _ShipmentSheet extends StatelessWidget {
                   color: Colors.black,
                 ),
               ),
-              SizedBox(width: 150),
+              SizedBox(width: 100),
               SvgPicture.asset('assets/icons/ic_add_raiting.svg'),
               SizedBox(width: 2),
               Text(

@@ -307,9 +307,22 @@ final class ApiService {
       DioException e, {
         String fallback = 'Ошибка сети',
       }) {
-    String message = fallback;
+    const userFriendly = 'Произошла ошибка. Обратитесь в поддержку';
+
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
+
+    if (statusCode == 404 || (statusCode != null && statusCode >= 500)) {
+      return ApiException(userFriendly, statusCode: statusCode);
+    }
+    if (statusCode == null) {
+      final rawErr = e.error?.toString();
+      if (rawErr != null && rawErr.trim().isNotEmpty) {
+        return ApiException(rawErr, statusCode: null);
+      }
+      return ApiException(fallback, statusCode: null);
+    }
+    String message = fallback;
 
     if (data is Map && data.isNotEmpty) {
       final firstKey = data.keys.first;
@@ -321,12 +334,13 @@ final class ApiService {
       }
     } else if (data is String && data.isNotEmpty) {
       message = data;
-    } else if (statusCode != null) {
-      message = 'Ошибка сервера $statusCode';
+    } else {
+      message = fallback;
     }
 
     return ApiException(message, statusCode: statusCode);
   }
+
 
   Future<RegisterResponse> postRegister(RegisterRequest body) async {
     try {

@@ -1,4 +1,5 @@
 
+import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -264,7 +265,7 @@ class _CarrierProfileBody extends StatelessWidget {
                       Container(
                         width: 1.5,
                         height: 30,
-                        color: Colors.black,
+                        color: Color(0xFF424242),
                       ),
                       const SizedBox(width: 12),
                       Text(
@@ -273,7 +274,7 @@ class _CarrierProfileBody extends StatelessWidget {
                           fontSize: 15,
                           height: 1.1,
                           fontWeight: FontWeight.w600,
-                          color: _ratingGrey,
+                          color: Color(0xFF54546c),
                         ),
                       ),
                     ],
@@ -477,7 +478,6 @@ class _StatisticsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-
           SizedBox(
             height: 52,
             child: ListView.separated(
@@ -644,8 +644,8 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = selected ? _accent : Colors.white;
     final borderColor = _accent;
-    final textColorTop = selected ? Colors.white : Colors.black;
-    final textColorBottom = selected ? Colors.white : _accent;
+    final textColorTop = Colors.black;
+    final textColorBottom = AppColors.black;
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),

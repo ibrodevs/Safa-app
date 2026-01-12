@@ -201,8 +201,51 @@ class _FromPointContentState extends State<_FromPointContent> {
           ),
           const SizedBox(height: 24),
 
-          _MainInput(controller: _bazarCtrl, hint: 'Откуда отправка'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _MainInput(
+                  controller: _bazarCtrl,
+                  hint: 'Откуда отправка',
+                ),
+              ),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
 
+                  final p = await Navigator.of(context).push<DeliveryPoint>(
+                    MaterialPageRoute(
+                      builder: (_) => MapPickerScreen(
+                        initial: LatLng(widget.lat, widget.lon),
+                        title: 'Точка отправки',
+                      ),
+                    ),
+                  );
+                  if (!mounted || p == null) return;
+
+                  setState(() {
+                    _pickedOnMap = p;
+                    _bazarCtrl.text = p.title;
+                    _containerCtrl.clear();
+                    _passageCtrl.clear();
+                  });
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: FromPointSheet._accent,
+                  textStyle: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                icon: const Icon(Icons.near_me_rounded, size: 20),
+                label: const Text('Карта'),
+              ),
+            ],
+          ),
           const SizedBox(height: 22),
           const Divider(height: 1, color: FromPointSheet._tileBorder),
           const SizedBox(height: 16),
@@ -220,43 +263,6 @@ class _FromPointContentState extends State<_FromPointContent> {
                 child: _ChipField(hint: 'Проход', controller: _passageCtrl),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 56,
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () async {
-                final p = await Navigator.of(context).push<DeliveryPoint>(
-                  MaterialPageRoute(
-                    builder: (_) => MapPickerScreen(
-                      initial: LatLng(widget.lat, widget.lon),
-                      title: 'Точка отправки',
-                    ),
-                  ),
-                );
-                if (!mounted || p == null) return;
-
-                setState(() {
-                  _pickedOnMap = p;
-                  _bazarCtrl.clear();
-                  _containerCtrl.clear();
-                  _passageCtrl.clear();
-                });
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: FromPointSheet._tileBorder),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                foregroundColor: Colors.black,
-                textStyle: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              child: const Text('Карта'),
-            ),
           ),
           const SizedBox(height: 28),
           SizedBox(
