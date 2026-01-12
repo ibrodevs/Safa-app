@@ -23,7 +23,7 @@ class ConfirmSelfieScreen extends StatelessWidget {
               const Text(
                 'Сделайте селфи с паспортом',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   height: 1.25,
                   color: Color(0xFF9FA4AD),
@@ -68,7 +68,8 @@ class _PageTitle extends StatelessWidget {
       'Подтверждение',
       style: TextStyle(
         fontSize: 27,
-        fontWeight: FontWeight.w900,
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w600,
         height: 1.1,
         color: Colors.black,
       ),

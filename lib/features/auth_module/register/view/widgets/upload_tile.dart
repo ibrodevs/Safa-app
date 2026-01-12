@@ -42,8 +42,8 @@ class UploadTile extends StatelessWidget {
             ],
           ),
           padding: hasImage
-              ? const EdgeInsets.all(8)
-              : const EdgeInsets.fromLTRB(22, 22, 22, 20),
+              ? const EdgeInsets.fromLTRB(8,8,8,8)
+              : const EdgeInsets.fromLTRB(15, 30, 15, 15),
           child: hasImage
               ? ClipRRect(
             borderRadius: BorderRadius.circular(12),
