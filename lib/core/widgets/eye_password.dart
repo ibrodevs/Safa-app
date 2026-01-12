@@ -14,18 +14,17 @@ class PasswordEye extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        width: 10,
-        height: 10,
         margin: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: const Color(0xFFE5E9EF),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           obscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-          size: 20,
+          size: 14, // меньше
           color: const Color(0xFF8F97A3),
         ),
       ),

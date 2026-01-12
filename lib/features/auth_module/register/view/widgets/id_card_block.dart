@@ -18,7 +18,7 @@ class IdCardBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+      padding: const EdgeInsets.fromLTRB(15, 20, 60, 22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -47,11 +47,11 @@ class IdCardBlock extends StatelessWidget {
               color: Colors.black,
             ),
           ),
-          const SizedBox(height: 6),
           const Text(
             'Нажмите и загрузите документ с двух сторон',
             style: TextStyle(
               fontSize: 11,
+              fontFamily: 'SFProDisplay',
               fontWeight: FontWeight.w600,
               height: 1.25,
               color: Color(0xFF9FA4AD),
@@ -68,7 +68,7 @@ class IdCardBlock extends StatelessWidget {
                   placeholderAsset: 'assets/icons/ic_front_id_card.svg',
                 ),
               ),
-              const SizedBox(width: 24),
+              const SizedBox(width: 16),
               Expanded(
                 child: UploadTile(
                   title: 'Обратная сторона',
@@ -84,4 +84,3 @@ class IdCardBlock extends StatelessWidget {
     );
   }
 }
-

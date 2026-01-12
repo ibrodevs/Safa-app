@@ -55,7 +55,16 @@ class AppTextField extends StatelessWidget {
           borderSide: BorderSide.none,
           borderRadius: BorderRadius.circular(8),
         ),
-        suffixIcon: suffix,
+        suffixIcon: suffix == null
+            ? null
+            : Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: suffix,
+        ),
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 4,
+          minHeight: 4,
+        ),
         prefixText: prefixText,
         prefixStyle: const TextStyle(
           fontSize: 15,

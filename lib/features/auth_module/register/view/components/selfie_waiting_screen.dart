@@ -110,7 +110,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
               Center(
                 child: SvgPicture.asset('assets/icons/ic_clock1.svg'),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
               const Center(
                 child: Text(
                   'Ожидайте подтверждения',
@@ -186,6 +186,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 22),
             ],
           ),
         ),
