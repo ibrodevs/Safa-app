@@ -49,7 +49,6 @@ class CarrierHomeScreen extends StatefulWidget {
 
 class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
 
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
   final MapController _mapController = MapController();
@@ -318,7 +317,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   Future<void> _acceptCurrent() async {
     final s = _currentNearby;
     if (s == null) return;
-
     try {
       final raw = await _acceptRaw(s.id);
       final parsed = _parseActive(raw, fallbackIndex: 0);
@@ -820,31 +818,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 }
 
 
-class _MeDot extends StatelessWidget {
-  const _MeDot();
-
-  static const _accent = Color(0xFFFF8A00);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: _accent,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _StopDot extends StatelessWidget {
   const _StopDot();
@@ -974,6 +947,7 @@ class _ShipmentSheet extends StatelessWidget {
         : '$distance метров';
 
     final stopsCount = shipment.stops.length;
+    final sigment = shipment.segment?.name;
     final nearestHint = shipment.stops.isNotEmpty ? shipment.stops.first.shortHint : '';
 
     return Container(
@@ -1016,14 +990,20 @@ class _ShipmentSheet extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Chip(icon: 'assets/icons/ic_box.svg', label: 'Большие мешки'),
+              Expanded(
+                flex: 3,
+                child: _Chip(icon: 'assets/icons/ic_box.svg', label: '$sigment'),
+              ),
               const SizedBox(width: 8),
-              _Chip(icon: 'assets/icons/ic_map.svg', label: '$stopsCount точки'),
+              Expanded(
+                flex: 2,
+                child: _Chip(icon: 'assets/icons/ic_map.svg', label: '$stopsCount точки'),
+              ),
             ],
           ),
           const SizedBox(height: 18),
           Row(
-            children:  [
+            children: [
               Text(
                 '${shipment.estimatedFare} сом',
                 style: const TextStyle(
@@ -1033,10 +1013,12 @@ class _ShipmentSheet extends StatelessWidget {
                   color: Colors.black,
                 ),
               ),
-              SizedBox(width: 100),
+
+              const Spacer(),
+
               SvgPicture.asset('assets/icons/ic_add_raiting.svg'),
-              SizedBox(width: 2),
-              Text(
+              const SizedBox(width: 2),
+              const Text(
                 '+1 рейтинг',
                 style: TextStyle(
                   fontSize: 14,
@@ -1115,8 +1097,9 @@ class _ActiveProgressSheet extends StatelessWidget {
     final isLast = stops.isNotEmpty && currentIndex >= stops.length - 1;
 
     final buttonText = (status == ShipmentStatus.assigned)
-        ? 'На месте'
+        ? 'Начать'
         : (isLast ? 'Выполнено' : 'Следующая точка');
+
 
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {
@@ -1161,7 +1144,11 @@ class _ActiveProgressSheet extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.place_outlined, size: 18, color: accent),
+                    SizedBox(
+                      height: 18,
+                      width: 16,
+                      child: SvgPicture.asset('assets/icons/ic_map.svg', color: AppColors.primary),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1176,9 +1163,30 @@ class _ActiveProgressSheet extends StatelessWidget {
                   ],
                 ),
               ),
-            const SizedBox(height: 14),
+            SizedBox(height: 8),
+            const Center(
+              child: Text(
+                'Сатурн — шестая планета по удалённости от Солнца и вторая по размерам планета',
+                style: TextStyle(
+                  fontSize: 15,
+                  letterSpacing: -0.4,
+                  height: 1.3,
+                  fontFamily: 'SFProDisplay',
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.grey,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
           ] else ...[
-            if (items.isNotEmpty) _TwoStopsCard(items: items, currentIndex: currentIndex),
+            if (stops.isNotEmpty)
+              _ProgressStopsCard(
+                status: status,
+                myLat: 0,
+                myLon: 0,
+                stops: stops,
+                currentIndex: currentIndex,
+              ),
             const SizedBox(height: 14),
           ],
 
@@ -1201,6 +1209,87 @@ class _ActiveProgressSheet extends StatelessWidget {
     );
   }
 }
+class _ProgressStopsCard extends StatelessWidget {
+  const _ProgressStopsCard({
+    required this.status,
+    required this.stops,
+    required this.currentIndex,
+    this.myLat,
+    this.myLon,
+  });
+
+  final ShipmentStatus status;
+  final List<_StopUi> stops;
+
+  final int currentIndex;
+
+  final double? myLat;
+  final double? myLon;
+
+  static const _green = Color(0xFF41C44B);
+  static const _grey = Color(0xFFB7BCC5);
+
+  @override
+  Widget build(BuildContext context) {
+    if (stops.isEmpty) return const SizedBox.shrink();
+
+    if (status == ShipmentStatus.assigned) {
+      final first = stops.first;
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StopRow(
+              title: first.headerLine,
+              subtitle: first.subLine,
+              trailing: const _TrailingStatus(text: 'Вы здесь', color: _green),
+              muted: false,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final ci = currentIndex.clamp(0, stops.length - 1);
+    final cur = stops[ci];
+
+    final hasNext = ci < stops.length - 1;
+    final next = hasNext ? stops[ci + 1] : null;
+
+    final label = _pointLabelRu(ci);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StopRow(
+            title: cur.headerLine,
+            subtitle: cur.subLine,
+            trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
+            muted: true,
+          ),
+          if (next != null) ...[
+            const SizedBox(height: 10),
+            const _ArrowDown(),
+            const SizedBox(height: 10),
+            _StopRow(
+              title: next.headerLine,
+              subtitle: next.subLine,
+              trailing: null,
+              muted: false,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 
 class _TwoStopsCard extends StatelessWidget {
   const _TwoStopsCard({
@@ -1221,12 +1310,7 @@ class _TwoStopsCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-      ),
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1257,15 +1341,31 @@ class _StopRow extends StatelessWidget {
   const _StopRow({
     required this.title,
     required this.subtitle,
-    required this.trailing,
+    this.trailing,
+    this.muted = false,
   });
 
   final String title;
   final String subtitle;
-  final Widget trailing;
+  final Widget? trailing;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
+    const double trailingW = 130;
+
+    final titleStyle = TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.w700,
+      color: muted ? const Color(0xFFB7BCC5) : Colors.black,
+    );
+
+    final subStyle = TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      color: muted ? const Color(0xFFB7BCC5) : const Color(0xFF9AA0A6),
+    );
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1273,48 +1373,265 @@ class _StopRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(title, style: titleStyle),
               const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF9AA0A6),
-                ),
-              ),
+              Text(subtitle, style: subStyle),
             ],
           ),
         ),
-        const SizedBox(width: 12),
-        trailing,
+        if (trailing != null) ...[
+          const SizedBox(width: 12),
+          SizedBox(width: trailingW, child: trailing),
+        ],
       ],
+    );
+  }
+}
+String _pointLabelRu(int idx0) {
+  // idx0 = 0-based, а в UI 1-based
+  final n = idx0 + 1;
+  switch (n) {
+    case 1: return 'Первая точка';
+    case 2: return 'Вторая точка';
+    case 3: return 'Третья точка';
+    case 4: return 'Четвертая точка';
+    default: return '$n-я точка';
+  }
+}
+
+class _TwoStopsCardV34 extends StatelessWidget {
+  const _TwoStopsCardV34({
+    required this.stops,
+    required this.currentIndex,
+  });
+
+  final List<_StopUi> stops;
+  final int currentIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stops.isEmpty) return const SizedBox.shrink();
+
+    final ci = currentIndex.clamp(0, stops.length - 1);
+    final cur = stops[ci];
+
+    final hasNext = ci < stops.length - 1;
+    final next = hasNext ? stops[ci + 1] : null;
+
+    final hasPrev = ci - 1 >= 0;
+    final prev = hasPrev ? stops[ci - 1] : null;
+
+    final label = _pointLabelRu(ci);
+
+    // Вариант A: текущая + следующая (как на скрине "Вторая/Третья точка" сверху + следующая снизу)
+    final top = _StopRow(
+      title: cur.headerLine,
+      subtitle: cur.subLine,
+      trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
+      muted: true, // на скринах верхняя строка приглушена
+    );
+
+    final bottomNext = next == null
+        ? null
+        : _StopRow(
+      title: next.headerLine,
+      subtitle: next.subLine,
+      trailing: null,
+      muted: false,
+    );
+
+    // Вариант B: предыдущая + текущая (для последней точки)
+    final topPrev = prev == null
+        ? null
+        : _StopRow(
+      title: prev.headerLine,
+      subtitle: prev.subLine,
+      trailing: null,
+      muted: true,
+    );
+
+    final bottomCur = _StopRow(
+      title: cur.headerLine,
+      subtitle: cur.subLine,
+      trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
+      muted: false,
+    );
+
+    final children = <Widget>[];
+
+    if (hasNext && bottomNext != null) {
+      children.add(top);
+      children.addAll(const [SizedBox(height: 10), _ArrowDown(), SizedBox(height: 10)]);
+      children.add(bottomNext);
+    } else {
+      if (topPrev != null) {
+        children.add(topPrev);
+        children.addAll(const [SizedBox(height: 10), _ArrowDown(), SizedBox(height: 10)]);
+      }
+      children.add(bottomCur);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
+class _TrailingHere extends StatelessWidget {
+  const _TrailingHere({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;    // "Вы здесь"
+  final String subtitle; // "Третья точка"
+
+  static const _green = Color(0xFF41C44B);
+  static const _grey = Color(0xFFB7BCC5);
+
+  @override
+  Widget build(BuildContext context) {
+    const barW = 2.0;
+    const barH = 44.0;
+
+    // ширины под твою верстку (как в _TrailingStatus)
+    const width = 130.0;
+    const textSlot = 110.0;
+    const gap = 10.0;
+
+    final barRight = textSlot + gap;
+
+    return SizedBox(
+      width: width,
+      height: barH,
+      child: Stack(
+        children: [
+          Positioned(
+            right: barRight,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: barW,
+              decoration: BoxDecoration(
+                color: _green,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: textSlot,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _green,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _grey,
+                      height: 1.05,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _TrailingStatus extends StatelessWidget {
-  const _TrailingStatus({required this.text, required this.color});
+  const _TrailingStatus({
+    required this.text,
+    required this.color,
+    this.width = 120,
+    this.textSlot = 100,
+    this.gap = 10,
+  });
 
   final String text;
   final Color color;
+  final double width;
+  final double textSlot;
+  final double gap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 2,
-          height: 44,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: 10),
-        Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
-      ],
+    const barW = 2.0;
+    const barH = 44.0;
+
+    final barRight = textSlot + gap;
+
+    return SizedBox(
+      width: width,
+      height: barH,
+      child: Stack(
+        children: [
+          Positioned(
+            right: barRight,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: barW,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: textSlot,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
+
 
 class _ArrowDown extends StatelessWidget {
   const _ArrowDown();
@@ -1621,18 +1938,24 @@ class _Chip extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height:18,width: 16,child: SvgPicture.asset(icon,color: AppColors.primary,),)
-          ,
+          SizedBox(
+            height: 18,
+            width: 16,
+            child: SvgPicture.asset(icon, color: AppColors.primary),
+          ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4B5563),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF4B5563),
+              ),
             ),
           ),
         ],
