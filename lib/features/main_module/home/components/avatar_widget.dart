@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Avatar extends StatelessWidget {
-  const Avatar({this.avatarUrl});
+  const Avatar({super.key, this.avatarUrl});
 
   final String? avatarUrl;
 

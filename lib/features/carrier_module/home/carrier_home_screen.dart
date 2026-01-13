@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/features/carrier_module/home/view/comp/empty_orders_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -65,10 +66,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   List<NearbyShipment> _nearby = const [];
   int _nearbyIndex = 0;
+
   NearbyShipment? get _currentNearby =>
       (_nearby.isNotEmpty && _nearbyIndex >= 0 && _nearbyIndex < _nearby.length)
-          ? _nearby[_nearbyIndex]
-          : null;
+      ? _nearby[_nearbyIndex]
+      : null;
 
   int? _activeId;
   String _activePublicCode = '';
@@ -86,6 +88,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   List<LatLng> _routePoints = const [];
 
   bool get _hasActive => _activeId != null;
+  bool _showEmptyOrders = false;
+  Timer? _nearbyPollTimer;
 
   @override
   void initState() {
@@ -99,9 +103,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _nearbyPollTimer?.cancel();
     _posSub?.cancel();
     super.dispose();
   }
+
 
   Future<void> _initLocation() async {
     try {
@@ -139,16 +145,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _moveMap(LatLng(_myLat, _myLon), zoom: 15);
 
       _posSub?.cancel();
-      _posSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
-        ),
-      ).listen((p) {
-        _myLat = p.latitude;
-        _myLon = p.longitude;
-        if (mounted) setState(() {});
-      });
+      _posSub =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 10,
+            ),
+          ).listen((p) {
+            _myLat = p.latitude;
+            _myLon = p.longitude;
+            if (mounted) setState(() {});
+          });
     } catch (_) {
       if (!mounted) return;
       _moveMap(_bishkekCenter);
@@ -164,12 +171,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   Future<Position> _getCurrentPositionOrThrow() async {
     final ok = await _ensureLocationPermission();
     if (!ok) {
-      throw Exception('Нужен доступ к геолокации, чтобы показать ближайшие заказы');
+      throw Exception(
+        'Нужен доступ к геолокации, чтобы показать ближайшие заказы',
+      );
     }
 
-    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
-
 
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
@@ -183,14 +193,16 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<Map<String, dynamic>> _acceptRaw(int id) async {
-    final resp =
-    await ApiService.instance.dio.post('delivery/shipments/$id/accept/');
+    final resp = await ApiService.instance.dio.post(
+      'delivery/shipments/$id/accept/',
+    );
     return _asMap(resp.data);
   }
 
   Future<Map<String, dynamic>> _advanceRaw(int id) async {
-    final resp =
-    await ApiService.instance.dio.post('delivery/shipments/$id/advance/');
+    final resp = await ApiService.instance.dio.post(
+      'delivery/shipments/$id/advance/',
+    );
     return _asMap(resp.data);
   }
 
@@ -241,6 +253,50 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       fare: fare,
     );
   }
+  Future<void> _refreshNearbySilently() async {
+    if (_hasActive) return;
+    try {
+      final ok = await _ensureLocationPermission();
+      if (!ok) return;
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      final page = await ApiService.instance.getNearbyShipments(
+        lat: pos.latitude,
+        lon: pos.longitude,
+      );
+
+      if (!mounted) return;
+
+      if (page.results.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        _showEmptyOrders = false;
+        _showWelcome = false;
+
+        _nearby = page.results;
+        _nearbyIndex = 0;
+
+        _myLat = pos.latitude;
+        _myLon = pos.longitude;
+        _centerLat = _myLat;
+        _centerLon = _myLon;
+
+        _didFitOnce = false;
+        _routeSignature = null;
+        _routePoints = const [];
+      });
+
+      await _syncRouteAndCameraForNearby();
+    } catch (_) {
+
+    }
+  }
+
   Future<void> _goOnline() async {
     if (_loadingOnline) return;
     setState(() => _loadingOnline = true);
@@ -256,16 +312,18 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       if (!mounted) return;
 
       if (page.results.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Рядом нет заказов')),
-        );
+        if (!mounted) return;
         setState(() {
-          _showWelcome = true;
           _nearby = const [];
           _nearbyIndex = 0;
+
+          _showWelcome = false;
+          _showEmptyOrders = true;
         });
+        _startNearbyPolling();
         return;
       }
+
 
       setState(() {
         _showWelcome = false;
@@ -276,6 +334,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _myLon = pos.longitude;
         _centerLat = _myLat;
         _centerLon = _myLon;
+        _stopNearbyPolling();
 
         _didFitOnce = false;
         _routeSignature = null;
@@ -289,18 +348,19 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       final perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Разрешите геолокацию в настройках приложения')),
+          const SnackBar(
+            content: Text('Разрешите геолокацию в настройках приложения'),
+          ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Произошла ошибка')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
       }
     } finally {
       if (mounted) setState(() => _loadingOnline = false);
     }
   }
-
 
   void _rejectNearby() {
     if (_nearby.isEmpty) return;
@@ -332,6 +392,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeFare = parsed.fare;
         _nearby = const [];
         _nearbyIndex = 0;
+        _stopNearbyPolling();
         _didFitOnce = false;
         _routeSignature = null;
         _routePoints = const [];
@@ -370,6 +431,19 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForActive();
     } catch (_) {}
   }
+  void _startNearbyPolling() {
+    _nearbyPollTimer?.cancel();
+    _nearbyPollTimer = Timer.periodic(
+      const Duration(seconds: 7),
+          (_) => _refreshNearbySilently(),
+    );
+    _refreshNearbySilently();
+  }
+
+  void _stopNearbyPolling() {
+    _nearbyPollTimer?.cancel();
+    _nearbyPollTimer = null;
+  }
 
   void _stopActiveAndBackToWelcome({String? message}) {
     _pollTimer?.cancel();
@@ -391,7 +465,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     });
 
     if (message != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
     }
   }
 
@@ -401,8 +477,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     try {
       final raw = await _advanceRaw(id);
-      final parsed =
-      _parseActive(raw, fallbackIndex: _activeCurrentStopIndex + 1);
+      final parsed = _parseActive(
+        raw,
+        fallbackIndex: _activeCurrentStopIndex + 1,
+      );
 
       if (!mounted) return;
 
@@ -420,15 +498,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       await _syncRouteAndCameraForActive();
 
-      if (parsed.status == ShipmentStatus.completed) {
-      }
+      if (parsed.status == ShipmentStatus.completed) {}
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
     }
   }
+
   List<LatLng> _pointsFromStops(List<_StopUi> stops) {
     final out = <LatLng>[];
     for (final s in stops) {
@@ -442,11 +520,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return out;
   }
 
-
   String _signature(List<LatLng> pts) {
     String f(double v) => v.toStringAsFixed(6);
     return pts.map((p) => '${f(p.latitude)},${f(p.longitude)}').join('|');
   }
+
   Future<bool> _ensureLocationPermission() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -466,7 +544,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       return false;
     }
 
-    return perm == LocationPermission.always || perm == LocationPermission.whileInUse;
+    return perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse;
   }
 
   Future<List<LatLng>> _buildOsrmLegRoute({
@@ -568,7 +647,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     const eps = 1e-6;
     final degenerate =
         (bounds.north - bounds.south).abs() < eps &&
-            (bounds.east - bounds.west).abs() < eps;
+        (bounds.east - bounds.west).abs() < eps;
 
     if (degenerate) {
       _mapController.move(clean.first, 15);
@@ -580,11 +659,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     try {
       _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: padding,
-          maxZoom: 17,
-        ),
+        CameraFit.bounds(bounds: bounds, padding: padding, maxZoom: 17),
       );
     } catch (_) {
       _mapController.move(clean.first, 15);
@@ -646,12 +721,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final s = _activeStops[i];
     if (s.lat == null || s.lon == null) return 0;
 
-    final d = Geolocator.distanceBetween(
-      _myLat,
-      _myLon,
-      s.lat!,
-      s.lon!,
-    );
+    final d = Geolocator.distanceBetween(_myLat, _myLon, s.lat!, s.lon!);
     return d.round();
   }
 
@@ -735,6 +805,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     } else {
       bottom = const SizedBox.shrink();
     }
+    if (_showEmptyOrders && !_hasActive) {
+      return const EmptyOrdersScreen();
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -816,8 +889,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     );
   }
 }
-
-
 
 class _StopDot extends StatelessWidget {
   const _StopDot();
@@ -912,7 +983,10 @@ class _WelcomeCard extends StatelessWidget {
                   ),
                   child: Text(
                     loading ? 'Загружаем…' : 'На линию',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -948,7 +1022,9 @@ class _ShipmentSheet extends StatelessWidget {
 
     final stopsCount = shipment.stops.length;
     final sigment = shipment.segment?.name;
-    final nearestHint = shipment.stops.isNotEmpty ? shipment.stops.first.shortHint : '';
+    final nearestHint = shipment.stops.isNotEmpty
+        ? shipment.stops.first.shortHint
+        : '';
 
     return Container(
       width: double.infinity,
@@ -979,7 +1055,9 @@ class _ShipmentSheet extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            nearestHint.isNotEmpty ? 'Ближайшая подача: $nearestHint' : 'Ближайшая подача',
+            nearestHint.isNotEmpty
+                ? 'Ближайшая подача: $nearestHint'
+                : 'Ближайшая подача',
             style: const TextStyle(
               fontSize: 15,
               height: 1.25,
@@ -992,12 +1070,18 @@ class _ShipmentSheet extends StatelessWidget {
             children: [
               Expanded(
                 flex: 3,
-                child: _Chip(icon: 'assets/icons/ic_box.svg', label: '$sigment'),
+                child: _Chip(
+                  icon: 'assets/icons/ic_box.svg',
+                  label: '$sigment',
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: _Chip(icon: 'assets/icons/ic_map.svg', label: '$stopsCount точки'),
+                child: _Chip(
+                  icon: 'assets/icons/ic_map.svg',
+                  label: '$stopsCount точки',
+                ),
               ),
             ],
           ),
@@ -1044,9 +1128,14 @@ class _ShipmentSheet extends StatelessWidget {
                 backgroundColor: accent,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: const Text('Забрать заказ', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Забрать заказ',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -1058,9 +1147,14 @@ class _ShipmentSheet extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: accent,
                 side: BorderSide(color: accent, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: const Text('Отказать', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Отказать',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
@@ -1100,7 +1194,6 @@ class _ActiveProgressSheet extends StatelessWidget {
         ? 'Начать'
         : (isLast ? 'Выполнено' : 'Следующая точка');
 
-
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {
       final ci = currentIndex.clamp(0, stops.length - 1);
@@ -1113,7 +1206,7 @@ class _ActiveProgressSheet extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: const [
           BoxShadow(
             color: Color(0x26000000),
@@ -1122,7 +1215,7 @@ class _ActiveProgressSheet extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1136,18 +1229,27 @@ class _ActiveProgressSheet extends StatelessWidget {
             if (stops.isNotEmpty)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1.2,
+                  ),
                 ),
                 child: Row(
                   children: [
                     SizedBox(
                       height: 18,
                       width: 16,
-                      child: SvgPicture.asset('assets/icons/ic_map.svg', color: AppColors.primary),
+                      child: SvgPicture.asset(
+                        'assets/icons/ic_map.svg',
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1179,17 +1281,27 @@ class _ActiveProgressSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ] else ...[
-            if (stops.isNotEmpty)
-              _ProgressStopsCard(
-                status: status,
-                myLat: 0,
-                myLon: 0,
-                stops: stops,
-                currentIndex: currentIndex,
+            if (stops.isNotEmpty) ...[
+              Builder(
+                builder: (_) {
+                  final ci = currentIndex.clamp(0, stops.length - 1);
+                  final showTwoStops = (ci == 0 && stops.length >= 2);
+                  if (showTwoStops) {
+                    return _TwoStopsCard(
+                      items: [stops[0], stops[1]],
+                      currentIndex: ci,
+                    );
+                  }
+                  return _ProgressStopsCard(
+                    status: status,
+                    stops: stops,
+                    currentIndex: ci,
+                  );
+                },
               ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
+            ],
           ],
-
           SizedBox(
             height: 52,
             width: double.infinity,
@@ -1199,9 +1311,17 @@ class _ActiveProgressSheet extends StatelessWidget {
                 backgroundColor: accent,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: Text(buttonText, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -1209,6 +1329,7 @@ class _ActiveProgressSheet extends StatelessWidget {
     );
   }
 }
+
 class _ProgressStopsCard extends StatelessWidget {
   const _ProgressStopsCard({
     required this.status,
@@ -1235,7 +1356,6 @@ class _ProgressStopsCard extends StatelessWidget {
 
     if (status == ShipmentStatus.assigned) {
       final first = stops.first;
-
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
@@ -1259,21 +1379,24 @@ class _ProgressStopsCard extends StatelessWidget {
     final hasNext = ci < stops.length - 1;
     final next = hasNext ? stops[ci + 1] : null;
 
+    final hasPrev = ci - 1 >= 0;
+    final prev = hasPrev ? stops[ci - 1] : null;
+
     final label = _pointLabelRu(ci);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _StopRow(
-            title: cur.headerLine,
-            subtitle: cur.subLine,
-            trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
-            muted: true,
-          ),
-          if (next != null) ...[
+    if (next != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StopRow(
+              title: cur.headerLine,
+              subtitle: cur.subLine,
+              trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
+              muted: true,
+            ),
             const SizedBox(height: 10),
             const _ArrowDown(),
             const SizedBox(height: 10),
@@ -1284,18 +1407,42 @@ class _ProgressStopsCard extends StatelessWidget {
               muted: false,
             ),
           ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (prev != null) ...[
+            _StopRow(
+              title: prev.headerLine,
+              subtitle: prev.subLine,
+              trailing: null,
+              muted: true,
+            ),
+            const SizedBox(height: 10),
+            const _ArrowDown(),
+            const SizedBox(height: 10),
+          ],
+          _StopRow(
+            title: cur.headerLine,
+            subtitle: cur.subLine,
+            trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
+            muted: false,
+          ),
         ],
       ),
     );
   }
+
 }
 
-
 class _TwoStopsCard extends StatelessWidget {
-  const _TwoStopsCard({
-    required this.items,
-    required this.currentIndex,
-  });
+  const _TwoStopsCard({required this.items, required this.currentIndex});
 
   final List<_StopUi> items;
   final int currentIndex;
@@ -1310,7 +1457,7 @@ class _TwoStopsCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1318,7 +1465,10 @@ class _TwoStopsCard extends StatelessWidget {
             _StopRow(
               title: prev.headerLine,
               subtitle: prev.subLine,
-              trailing: const _TrailingStatus(text: 'Забрали груз', color: _grey),
+              trailing: const _TrailingStatus(
+                text: 'Забрали груз',
+                color: _grey,
+              ),
             ),
           if (prev != null) ...[
             const SizedBox(height: 10),
@@ -1387,23 +1537,25 @@ class _StopRow extends StatelessWidget {
     );
   }
 }
+
 String _pointLabelRu(int idx0) {
-  // idx0 = 0-based, а в UI 1-based
   final n = idx0 + 1;
   switch (n) {
-    case 1: return 'Первая точка';
-    case 2: return 'Вторая точка';
-    case 3: return 'Третья точка';
-    case 4: return 'Четвертая точка';
-    default: return '$n-я точка';
+    case 1:
+      return 'Первая точка';
+    case 2:
+      return 'Вторая точка';
+    case 3:
+      return 'Третья точка';
+    case 4:
+      return 'Четвертая точка';
+    default:
+      return '$n-я точка';
   }
 }
 
 class _TwoStopsCardV34 extends StatelessWidget {
-  const _TwoStopsCardV34({
-    required this.stops,
-    required this.currentIndex,
-  });
+  const _TwoStopsCardV34({required this.stops, required this.currentIndex});
 
   final List<_StopUi> stops;
   final int currentIndex;
@@ -1434,21 +1586,21 @@ class _TwoStopsCardV34 extends StatelessWidget {
     final bottomNext = next == null
         ? null
         : _StopRow(
-      title: next.headerLine,
-      subtitle: next.subLine,
-      trailing: null,
-      muted: false,
-    );
+            title: next.headerLine,
+            subtitle: next.subLine,
+            trailing: null,
+            muted: false,
+          );
 
     // Вариант B: предыдущая + текущая (для последней точки)
     final topPrev = prev == null
         ? null
         : _StopRow(
-      title: prev.headerLine,
-      subtitle: prev.subLine,
-      trailing: null,
-      muted: true,
-    );
+            title: prev.headerLine,
+            subtitle: prev.subLine,
+            trailing: null,
+            muted: true,
+          );
 
     final bottomCur = _StopRow(
       title: cur.headerLine,
@@ -1461,12 +1613,20 @@ class _TwoStopsCardV34 extends StatelessWidget {
 
     if (hasNext && bottomNext != null) {
       children.add(top);
-      children.addAll(const [SizedBox(height: 10), _ArrowDown(), SizedBox(height: 10)]);
+      children.addAll(const [
+        SizedBox(height: 10),
+        _ArrowDown(),
+        SizedBox(height: 10),
+      ]);
       children.add(bottomNext);
     } else {
       if (topPrev != null) {
         children.add(topPrev);
-        children.addAll(const [SizedBox(height: 10), _ArrowDown(), SizedBox(height: 10)]);
+        children.addAll(const [
+          SizedBox(height: 10),
+          _ArrowDown(),
+          SizedBox(height: 10),
+        ]);
       }
       children.add(bottomCur);
     }
@@ -1480,12 +1640,9 @@ class _TwoStopsCardV34 extends StatelessWidget {
 }
 
 class _TrailingHere extends StatelessWidget {
-  const _TrailingHere({
-    required this.title,
-    required this.subtitle,
-  });
+  const _TrailingHere({required this.title, required this.subtitle});
 
-  final String title;    // "Вы здесь"
+  final String title; // "Вы здесь"
   final String subtitle; // "Третья точка"
 
   static const _green = Color(0xFF41C44B);
@@ -1632,17 +1789,16 @@ class _TrailingStatus extends StatelessWidget {
   }
 }
 
-
 class _ArrowDown extends StatelessWidget {
   const _ArrowDown();
 
   @override
   Widget build(BuildContext context) {
-    return  Align(
+    return Align(
       alignment: Alignment.centerLeft,
       child: Padding(
         padding: EdgeInsets.only(left: 6),
-        child: SvgPicture.asset('assets/icons/ic_arrow_long.svg')
+        child: SvgPicture.asset('assets/icons/ic_arrow_long.svg'),
       ),
     );
   }
@@ -1793,7 +1949,7 @@ class _StopsTimeline extends StatelessWidget {
               const SizedBox(height: 6),
               Padding(
                 padding: EdgeInsets.only(left: 2),
-                child: SvgPicture.asset('assets/icons/ic_arrow_long.svg')
+                child: SvgPicture.asset('assets/icons/ic_arrow_long.svg'),
               ),
               const SizedBox(height: 10),
             ],
@@ -1848,13 +2004,8 @@ class _StopTile extends StatelessWidget {
   }
 }
 
-
 class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.big,
-    required this.small,
-    required this.icon,
-  });
+  const _StatCard({required this.big, required this.small, required this.icon});
 
   final String big;
   final String small;
@@ -1895,10 +2046,7 @@ class _StatCard extends StatelessWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: SvgPicture.asset(
-                  icon,
-                  color: AppColors.green,
-                ),
+                child: SvgPicture.asset(icon, color: AppColors.green),
               ),
               const SizedBox(width: 4),
               Expanded(
@@ -1964,7 +2112,6 @@ class _Chip extends StatelessWidget {
   }
 }
 
-
 class _StopUi {
   final String title;
   final String? bazar;
@@ -1981,6 +2128,7 @@ class _StopUi {
     this.passage,
     this.container,
   });
+
   static double? _toDouble(dynamic v) {
     if (v == null) return null;
     final d = double.tryParse(v.toString());
