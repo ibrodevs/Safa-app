@@ -113,7 +113,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
             child: FadeTransition(
               opacity: _contentOpacity,
               child: Image.asset(
-                'assets/images/img_bottom_splash.png',
+                'assets/images/img_splash_second.png',
                 width: double.infinity,
                 fit: BoxFit.fitWidth,
               ),
