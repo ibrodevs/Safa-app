@@ -578,6 +578,7 @@ class _StatLine extends StatelessWidget {
     required this.rightBottomStyle,
     this.rightTopText,
     this.rightTopStyle,
+    this.leftWidth = 90,
   });
 
   final String leftText;
@@ -587,45 +588,43 @@ class _StatLine extends StatelessWidget {
   final String rightBottomText;
   final TextStyle rightBottomStyle;
 
+  final double leftWidth;
+
   @override
   Widget build(BuildContext context) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            leftText,
-            style:valueStyle ,
+          SizedBox(
+            width: leftWidth,
+            child: Align(
+              alignment: Alignment.centerLeft, // или centerRight если хочешь прижать числа к линии
+              child: Text(leftText, style: valueStyle, maxLines: 1),
+            ),
           ),
           const SizedBox(width: 18),
-          Container(
-            width: 1,
-            color: Colors.black,
-          ),
+          Container(width: 1, color: Colors.black),
           const SizedBox(width: 18),
-          Column(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (rightTopText != null) ...[
-                Text(
-                  rightTopText!,
-                  style: rightTopStyle,
-                ),
-                const SizedBox(height: 4),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (rightTopText != null) ...[
+                  Text(rightTopText!, style: rightTopStyle),
+                  const SizedBox(height: 4),
+                ],
+                Text(rightBottomText, style: rightBottomStyle),
               ],
-              Text(
-                rightBottomText,
-                style: rightBottomStyle,
-              ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 }
+
 
 class _StatChip extends StatelessWidget {
   const _StatChip({

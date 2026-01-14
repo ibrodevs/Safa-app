@@ -319,13 +319,6 @@ class _HistoryDetailsBody extends StatelessWidget {
                   value: commissionText,
                 ),
               ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height:
-                  32 + MediaQuery.viewPaddingOf(context).bottom,
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: Padding(
