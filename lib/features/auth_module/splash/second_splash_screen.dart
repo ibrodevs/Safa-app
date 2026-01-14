@@ -119,7 +119,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
               ),
             ),
           ),
-
           Positioned(
             right: 0,
             top: 51,
