@@ -1189,10 +1189,14 @@ class _ActiveProgressSheet extends StatelessWidget {
         : '$distanceM метров';
 
     final isLast = stops.isNotEmpty && currentIndex >= stops.length - 1;
+    final ci = stops.isEmpty ? 0 : currentIndex.clamp(0, stops.length - 1);
+    final showTwoStops = (ci == 0 && stops.length >= 2);
 
-    final buttonText = (status == ShipmentStatus.assigned)
+    final buttonText =
+    (status == ShipmentStatus.assigned || showTwoStops)
         ? 'Начать'
         : (isLast ? 'Выполнено' : 'Следующая точка');
+
 
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {

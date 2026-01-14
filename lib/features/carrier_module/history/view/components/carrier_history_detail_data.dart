@@ -326,6 +326,7 @@ class _HistoryDetailsBody extends StatelessWidget {
                 ),
               ),
               const SliverToBoxAdapter(child: _Divider()),
+              const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),

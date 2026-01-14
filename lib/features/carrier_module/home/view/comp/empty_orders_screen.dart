@@ -65,7 +65,14 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 HeaderEmptyRow(avatarUrl: avatarUrl, title: greeting),
-                const SizedBox(height: 6),
+                const SizedBox(height: 300),
+                Center(
+                  child: Text(
+                    'Пока нет активных\nзаказов',
+                    style: TextStyle(fontSize: 21,fontFamily: 'SFProDisplay',fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ],
             ),
           ),
