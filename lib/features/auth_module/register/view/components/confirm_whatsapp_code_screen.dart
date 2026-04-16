@@ -4,7 +4,6 @@ import 'package:dogo/core/widgets/primary_button.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -68,7 +67,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
     if (!mounted) return;
 
     if (ok) {
-      context.go('/home');
+      context.go('/privacy-policy');
     } else {
       final msg = provider.error ?? 'Неверный код из WhatsApp';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));

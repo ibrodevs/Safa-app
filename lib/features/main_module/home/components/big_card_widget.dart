@@ -1,11 +1,10 @@
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/main_module/home/components/tag_chip_widget.dart';
-import 'package:dogo/features/main_module/home/home_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 
 class BigFeatureCard extends StatelessWidget {
   const BigFeatureCard({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.tagText,

@@ -13,7 +13,7 @@ import '../../features/main_module/history/data/model/shipment_detail_model.dart
 import '../../features/main_module/history/data/model/shipment_history_models.dart';
 import '../../features/main_module/map/data/model/delivery_reverse_geo.dart';
 import '../../features/main_module/profile/data/model/profile_model.dart';
-import '../../features/main_module/type_cargo/data/model/cargo_segment_model.dart';
+import '../../features/main_module/profile/data/model/support_model.dart';
 import '../services/http_logger.dart';
 import '../services/secure_storage_service.dart';
 import 'model/api_exeptions_model.dart';
@@ -22,7 +22,7 @@ final class ApiService {
   static final ApiService instance = ApiService._internal();
   factory ApiService() => instance;
 
-  static const String _baseUrl = 'https://dordoi-go.tech/api/';
+  static const String _baseUrl = 'http://46.101.255.131:8001/api/';
 
   final SecureStorageService _storage = SecureStorageService();
   late final Dio _dio;
@@ -241,7 +241,7 @@ final class ApiService {
 
   Future<bool> _hasInternet() async {
     final r = await Connectivity().checkConnectivity();
-    return r != ConnectivityResult.none;
+    return !r.contains(ConnectivityResult.none);
   }
 
   Future<void> setBearer(String? accessToken) async {
@@ -388,6 +388,16 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('users/delete-account/');
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось удалить аккаунт');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
   Future<ProfileModel> patchProfile({
     required int? id,
     String? firstName,
@@ -689,40 +699,10 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
-  Future<List<CargoSegment>> getDeliverySegments() async {
-    try {
-      final resp = await _dio.get('delivery/segments/');
-      final data = resp.data;
-
-      if (data is List) {
-        return data
-            .where((e) => e is Map)
-            .map<CargoSegment>(
-              (e) => CargoSegment.fromJson(
-            Map<String, dynamic>.from(e as Map),
-          ),
-        )
-            .toList();
-      }
-
-      return const [];
-    } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить типы груза',
-      );
-    } catch (_) {
-      throw ApiException('Непредвиденная ошибка');
-    }
-  }
   Future<Map<String, dynamic>> createShipment({
     required String title,
-    required int segment,
-    required int quantity,
+    required String description,
     required List<Map<String, dynamic>> stops,
-    String size = 'S',
-    bool fragile = false,
-    String description = '',
     bool returnToStart = false,
   }) async {
     try {
@@ -730,10 +710,6 @@ final class ApiService {
         'delivery/shipments/',
         data: {
           'title': title,
-          'segment': segment,
-          'size': size,
-          'quantity': quantity,
-          'fragile': fragile,
           'description': description,
           'stops': stops,
           'return_to_start': returnToStart,
@@ -744,6 +720,29 @@ final class ApiService {
       throw _mapDioError(
         e,
         fallback: 'Не удалось создать доставку',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
+  Future<Map<String, dynamic>> getShipmentQuote({
+    required List<Map<String, dynamic>> stops,
+    bool returnToStart = false,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        'delivery/shipments/quote/',
+        data: {
+          'stops': stops,
+          'return_to_start': returnToStart,
+        },
+      );
+      return _asMap(resp.data);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось рассчитать стоимость',
       );
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
@@ -764,14 +763,14 @@ final class ApiService {
   }
   Future<void> patchShipmentStatus(int id, {required String status}) async {
     try {
-      await _dio.patch(
-        'delivery/shipments/$id/',
+      await _dio.post(
+        'delivery/shipments/$id/set_status/',
         data: {'status': status},
       );
     } on DioException catch (e) {
       throw _mapDioError(
         e,
-        fallback: 'Не удалось отменить доставку',
+        fallback: 'Не удалось сменить статус',
       );
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
@@ -845,10 +844,10 @@ final class ApiService {
       final resp = await _dio.post('delivery/shipments/$id/advance/');
       final map = _asMap(resp.data);
       return ShipmentDetail.fromJson(map);
-    }/* on DioException catch (e) {
+    } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Не удалось перейти к следующей точке');
-    } */catch (_) {
-      throw ApiException('');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
     }
   }
   Future<ShipmentDetail> acceptShipment(int id) async {
@@ -889,8 +888,9 @@ final class ApiService {
       final status = e.response?.statusCode;
       final body = e.response?.data;
       final uri = (e.response?.requestOptions ?? e.requestOptions).uri;
-      throw Exception(
+      throw ApiException(
         'FCM_REGISTER_${status ?? 'ERR'} @ $uri: ${body is String ? body : (e.message ?? 'Ошибка сети')}',
+        statusCode: status,
       );
     }
   }
@@ -901,12 +901,27 @@ final class ApiService {
     );
     if (resp.data is Map<String, dynamic>) return resp.data as Map<String, dynamic>;
     if (resp.data is Map) return Map<String, dynamic>.from(resp.data as Map);
-    throw Exception('Некорректный ответ delivery/shipments/');
+    throw ApiException('Некорректный ответ delivery/shipments/');
   }
 
   String? get currentAccessToken {
     final raw = _dio.options.headers['Authorization']?.toString();
     if (raw == null || raw.isEmpty) return null;
     return raw.startsWith('Bearer ') ? raw.substring(7) : raw;
+  }
+
+  Future<SupportModel> getSupport() async {
+    try {
+      final resp = await _dio.get('delivery/support/');
+      final map = _asMap(resp.data);
+      return SupportModel.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить данные поддержки',
+      );
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
   }
 }

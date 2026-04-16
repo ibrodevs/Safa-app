@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:flutter/material.dart';

@@ -14,7 +14,6 @@ const _greyText = Color(0xFF9FA4AD);
 const _tileBorder = Color(0xFFE9EDF2);
 const _chev = Color(0xFFC7CFD9);
 const _green = Color(0xFF22C55E);
-const _ratingGrey = Color(0xFF737A86);
 
 
 class CarrierProfileScreen extends StatelessWidget {
@@ -168,7 +167,7 @@ class _CarrierProfileBody extends StatelessWidget {
                     border: Border.all(color: Color(0xFFF4F4F4), width: 1),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0xF808080),
+                        color: Color(0x0F808080),
                         blurRadius: 60,
                         offset: Offset(0, 3),
                       ),
@@ -578,7 +577,6 @@ class _StatLine extends StatelessWidget {
     required this.rightBottomStyle,
     this.rightTopText,
     this.rightTopStyle,
-    this.leftWidth = 90,
   });
 
   final String leftText;
@@ -588,7 +586,7 @@ class _StatLine extends StatelessWidget {
   final String rightBottomText;
   final TextStyle rightBottomStyle;
 
-  final double leftWidth;
+  static const double leftWidth = 90;
 
   @override
   Widget build(BuildContext context) {

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/config/finik_config.dart';
 import '../../../../core/utils/app_colors.dart';
+import 'dart:ui';
 import '../provider/finik_payment_flow_provider.dart';
 
 final class FinikPaymentScreen extends StatefulWidget {
@@ -141,11 +142,8 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               visibilityType: VisibilityType.PRIVATE,
             ),
           ),
-          const Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: _FlowOverlayBar(),
+          const Positioned.fill(
+            child: _FinikStatusOverlay(),
           ),
         ],
       ),
@@ -153,66 +151,186 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
   }
 }
 
-class _FlowOverlayBar extends StatelessWidget {
-  const _FlowOverlayBar();
+class _FinikStatusOverlay extends StatelessWidget {
+  const _FinikStatusOverlay();
 
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<FinikPaymentFlowProvider>();
+    final status = flow.status;
 
-    if (flow.status == FinikFlowStatus.succeeded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (Navigator.of(context).canPop()) Navigator.of(context).pop(true);
-      });
-      return _bar('Оплата подтверждена',
-          trailing: const Icon(Icons.check_circle, color: Colors.white));
+    if (status != FinikFlowStatus.polling &&
+        status != FinikFlowStatus.succeeded &&
+        status != FinikFlowStatus.failed) {
+      return const SizedBox.shrink();
     }
 
-    if (flow.status == FinikFlowStatus.polling) {
-      return _bar(
-        'Подтверждаем оплату…',
-        trailing: const SizedBox(
-          height: 18,
-          width: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      );
-    }
-
-    if (flow.status == FinikFlowStatus.failed) {
-      return _bar(flow.errorText ?? 'Ошибка оплаты',
-          trailing: const Icon(Icons.error, color: Colors.white));
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  static Widget _bar(String text, {Widget? trailing}) {
-    return Container(
-      height: 54,
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 300),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8 * value, sigmaY: 8 * value),
+            child: Container(
+              color: AppColors.black.withValues(alpha: 0.4 * value),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: status == FinikFlowStatus.polling
+                      ? _buildPollingCard()
+                      : status == FinikFlowStatus.succeeded
+                          ? _buildSuccessCard(context)
+                          : _buildFailedCard(context, flow.errorText),
+                ),
               ),
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            trailing,
-          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPollingCard() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            height: 64,
+            width: 64,
+            child: CircularProgressIndicator(
+              strokeWidth: 6,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+              strokeCap: StrokeCap.round,
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            'Проверка платежа',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.black,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Обычно это занимает пару секунд. Не закрывайте приложение…',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppColors.grey2.withValues(alpha: 0.8),
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuccessCard(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+      });
+    });
+
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: AppColors.green,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 48),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Оплата прошла!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: AppColors.green,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Заказ успешно оплачен',
+            style: TextStyle(fontSize: 16, color: AppColors.grey2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFailedCard(BuildContext context, String? error) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.cancelColor, size: 64),
+          const SizedBox(height: 24),
+          const Text(
+            'Оплата не удалась',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.black,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            error ?? 'Неизвестная ошибка',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: AppColors.grey2),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Вернуться к заказу'),
+            ),
+          ),
         ],
       ),
     );

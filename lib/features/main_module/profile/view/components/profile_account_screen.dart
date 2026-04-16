@@ -202,6 +202,20 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
                             onTap: () => _showLogoutSheet(context),
                             showChevron: false,
                           ),
+                          const _AccountDivider(),
+                          _AccountTile(
+                            label: 'Удалить аккаунт',
+                            value: 'данные будут удалены безвозвратно',
+                            valueStyle: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.red2,
+                              fontFamily: 'SFProText',
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                            ),
+                            onTap: () => _showDeleteAccountSheet(context),
+                            showChevron: false,
+                          ),
                         ],
                       ),
                     ),
@@ -231,6 +245,32 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
     if (!context.mounted) return;
 
     context.go('/');
+  }
+
+  Future<void> _showDeleteAccountSheet(BuildContext context) async {
+    final res = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => const _DeleteAccountSheet(),
+    );
+
+    if (res != true || !context.mounted) return;
+
+    final ok = await context.read<ProfileProvider>().deleteAccount();
+
+    if (!context.mounted) return;
+
+    if (ok) {
+      await const LogoutService().logout();
+      if (!context.mounted) return;
+      context.go('/');
+    } else {
+      final err = context.read<ProfileProvider>().error ?? 'Не удалось удалить аккаунт';
+      _showSnack(context, err);
+    }
   }
   Future<void> _openEditDialog(
     BuildContext context, {
@@ -789,5 +829,135 @@ class _AccountDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Divider(height: 1, thickness: 1, color: Color(0xFFE9EDF2));
+  }
+}
+
+class _DeleteAccountSheet extends StatelessWidget {
+  const _DeleteAccountSheet();
+
+  static const _radius = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottom),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E8EA),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE9EA),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.delete_forever_rounded,
+                color: Color(0xFFE53935),
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Удалить аккаунт?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Это действие необратимо. Все ваши данные, история и настройки будут удалены навсегда.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.25,
+                color: Color(0xFF7B808A),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE7E8EA)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        foregroundColor: const Color(0xFF111318),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: const Text('Отмена'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE53935),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('Удалить'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

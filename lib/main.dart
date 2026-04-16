@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-
 import 'core/config/finik_config.dart';
 import 'core/router/app_router.dart';
 import 'data/network/api_service.dart';
@@ -20,10 +19,11 @@ import 'features/main_module/map/provider/active_shipment_provider.dart';
 import 'features/main_module/map/provider/delivery_address_provider.dart';
 import 'features/main_module/map/provider/delivery_autocomplete_provider.dart';
 import 'features/main_module/payments/data/repo/shipments_repository.dart';
-import 'features/main_module/profile/data/repo/notifications_repo.dart';
 import 'features/main_module/profile/data/repo/profile_repo.dart';
-import 'features/main_module/profile/provider/notifications_provider.dart';
 import 'features/main_module/profile/provider/profile_provider.dart';
+import 'features/main_module/profile/provider/support_provider.dart';
+import 'features/main_module/payments/data/repo/finik_payments_repository.dart';
+import 'features/main_module/payments/provider/finik_payment_flow_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
@@ -62,8 +62,7 @@ Future<void> main() async {
   final authRepo = AuthRepository(api);
   final geoRepo = DeliveryGeoRepository(api);
   final profileRepo = ProfileRepository(api);
-  final notiRepo = NotificationsRepository(api);
-  final shipRepo =  ShipmentsRepository();
+  final shipRepo = ShipmentsRepository();
   runApp(
     MultiProvider(
       providers: [
@@ -80,8 +79,17 @@ Future<void> main() async {
           create: (_) => ProfileProvider(repo: profileRepo),
         ),
         ChangeNotifierProvider(
-          create: (_) => ActiveShipmentProvider(repo:shipRepo),
-        )
+          create: (_) => SupportProvider(repo: profileRepo),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ActiveShipmentProvider(repo: shipRepo),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => FinikPaymentFlowProvider(
+            shipmentsRepo: shipRepo,
+            paymentsRepo: FinikPaymentsRepository(api: api),
+          ),
+        ),
       ],
       child: const DoGoApp(),
     ),

@@ -17,7 +17,6 @@ class SelfieWaitingScreen extends StatefulWidget {
 }
 
 class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
-  static const _accent = Color(0xFFE67E22);
   static const _cancelGrey = Color(0xFFB9C0C8);
 
   Timer? _timer;
@@ -96,7 +95,6 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final auth = context.read<AuthProvider>();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

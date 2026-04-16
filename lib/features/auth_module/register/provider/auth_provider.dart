@@ -17,7 +17,6 @@ class AuthProvider extends ChangeNotifier {
   RegisterResponse? _user;
 
   String? _pendingPhone;
-  String? _pendingPassword;
   bool _loggedIn = false;
 
   UserRole? get role => _role;
@@ -61,7 +60,6 @@ class AuthProvider extends ChangeNotifier {
     try {
       _user = await _repo.register(request);
       _pendingPhone = phoneNumber;
-      _pendingPassword = password;
       _loggedIn = false;
 
       final prefs = await SharedPreferences.getInstance();
@@ -80,7 +78,6 @@ class AuthProvider extends ChangeNotifier {
             password: password,
           );
           _pendingPhone = phoneNumber;
-          _pendingPassword = password;
           _loggedIn = true;
           _error = null;
 

@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:dogo/features/main_module/type_cargo/data/model/cargo_segment_model.dart';
 
 int _asInt(dynamic v) {
   if (v is int) return v;
@@ -60,7 +59,7 @@ class ShipmentDetail {
   final String publicCode;
   final String status;
   final String title;
-  final CargoSegment? segment;
+  final Map<String, dynamic>? segment;
   final String size;
   final int quantity;
   final bool fragile;
@@ -96,11 +95,9 @@ class ShipmentDetail {
 
   factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
     final segmentJson = json['segment'];
-    CargoSegment? segment;
+    Map<String, dynamic>? segment;
     if (segmentJson is Map) {
-      segment = CargoSegment.fromJson(
-        Map<String, dynamic>.from(segmentJson),
-      );
+      segment = Map<String, dynamic>.from(segmentJson);
     }
 
     final stopsJson = json['stops'] as List? ?? const [];

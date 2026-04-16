@@ -8,7 +8,8 @@ import 'package:dogo/features/main_module/history/view/history_screen.dart';
 import 'package:dogo/features/main_module/map/view/map_screen.dart';
 import 'package:dogo/features/main_module/profile/view/profile_screen.dart';
 import 'package:dogo/features/auth_module/splash/second_splash_screen.dart';
-import 'package:dogo/features/main_module/type_cargo/view/cargo_type_screen.dart';
+import 'package:dogo/features/auth_module/register/view/privacy_policy_screen.dart';
+
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth_module/register/view/components/confirm_selfie_screen.dart';
@@ -26,6 +27,7 @@ import '../../features/main_module/profile/view/components/profile_account_scree
 import '../../features/main_module/profile/view/components/profile_balance_history_screen.dart';
 import '../../features/main_module/profile/view/components/profile_notifications_screen.dart';
 import '../../features/main_module/profile/view/components/profile_support_screen.dart';
+import '../../features/main_module/payments/view/finik_payment_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -161,10 +163,6 @@ final class AppRouter {
       ),
 
       GoRoute(
-        path: '/type_cargo',
-        pageBuilder: (context, state) => _build(state, CargoTypeScreen()),
-      ),
-      GoRoute(
         path: '/selfie-waiting',
         pageBuilder: (context, state) => _build(state, SelfieWaitingScreen()),
       ),
@@ -172,6 +170,15 @@ final class AppRouter {
         path: '/profile/topup',
         pageBuilder: (context, state) =>
             _build(state, const BalanceTopUpScreen()),
+      ),
+      GoRoute(
+        path: '/finik_pay',
+        name: 'finik_pay',
+        pageBuilder: (context, state) => _build(state, const FinikPaymentScreen()),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        pageBuilder: (context, state) => _build(state, const PrivacyPolicyScreen()),
       ),
 
       StatefulShellRoute.indexedStack(

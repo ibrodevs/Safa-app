@@ -79,10 +79,10 @@ class _BottomTabBarState extends State<BottomTabBar> {
 }
 
 class _SvgNavIcon extends StatelessWidget {
-  const _SvgNavIcon(this.asset, {required this.color, this.size = 24});
+  const _SvgNavIcon(this.asset, {required this.color});
   final String asset;
   final Color color;
-  final double size;
+  static const double size = 24;
 
   @override
   Widget build(BuildContext context) {

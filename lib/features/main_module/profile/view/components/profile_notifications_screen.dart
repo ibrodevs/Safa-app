@@ -512,8 +512,6 @@ class _FilterPill extends StatelessWidget {
   final NotificationsReadFilter value;
   final ValueChanged<NotificationsReadFilter> onChanged;
 
-  static const _accent = Color(0xFFFF8A00);
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -857,7 +855,7 @@ class _SwitchTile extends StatelessWidget {
           ),
           Switch.adaptive(
             value: value,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: _accent,
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFE9EDF2),

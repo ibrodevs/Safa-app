@@ -13,7 +13,7 @@ class ShadowField extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(
-            color: Color(0xF808080),
+            color: Color(0x0F808080),
             blurRadius: 60,
             offset: Offset(0, 3),
           ),

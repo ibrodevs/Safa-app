@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+// ignore_for_file: avoid_print
 
 class HttpLoggerInterceptor extends Interceptor {
   HttpLoggerInterceptor({
@@ -16,36 +17,34 @@ class HttpLoggerInterceptor extends Interceptor {
   final bool alsoPrint;
 
   @override
-  void onRequest(RequestOptions o, RequestInterceptorHandler h) {
-    final msg = _fmtRequest(o);
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final msg = _fmtRequest(options);
     dev.log(msg, name: tag);
-    if (alsoPrint) print('[$tag]\n$msg');
-    h.next(o);
+    if (alsoPrint) debugPrint('[$tag]\n$msg');
+    handler.next(options);
   }
 
   @override
-  @override
-  void onResponse(Response r, ResponseInterceptorHandler h) {
-    final full = _pretty(r.data);
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final full = _pretty(response.data);
     dev.log(
-      '← ${r.statusCode} ${r.requestOptions.uri}\n$full',
+      '← ${response.statusCode} ${response.requestOptions.uri}\n$full',
       name: tag,
     );
 
     if (alsoPrint) {
-      print('[$tag] body: ${_short(full)}');
+      debugPrint('[$tag] body: ${_short(full)}');
     }
 
-    h.next(r);
+    handler.next(response);
   }
 
-
   @override
-  void onError(DioException e, ErrorInterceptorHandler h) {
-    final msg = _fmtError(e);
-    dev.log(msg, name: tag, error: e.error, stackTrace: e.stackTrace);
-    if (alsoPrint) print('[$tag]\n$msg');
-    h.next(e);
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final msg = _fmtError(err);
+    dev.log(msg, name: tag, error: err.error, stackTrace: err.stackTrace);
+    if (alsoPrint) debugPrint('[$tag]\n$msg');
+    handler.next(err);
   }
 
   String _fmtRequest(RequestOptions o) {
@@ -54,14 +53,6 @@ class HttpLoggerInterceptor extends Interceptor {
       ..writeln('headers: ${_short(_pretty(o.headers))}');
     if (o.queryParameters.isNotEmpty) b.writeln('query: ${_short(_pretty(o.queryParameters))}');
     if (o.data != null) b.writeln('body: ${_short(_pretty(o.data))}');
-    return b.toString().trimRight();
-  }
-
-  String _fmtResponse(Response r) {
-    final b = StringBuffer()
-      ..writeln('← ${r.statusCode} ${r.requestOptions.method} ${r.requestOptions.uri}')
-      ..writeln('headers: ${_short(_pretty(r.headers.map))}');
-    if (r.data != null) b.writeln('body: ${_short(_pretty(r.data))}');
     return b.toString().trimRight();
   }
 
@@ -84,18 +75,6 @@ class HttpLoggerInterceptor extends Interceptor {
       return '${s.substring(0, maxBody)}…(truncated ${s.length - maxBody})';
     }
     return s;
-  }
-  void _logLong(String text) {
-    const chunkSize = 800;
-    for (var i = 0; i < text.length; i += chunkSize) {
-      dev.log(
-        text.substring(
-          i,
-          i + chunkSize > text.length ? text.length : i + chunkSize,
-        ),
-        name: tag,
-      );
-    }
   }
 
   String _pretty(dynamic v) {

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 class ProfileBalanceHistoryScreen extends StatelessWidget {
   const ProfileBalanceHistoryScreen({super.key});
 
-  static const _accent = Color(0xFFFF8A00);
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
-  static const _green = Color(0xFF22C55E);
-  static const _red = Color(0xFFEF4444);
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +254,7 @@ class _OperationTile extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(

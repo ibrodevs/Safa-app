@@ -27,7 +27,6 @@ class _HistoryDetailsBody extends StatelessWidget {
   const _HistoryDetailsBody();
 
   static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
   static const _statusGreen = Color(0xFF2E7D32);
 
   String _fmtDate(DateTime d) {
@@ -128,10 +127,10 @@ class _HistoryDetailsBody extends StatelessWidget {
               'assets/icons/ic_warning.svg',
               'Хрупкая посылка',
             ),
-          if (d.segment != null && d.segment!.name.isNotEmpty)
+          if (d.segment != null && (d.segment!['name']?.toString() ?? '').isNotEmpty)
             _DetailChip(
               'assets/icons/ic_box.svg',
-              'Тип: ${d.segment!.name}',
+              'Тип: ${d.segment!['name']}',
             ),
         ];
         final flightNumberText =
@@ -176,7 +175,7 @@ class _HistoryDetailsBody extends StatelessWidget {
         if (d.commission.isNotEmpty) {
           priceBuffer.writeln('Комиссия: ${d.commission}');
         }
-        final priceText = priceBuffer.toString().trim();
+        // ignore: unused_local_variable\r\n        final priceText = priceBuffer.toString().trim();
 
         return Scaffold(
           backgroundColor: Colors.white,

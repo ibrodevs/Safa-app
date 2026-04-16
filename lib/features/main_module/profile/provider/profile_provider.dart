@@ -84,4 +84,26 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+  Future<bool> deleteAccount() async {
+    _saving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repo.deleteAccount();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
+    } catch (e, st) {
+      _error = 'Не удалось удалить аккаунт';
+      if (kDebugMode) {
+        print('ProfileProvider.deleteAccount error: $e\n$st');
+      }
+      return false;
+    } finally {
+      _saving = false;
+      notifyListeners();
+    }
+  }
 }

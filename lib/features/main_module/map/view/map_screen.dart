@@ -8,13 +8,12 @@ import 'package:dogo/features/main_module/map/view/components/search_sheet.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/utils/app_colors.dart';
 import '../../../../data/network/api_service.dart';
-import '../../type_cargo/view/cargo_type_screen.dart';
+import '../../payments/data/repo/shipments_repository.dart';
 import '../data/model/delivery_point_model.dart';
 import '../data/model/shipment_status.dart';
 import '../provider/active_shipment_provider.dart';
@@ -23,6 +22,7 @@ import 'components/order_fulfillment_sheet.dart';
 import 'widgets/add_adress_button.dart';
 import 'widgets/here_bubble.dart';
 import 'components/intermediate_point_sheet.dart';
+import 'components/shipment_payment_sheet.dart';
 import 'widgets/me_dot.dart';
 import 'widgets/parsed_adress.dart';
 
@@ -62,6 +62,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
   Timer? _shipmentPollTimer;
   ShipmentStatus _currentStatus = ShipmentStatus.unknown;
+  bool _isPaid = true;
+  int _fare = 0;
 
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
@@ -248,9 +250,11 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         _activeShipmentId = active.id;
         _activeStops = active.stops;
         _currentStatus = status;
+        _isPaid = active.isPaid;
+        _fare = active.fare;
         _showFulfillmentSheet =
-            status == ShipmentStatus.assigned ||
-            status == ShipmentStatus.inTransit;
+            (status == ShipmentStatus.assigned && active.isPaid) ||
+                status == ShipmentStatus.inTransit;
       });
 
       _startShipmentPolling(active.id);
@@ -297,7 +301,9 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       if (!mounted) return;
@@ -365,6 +371,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       _didFitOnFulfillment = false;
       _routePoints = const [];
       _routeSignature = null;
+      _isPaid = true;
+      _fare = 0;
     });
 
     context.read<ActiveShipmentProvider>().clear();
@@ -379,12 +387,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 
       final status = parseShipmentStatus(dto.status);
 
-      final shouldShowFulfillment =
-          status == ShipmentStatus.assigned ||
-          status == ShipmentStatus.inTransit;
-
-      final statusChanged = status != _currentStatus;
-
       _currentStatus = status;
 
       if (status == ShipmentStatus.completed ||
@@ -394,9 +396,15 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         return;
       }
 
+      final shouldShowFulfillment =
+          (status == ShipmentStatus.assigned && dto.isPaid) ||
+              status == ShipmentStatus.inTransit;
+
       setState(() {
         _activeStops = dto.stops;
         _showFulfillmentSheet = shouldShowFulfillment;
+        _isPaid = dto.isPaid;
+        _fare = dto.fare;
       });
 
       _syncRouteAndCamera();
@@ -480,23 +488,30 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
     }
   }
 
-  Future<void> _cancelShipment() async {
+  Future<void> _cancelShipment({String targetStatus = 'canceled'}) async {
     final id = _activeShipmentId;
     if (id == null || _cancellingShipment) return;
 
     setState(() => _cancellingShipment = true);
 
     try {
-      _stopShipmentPolling();
+      if (targetStatus == 'canceled') {
+        _stopShipmentPolling();
+      }
 
-      await ApiService.instance.patchShipmentStatus(id, status: 'canceled');
+      await ApiService.instance.patchShipmentStatus(id, status: targetStatus);
 
       if (!mounted) return;
 
-      _resetShipmentState();
-      _deliveryPoint = null;
-      _fromPoint = null;
-      _intermediatePoints.clear();
+      if (targetStatus == 'canceled') {
+        _resetShipmentState();
+        _deliveryPoint = null;
+        _fromPoint = null;
+        _intermediatePoints.clear();
+      } else {
+        // if pending, we just stay in active mode, polling will continue or we can force one poll
+        _pollShipment(id);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -504,6 +519,40 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _cancellingShipment = false);
+    }
+  }
+
+  Future<void> _handleCreateShipment(List<DeliveryPoint> stops) async {
+    if (_creatingShipment || stops.isEmpty) return;
+
+    setState(() => _creatingShipment = true);
+
+    try {
+      final repo = ShipmentsRepository();
+
+      final title = stops.length > 1 ? stops.last.title : 'Доставка';
+
+      final shipmentId = await repo.createShipment(
+        title: title,
+        description: '',
+        stops: stops.map((s) => s.toStopJson()).toList(),
+        returnToStart: false,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _activeShipmentId = shipmentId;
+        _isPaid = true; // initially we assume we don't need payment sheet until assigned
+      });
+      _startShipmentPolling(shipmentId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _creatingShipment = false);
     }
   }
 
@@ -647,8 +696,9 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                   userAgentPackageName: 'kg.genesis.dogo',
+                  subdomains: const ['a', 'b', 'c', 'd'],
                 ),
 
                 if (_showFulfillmentSheet && _routePoints.isNotEmpty)
@@ -656,8 +706,13 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                     polylines: [
                       Polyline(
                         points: _routePoints,
-                        strokeWidth: 2,
-                        color: Colors.black,
+                        strokeWidth: 5,
+                        color: Colors.black.withValues(alpha: 0.15),
+                      ),
+                      Polyline(
+                        points: _routePoints,
+                        strokeWidth: 3,
+                        color: Colors.white,
                       ),
                     ],
                   ),
@@ -674,18 +729,24 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
             bottom: 16 + bottomInsets,
             child: _activeShipmentId != null
                 ? (_showFulfillmentSheet
-                      ? OrderFulfillmentSheet(stops: _activeStops)
-                      : SearchingSheet(
-                          stops: _activeStops.isNotEmpty
-                              ? _activeStops
-                              : _buildStopsForSearchSheet(
-                                  fromTitle: fromTitle,
-                                  bazarTitle: bazarTitle,
-                                  detailText: detailText,
-                                ),
-                          cancelling: _cancellingShipment,
-                          onCancel: _cancelShipment,
-                        ))
+                    ? OrderFulfillmentSheet(stops: _activeStops)
+                    : (_currentStatus == ShipmentStatus.assigned && !_isPaid)
+                        ? ShipmentPaymentSheet(
+                            shipmentId: _activeShipmentId!,
+                            amount: _fare,
+                            onCancel: () => _cancelShipment(targetStatus: 'pending'),
+                          )
+                        : SearchingSheet(
+                            stops: _activeStops.isNotEmpty
+                                ? _activeStops
+                                : _buildStopsForSearchSheet(
+                                    fromTitle: fromTitle,
+                                    bazarTitle: bazarTitle,
+                                    detailText: detailText,
+                                  ),
+                            cancelling: _cancellingShipment,
+                            onCancel: _cancelShipment,
+                          ))
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -728,20 +789,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                                     detailText: detailText,
                                   );
 
-                                  final result = await context
-                                      .push<CargoTypePaidResult>(
-                                        '/type_cargo',
-                                        extra: CargoRouteArgs(stops: stops),
-                                      );
-
-                                  if (result != null && mounted) {
-                                    setState(
-                                      () =>
-                                          _activeShipmentId = result.shipmentId,
-                                    );
-
-                                    _startShipmentPolling(result.shipmentId);
-                                  }
+                                  await _handleCreateShipment(stops);
                                 },
                           style: ButtonStyle(
                             backgroundColor: WidgetStateProperty.resolveWith(
@@ -751,7 +799,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                               (_) => Colors.white,
                             ),
                             overlayColor: WidgetStateProperty.resolveWith(
-                              (_) => Colors.white.withOpacity(0.10),
+                              (_) => Colors.white.withValues(alpha: 0.10),
                             ),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
@@ -781,13 +829,10 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
 }
 
 class _StopDotMarker extends StatelessWidget {
-  const _StopDotMarker({
-    this.color = const Color(0xFFFFDFC7),
-    this.strokeColor = const Color(0xFFFFDFC7),
-  });
+  const _StopDotMarker();
 
-  final Color color;
-  final Color strokeColor;
+  static const Color color = Color(0xFFFFDFC7);
+  static const Color strokeColor = Color(0xFFFFDFC7);
 
   @override
   Widget build(BuildContext context) {

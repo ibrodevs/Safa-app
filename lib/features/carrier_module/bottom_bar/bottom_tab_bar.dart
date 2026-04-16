@@ -1,4 +1,3 @@
-// lib/widgets/bottom_tab_bar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -13,9 +12,9 @@ class BottomCarrierTabBar extends StatefulWidget {
 
 class _BottomCarrierTabBarState extends State<BottomCarrierTabBar> {
   static const _accent = Color(0xFFE67E22);
-  static const _bg      = Color(0xFFF7F8FA);
-  static const _border  = Color(0xFFE9EDF2);
-  static const _grey    = Color(0xFFB9C0C8);
+  static const _bg = Color(0xFFF7F8FA);
+  static const _border = Color(0xFFE9EDF2);
+  static const _grey = Color(0xFFB9C0C8);
 
   void _onTap(int index) {
     widget.navigationShell.goBranch(
@@ -75,10 +74,10 @@ class _BottomCarrierTabBarState extends State<BottomCarrierTabBar> {
 }
 
 class _SvgNavIcon extends StatelessWidget {
-  const _SvgNavIcon(this.asset, {required this.color, this.size = 24});
+  const _SvgNavIcon(this.asset, {required this.color});
   final String asset;
   final Color color;
-  final double size;
+  static const double size = 24;
 
   @override
   Widget build(BuildContext context) {

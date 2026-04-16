@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../data/network/api_service.dart';
+import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
 import 'data/model/nearby_shipment.dart';
 
@@ -132,7 +133,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       if (!mounted) return;
 
@@ -171,20 +174,22 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   Future<Position> _getCurrentPositionOrThrow() async {
     final ok = await _ensureLocationPermission();
     if (!ok) {
-      throw Exception(
+      throw ApiException(
         'Нужен доступ к геолокации, чтобы показать ближайшие заказы',
       );
     }
 
     return Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
     );
   }
 
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
-    throw Exception('Некорректный формат ответа сервера');
+    throw ApiException('Некорректный формат ответа сервера');
   }
 
   Future<Map<String, dynamic>> _getShipmentByIdRaw(int id) async {
@@ -260,7 +265,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       if (!ok) return;
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final page = await ApiService.instance.getNearbyShipments(
@@ -731,17 +738,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final padding = MediaQuery.viewPaddingOf(context);
     final bottomSafe = padding.bottom;
 
-    final myPoint = LatLng(_myLat, _myLon);
-
-    final markers = <Marker>[
-      /*Marker(
-        point: myPoint,
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        child: const _MeDot(),
-      ),*/
-    ];
+    final markers = <Marker>[];
 
     final stopPts = <LatLng>[];
     if (_hasActive) {
@@ -819,10 +816,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
               initialCenter: LatLng(_centerLat, _centerLon),
               initialZoom: 15,
               onPositionChanged: (pos, hasGesture) {
-                final c = pos.center;
-                if (c == null) return;
-                _centerLat = c.latitude;
-                _centerLon = c.longitude;
+                _centerLat = pos.center.latitude;
+                _centerLon = pos.center.longitude;
               },
             ),
             children: [
@@ -837,7 +832,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                     Polyline(
                       points: _routePoints,
                       strokeWidth: 5,
-                      color: Colors.black.withOpacity(0.75),
+                      color: Colors.black.withValues(alpha: 0.75),
                     ),
                   ],
                 ),
@@ -863,8 +858,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.08),
-                      Colors.black.withOpacity(0.16),
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.16),
                     ],
                   ),
                 ),
@@ -930,9 +925,9 @@ class _WelcomeCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white.withOpacity(0.7), width: 1),
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x1A000000),
@@ -1252,7 +1247,7 @@ class _ActiveProgressSheet extends StatelessWidget {
                       width: 16,
                       child: SvgPicture.asset(
                         'assets/icons/ic_map.svg',
-                        color: AppColors.primary,
+                        colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1339,8 +1334,6 @@ class _ProgressStopsCard extends StatelessWidget {
     required this.status,
     required this.stops,
     required this.currentIndex,
-    this.myLat,
-    this.myLon,
   });
 
   final ShipmentStatus status;
@@ -1348,11 +1341,7 @@ class _ProgressStopsCard extends StatelessWidget {
 
   final int currentIndex;
 
-  final double? myLat;
-  final double? myLon;
-
   static const _green = Color(0xFF41C44B);
-  static const _grey = Color(0xFFB7BCC5);
 
   @override
   Widget build(BuildContext context) {
@@ -1558,90 +1547,6 @@ String _pointLabelRu(int idx0) {
   }
 }
 
-class _TwoStopsCardV34 extends StatelessWidget {
-  const _TwoStopsCardV34({required this.stops, required this.currentIndex});
-
-  final List<_StopUi> stops;
-  final int currentIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    if (stops.isEmpty) return const SizedBox.shrink();
-
-    final ci = currentIndex.clamp(0, stops.length - 1);
-    final cur = stops[ci];
-
-    final hasNext = ci < stops.length - 1;
-    final next = hasNext ? stops[ci + 1] : null;
-
-    final hasPrev = ci - 1 >= 0;
-    final prev = hasPrev ? stops[ci - 1] : null;
-
-    final label = _pointLabelRu(ci);
-
-    // Вариант A: текущая + следующая (как на скрине "Вторая/Третья точка" сверху + следующая снизу)
-    final top = _StopRow(
-      title: cur.headerLine,
-      subtitle: cur.subLine,
-      trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
-      muted: true, // на скринах верхняя строка приглушена
-    );
-
-    final bottomNext = next == null
-        ? null
-        : _StopRow(
-            title: next.headerLine,
-            subtitle: next.subLine,
-            trailing: null,
-            muted: false,
-          );
-
-    // Вариант B: предыдущая + текущая (для последней точки)
-    final topPrev = prev == null
-        ? null
-        : _StopRow(
-            title: prev.headerLine,
-            subtitle: prev.subLine,
-            trailing: null,
-            muted: true,
-          );
-
-    final bottomCur = _StopRow(
-      title: cur.headerLine,
-      subtitle: cur.subLine,
-      trailing: _TrailingHere(title: 'Вы здесь', subtitle: label),
-      muted: false,
-    );
-
-    final children = <Widget>[];
-
-    if (hasNext && bottomNext != null) {
-      children.add(top);
-      children.addAll(const [
-        SizedBox(height: 10),
-        _ArrowDown(),
-        SizedBox(height: 10),
-      ]);
-      children.add(bottomNext);
-    } else {
-      if (topPrev != null) {
-        children.add(topPrev);
-        children.addAll(const [
-          SizedBox(height: 10),
-          _ArrowDown(),
-          SizedBox(height: 10),
-        ]);
-      }
-      children.add(bottomCur);
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
-      child: Column(mainAxisSize: MainAxisSize.min, children: children),
-    );
-  }
-}
 
 class _TrailingHere extends StatelessWidget {
   const _TrailingHere({required this.title, required this.subtitle});
@@ -1731,16 +1636,13 @@ class _TrailingStatus extends StatelessWidget {
   const _TrailingStatus({
     required this.text,
     required this.color,
-    this.width = 120,
-    this.textSlot = 100,
-    this.gap = 10,
   });
 
   final String text;
   final Color color;
-  final double width;
-  final double textSlot;
-  final double gap;
+  static const double width = 120;
+  static const double textSlot = 100;
+  static const double gap = 10;
 
   @override
   Widget build(BuildContext context) {
@@ -2050,7 +1952,7 @@ class _StatCard extends StatelessWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: SvgPicture.asset(icon, color: AppColors.green),
+                child: SvgPicture.asset(icon, colorFilter: ColorFilter.mode(AppColors.green, BlendMode.srcIn)),
               ),
               const SizedBox(width: 4),
               Expanded(
@@ -2094,7 +1996,7 @@ class _Chip extends StatelessWidget {
           SizedBox(
             height: 18,
             width: 16,
-            child: SvgPicture.asset(icon, color: AppColors.primary),
+            child: SvgPicture.asset(icon, colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn)),
           ),
           const SizedBox(width: 6),
           Expanded(

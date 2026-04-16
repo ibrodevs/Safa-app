@@ -262,8 +262,8 @@ class _SelfieFrame extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.black.withOpacity(0.0),
-                        Colors.black.withOpacity(0.55),
+                        Colors.black.withValues(alpha: 0.0),
+                        Colors.black.withValues(alpha: 0.55),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -302,12 +302,12 @@ class _HeadTarget extends StatelessWidget {
           color: const Color(0xFFFFF3E0),
           width: 3,
         ),
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.black.withValues(alpha: 0.18),
       ),
       child: Icon(
         Icons.person_rounded,
         size: 76,
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
       ),
     );
   }
@@ -327,7 +327,7 @@ class _CardTarget extends StatelessWidget {
           color: const Color(0xFFFFF3E0),
           width: 3,
         ),
-        color: Colors.black.withOpacity(0.26),
+        color: Colors.black.withValues(alpha: 0.26),
       ),
       child: Row(
         children: [
@@ -337,7 +337,7 @@ class _CardTarget extends StatelessWidget {
             height: 46,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
             ),
             child: const Icon(
               Icons.badge_rounded,
@@ -356,7 +356,7 @@ class _CardTarget extends StatelessWidget {
                   margin: const EdgeInsets.only(right: 40),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -365,7 +365,7 @@ class _CardTarget extends StatelessWidget {
                   margin: const EdgeInsets.only(right: 80),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                   ),
                 ),
               ],

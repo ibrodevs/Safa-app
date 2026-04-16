@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../type_cargo/data/model/finik_pay_init_response.dart';
+import '../data/model/finik_pay_init_response.dart';
 import '../data/repo/finik_payments_repository.dart';
 import '../data/repo/shipments_repository.dart';
 
 enum FinikFlowStatus {
-  idle,
-  creatingShipment,
-  startingPayment,
+  initial,
   awaitingFinikUi,
   polling,
+  waiting,
   succeeded,
   failed,
 }
@@ -24,7 +23,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   final ShipmentsRepository _shipmentsRepo;
   final FinikPaymentsRepository _paymentsRepo;
 
-  FinikFlowStatus status = FinikFlowStatus.idle;
+  FinikFlowStatus status = FinikFlowStatus.initial;
   String? errorText;
 
   int? shipmentId;
@@ -37,35 +36,54 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     _pollTimer?.cancel();
     _pollTimer = null;
     _pollTicks = 0;
-    status = FinikFlowStatus.idle;
+    status = FinikFlowStatus.initial;
     errorText = null;
     shipmentId = null;
     init = null;
     notifyListeners();
   }
 
-  Future<void> createShipmentAndStartPayment({
-    required String title,
-    required int segmentId,
-    required int quantity,
-    required List<Map<String, dynamic>> stops,
-  }) async {
-    if (status != FinikFlowStatus.idle) return;
+  Future<void> startExistingShipmentPayment(int id) async {
+    if (status != FinikFlowStatus.initial && status != FinikFlowStatus.failed) return;
 
     try {
-      status = FinikFlowStatus.creatingShipment;
+      shipmentId = id;
+      status = FinikFlowStatus.waiting;
+      errorText = null;
+      notifyListeners();
+
+      init = await _paymentsRepo.startFinikPayment(id);
+
+      status = FinikFlowStatus.awaitingFinikUi;
+      notifyListeners();
+    } catch (e) {
+      status = FinikFlowStatus.failed;
+      errorText = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> createShipmentAndStartPayment({
+    required String title,
+    required String description,
+    required List<Map<String, dynamic>> stops,
+  }) async {
+    if (status != FinikFlowStatus.initial) return;
+
+    try { 
+      status = FinikFlowStatus.waiting;
       errorText = null;
       notifyListeners();
 
       final id = await _shipmentsRepo.createShipment(
         title: title,
-        segment: segmentId,
-        quantity: quantity,
+        description: description,
         stops: stops,
       );
       shipmentId = id;
 
-      status = FinikFlowStatus.startingPayment;
+      status = FinikFlowStatus.waiting;
       notifyListeners();
 
       init = await _paymentsRepo.startFinikPayment(id);

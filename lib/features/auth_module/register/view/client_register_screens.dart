@@ -84,7 +84,6 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     final loading = context.watch<AuthProvider>().loading;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Scaffold(

@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:dogo/features/main_module/type_cargo/data/model/finik_pay_init_response.dart';
+import '../model/finik_pay_init_response.dart';
 import '../../../../../data/network/api_service.dart';
 import '../../../../../data/network/model/api_exeptions_model.dart';
 

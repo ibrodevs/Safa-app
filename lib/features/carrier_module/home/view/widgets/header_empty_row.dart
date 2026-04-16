@@ -1,4 +1,3 @@
-import 'package:dogo/features/main_module/home/components/avatar_widget.dart';
 import 'package:flutter/material.dart';
 
 class HeaderEmptyRow extends StatelessWidget {

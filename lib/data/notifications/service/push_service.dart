@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -15,7 +14,6 @@ class PushService {
   static final PushService instance = PushService._();
 
   final FirebaseMessaging _fm = FirebaseMessaging.instance;
-  StreamSubscription<RemoteMessage>? _fgSub;
   bool _inited = false;
 
   String? _lastToken;
@@ -44,7 +42,7 @@ class PushService {
       print('🔑 FCM token: $_lastToken');
     }
 
-    _fgSub = FirebaseMessaging.onMessage.listen((msg) async {
+    FirebaseMessaging.onMessage.listen((msg) async {
       if (kDebugMode) {
         print('📬 FG message: ${msg.data}');
       }
@@ -111,8 +109,6 @@ class PushService {
 
     final platform =
     defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
-
-    final l = ui.PlatformDispatcher.instance.locale;
 
     try {
       await api.postFcmRegister(

@@ -5,10 +5,9 @@ import 'osm_geo_api.dart';
 import 'package:dio/dio.dart';
 
 class DeliveryGeoRepository {
-  final ApiService _api;
   final OsmGeoApi _osm;
 
-  DeliveryGeoRepository(this._api)
+  DeliveryGeoRepository(ApiService _)
       : _osm = OsmGeoApi(Dio());
 
   Future<DeliveryReverseGeo> getAddress({

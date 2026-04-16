@@ -8,8 +8,6 @@ import '../provider/profile_provider.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  static const _accent = Color(0xFFFF8A00);
-  static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
 
   @override

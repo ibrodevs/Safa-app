@@ -63,6 +63,12 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (isLoggedIn) {
+      final privacyAccepted = prefs.getBool('privacy_accepted') ?? false;
+      if (!privacyAccepted) {
+        context.go('/privacy-policy');
+        return;
+      }
+
       if (userRole == 'carrier') {
         context.go('/home-carrier');
       } else {

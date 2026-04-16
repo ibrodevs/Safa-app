@@ -16,12 +16,8 @@ final class ShipmentsRepository {
 
   Future<int> createShipment({
     required String title,
-    required int segment,
-    required int quantity,
+    required String description,
     required List<Map<String, dynamic>> stops,
-    String size = 'S',
-    bool fragile = false,
-    String description = '',
     bool returnToStart = false,
   }) async {
     try {
@@ -29,10 +25,6 @@ final class ShipmentsRepository {
         'delivery/shipments/',
         data: {
           'title': title,
-          'segment': segment,
-          'size': size,
-          'quantity': quantity,
-          'fragile': fragile,
           'description': description,
           'stops': stops,
           'return_to_start': returnToStart,
@@ -47,6 +39,16 @@ final class ShipmentsRepository {
     } on DioException catch (e) {
       throw ApiException(e.response?.data?.toString() ?? 'Не удалось создать доставку');
     }
+  }
+
+  Future<Map<String, dynamic>> getQuote({
+    required List<Map<String, dynamic>> stops,
+    bool returnToStart = false,
+  }) async {
+    return _api.getShipmentQuote(
+      stops: stops,
+      returnToStart: returnToStart,
+    );
   }
 
   Future<bool> isShipmentPaid(int shipmentId) async {
@@ -66,11 +68,15 @@ class ShipmentsListItemDto {
   final int id;
   final String status;
   final List<DeliveryPoint> stops;
+  final bool isPaid;
+  final int fare;
 
   const ShipmentsListItemDto({
     required this.id,
     required this.status,
     required this.stops,
+    this.isPaid = false,
+    this.fare = 0,
   });
 
   static double? _toDouble(dynamic v) {
@@ -129,6 +135,14 @@ class ShipmentsListItemDto {
       id: (j['id'] as num).toInt(),
       status: (j['status'] ?? '').toString(),
       stops: stops,
+      isPaid: j['is_paid'] == true,
+      fare: (() {
+        final f = j['final_fare'];
+        final e = j['estimated_fare'];
+        if (f != null && f is num && f > 0) return f.toInt();
+        if (e != null && e is num) return e.toInt();
+        return 0;
+      })(),
     );
   }
 }
