@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/utils/app_colors.dart';
 import '../../../../data/network/api_service.dart';
 import '../../payments/data/repo/shipments_repository.dart';
@@ -180,7 +181,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   Future<void> _syncRouteAndCamera() async {
     if (!mounted) return;
 
-    if (!_showFulfillmentSheet) {
+    if (!_showFulfillmentSheet && !_searchMode) {
       if (_routePoints.isNotEmpty || _routeSignature != null) {
         setState(() {
           _routePoints = const [];
@@ -280,6 +281,16 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) setState(() => _gate = _LocationGate.serviceOff);
+        if (!mounted) return;
+        AppSnackBar.showError(
+          context,
+          message: 'Геолокация отключена. Пожалуйста, включите GPS.',
+          actionLabel: 'Включить',
+          onAction: () async {
+            await Geolocator.openLocationSettings();
+            _initLocation();
+          },
+        );
         return;
       }
 
@@ -288,14 +299,22 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         perm = await Geolocator.requestPermission();
       }
 
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.deniedForever) {
         if (mounted) setState(() => _gate = _LocationGate.denied);
+        if (!mounted) return;
+        AppSnackBar.showError(
+          context,
+          message: 'Доступ к местоположению запрещен. Пожалуйста, разрешите его для работы карты.',
+          actionLabel: 'Настройки',
+          onAction: () async {
+            await Geolocator.openAppSettings();
+            _initLocation(); // Retry after settings
+          },
+        );
         return;
       }
 
-      if (perm != LocationPermission.always &&
-          perm != LocationPermission.whileInUse) {
+      if (perm == LocationPermission.denied) {
         if (mounted) setState(() => _gate = _LocationGate.denied);
         return;
       }
@@ -514,9 +533,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppSnackBar.showError(context, error: e);
     } finally {
       if (mounted) setState(() => _cancellingShipment = false);
     }
@@ -548,9 +565,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       _startShipmentPolling(shipmentId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      AppSnackBar.showError(context, error: e);
     } finally {
       if (mounted) setState(() => _creatingShipment = false);
     }
@@ -701,7 +716,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
                   subdomains: const ['a', 'b', 'c', 'd'],
                 ),
 
-                if (_showFulfillmentSheet && _routePoints.isNotEmpty)
+                if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
                   PolylineLayer(
                     polylines: [
                       Polyline(

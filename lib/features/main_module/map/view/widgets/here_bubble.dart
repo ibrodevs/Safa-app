@@ -97,21 +97,6 @@ class HereBubble extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
-            TextButton(
-              onPressed: onEdit,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 0),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                foregroundColor: _greyText,
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              child: const Text('Изменить'),
-            ),
           ],
         ),
       ),

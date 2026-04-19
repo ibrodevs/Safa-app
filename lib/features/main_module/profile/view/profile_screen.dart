@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/snackbar_utils.dart';
 import '../provider/profile_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -173,11 +174,9 @@ class _ProfileBody extends StatelessWidget {
     );
   }
   void _showSoonSnack(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-        Text('Интеграция будет добавлена позже.'),
-      ),
+    AppSnackBar.showSuccess(
+      context,
+      message: 'Интеграция будет добавлена позже.',
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/snackbar_utils.dart';
 import '../data/repo/carrier_profile_repository.dart';
 import '../provider/carrier_profile_provider.dart';
 
@@ -33,11 +34,9 @@ class CarrierProfileScreen extends StatelessWidget {
 class _CarrierProfileBody extends StatelessWidget {
   const _CarrierProfileBody();
   void _showSoonSnack(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-        Text('Интеграция будет добавлена позже.'),
-      ),
+    AppSnackBar.showSuccess(
+      context,
+      message: 'Интеграция будет добавлена позже.',
     );
   }
   String formatKgPhone(String? input) {

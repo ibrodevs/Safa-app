@@ -4,6 +4,8 @@ import 'package:dogo/core/widgets/primary_button.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../../core/utils/snackbar_utils.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -45,9 +47,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
       if (!mounted) return;
       if (!ok) {
         final msg = provider.error ?? 'Не удалось отправить код в WhatsApp';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
+        AppSnackBar.showError(context, message: msg);
       }
     });
   }
@@ -55,9 +55,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
   Future<void> _onNext() async {
     final code = _code.text.trim();
     if (code.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Введите код из WhatsApp')));
+      AppSnackBar.showError(context, message: 'Введите код из WhatsApp');
       return;
     }
 
@@ -70,7 +68,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
       context.go('/privacy-policy');
     } else {
       final msg = provider.error ?? 'Неверный код из WhatsApp';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      AppSnackBar.showError(context, message: msg);
     }
   }
 

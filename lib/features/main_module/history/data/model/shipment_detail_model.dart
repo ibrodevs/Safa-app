@@ -23,7 +23,7 @@ DateTime _asDateTime(dynamic v) {
   if (v == null) {
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
-  return DateTime.tryParse(v.toString()) ??
+  return DateTime.tryParse(v.toString())?.toLocal() ??
       DateTime.fromMillisecondsSinceEpoch(0);
 }
 
@@ -71,6 +71,7 @@ class ShipmentDetail {
   final String commission;
   final String courierIncome;
   final DateTime createdAt;
+  final DateTime? paidAt;
   final DateTime? finishedAt;
 
   const ShipmentDetail({
@@ -90,6 +91,7 @@ class ShipmentDetail {
     required this.commission,
     required this.courierIncome,
     required this.createdAt,
+    required this.paidAt,
     required this.finishedAt,
   });
 
@@ -127,6 +129,7 @@ class ShipmentDetail {
       commission: _asString(json['commission']),
       courierIncome: _asString(json['courier_income']),
       createdAt: _asDateTime(json['created_at']),
+      paidAt: json['paid_at'] != null ? _asDateTime(json['paid_at']) : null,
       finishedAt: json['finished_at'] != null
           ? _asDateTime(json['finished_at'])
           : null,

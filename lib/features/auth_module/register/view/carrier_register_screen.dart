@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../core/utils/snackbar_utils.dart';
 import '../provider/auth_provider.dart';
 import 'components/image_source_sheet.dart';
 import 'widgets/carrier_title_block_widget.dart';
@@ -90,23 +92,17 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
     final pass2 = _pass2.text;
 
     if (firstName.isEmpty || phone.isEmpty || pass.isEmpty || pass2.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Заполните все поля')));
+      AppSnackBar.showError(context, message: 'Заполните все поля');
       return;
     }
 
     if (pass != pass2) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
+      AppSnackBar.showError(context, message: 'Пароли не совпадают');
       return;
     }
 
     if (_idFrontPath == null || _idBackPath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Загрузите обе стороны документа')),
-      );
+      AppSnackBar.showError(context, message: 'Загрузите обе стороны документа');
       return;
     }
 
@@ -127,9 +123,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
       context.push('/register/confirm');
     } else {
       final message = provider.error ?? 'Не удалось завершить регистрацию';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      AppSnackBar.showError(context, message: message);
     }
   }
 

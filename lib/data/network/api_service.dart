@@ -16,6 +16,7 @@ import '../../features/main_module/profile/data/model/profile_model.dart';
 import '../../features/main_module/profile/data/model/support_model.dart';
 import '../services/http_logger.dart';
 import '../services/secure_storage_service.dart';
+import '../../core/utils/app_logger.dart';
 import 'model/api_exeptions_model.dart';
 
 final class ApiService {
@@ -37,9 +38,7 @@ final class ApiService {
         baseUrl: _baseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
-        headers: const {
-          'Accept': 'application/json',
-        },
+        headers: const {'Accept': 'application/json'},
       ),
     );
 
@@ -48,9 +47,7 @@ final class ApiService {
         baseUrl: _baseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
-        headers: const {
-          'Accept': 'application/json',
-        },
+        headers: const {'Accept': 'application/json'},
       ),
     );
     _dio.interceptors.add(HttpLoggerInterceptor());
@@ -83,9 +80,7 @@ final class ApiService {
           if (!kReleaseMode) {
             final raw = options.headers['Authorization']?.toString();
             if (raw != null && raw.isNotEmpty) {
-              final token = raw.startsWith('Bearer ')
-                  ? raw.substring(7)
-                  : raw;
+              final token = raw.startsWith('Bearer ') ? raw.substring(7) : raw;
               debugPrint('💉 JWT access token: $token');
             } else {
               debugPrint('💉 JWT access token: <none>');
@@ -111,7 +106,7 @@ final class ApiService {
           try {
             if (_refreshing) {
               final ok =
-              await (_refreshCompleter?.future ?? Future.value(false));
+                  await (_refreshCompleter?.future ?? Future.value(false));
               if (!ok) return handler.next(e);
             } else {
               _refreshing = true;
@@ -140,7 +135,6 @@ final class ApiService {
         },
       ),
     );
-
 
     if (!kReleaseMode) {
       _dio.interceptors.add(
@@ -198,7 +192,7 @@ final class ApiService {
           try {
             if (_refreshing) {
               final ok =
-              await (_refreshCompleter?.future ?? Future.value(false));
+                  await (_refreshCompleter?.future ?? Future.value(false));
               if (!ok) return handler.next(e);
             } else {
               _refreshing = true;
@@ -252,10 +246,7 @@ final class ApiService {
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';
   }
 
-  RequestOptions _cloneForRetry(
-      RequestOptions original,
-      String? accessToken,
-      ) {
+  RequestOptions _cloneForRetry(RequestOptions original, String? accessToken) {
     final headers = Map<String, dynamic>.from(original.headers);
     if (accessToken?.isNotEmpty == true) {
       headers['Authorization'] = 'Bearer $accessToken';
@@ -303,11 +294,8 @@ final class ApiService {
     throw ApiException('Некорректный формат ответа сервера');
   }
 
-  ApiException _mapDioError(
-      DioException e, {
-        String fallback = 'Ошибка сети',
-      }) {
-    const userFriendly = 'Произошла ошибка. Обратитесь в поддержку';
+  ApiException _mapDioError(DioException e, {String fallback = 'Ошибка сети'}) {
+    const userFriendly = 'ошибка. Обратитесь в поддержку';
 
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
@@ -338,9 +326,10 @@ final class ApiService {
       message = fallback;
     }
 
-    return ApiException(message, statusCode: statusCode);
+    final exception = ApiException(message, statusCode: statusCode);
+    AppLogger.e('API Error [${statusCode ?? 'N/A'}]: $message', e, e.stackTrace);
+    return exception;
   }
-
 
   Future<RegisterResponse> postRegister(RegisterRequest body) async {
     try {
@@ -361,12 +350,7 @@ final class ApiService {
 
   Future<void> postWhatsappCode({required String phoneNumber}) async {
     try {
-      await _dio.post(
-        'users/whatsapp-code/',
-        data: {
-          'phone': phoneNumber,
-        },
-      );
+      await _dio.post('users/whatsapp-code/', data: {'phone': phoneNumber});
     } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Не удалось отправить код в WhatsApp');
     } catch (_) {
@@ -376,18 +360,14 @@ final class ApiService {
 
   Future<void> postDebugWhatsappCode({required String phoneNumber}) async {
     try {
-      await _dio.post(
-        'users/debug-code/',
-        data: {
-          'phone': phoneNumber,
-        },
-      );
+      await _dio.post('users/debug-code/', data: {'phone': phoneNumber});
     } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Не удалось отправить код в WhatsApp');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<void> deleteAccount() async {
     try {
       await _dio.delete('users/delete-account/');
@@ -433,10 +413,7 @@ final class ApiService {
     try {
       final resp = await _dio.post(
         'users/verify/',
-        data: {
-          'phone': phone,
-          'code': code,
-        },
+        data: {'phone': phone, 'code': code},
       );
       final map = _asMap(resp.data);
       final access = map['access']?.toString() ?? '';
@@ -462,10 +439,7 @@ final class ApiService {
     try {
       final resp = await _authDio.post(
         'users/token/',
-        data: {
-          'phone_number': phoneNumber,
-          'password': password,
-        },
+        data: {'phone_number': phoneNumber, 'password': password},
       );
       final map = _asMap(resp.data);
       final access = map['access']?.toString() ?? '';
@@ -486,9 +460,7 @@ final class ApiService {
     try {
       final resp = await _authDio.post(
         'users/token/refresh/',
-        data: {
-          'refresh': refreshToken,
-        },
+        data: {'refresh': refreshToken},
       );
       if (resp.statusCode != 200 && resp.statusCode != 201) {
         return false;
@@ -517,17 +489,12 @@ final class ApiService {
         throw ApiException('Номер телефона не задан');
       }
 
-      final formData = FormData.fromMap({
-        'phone': phone,
-      });
+      final formData = FormData.fromMap({'phone': phone});
 
       formData.files.add(
         MapEntry(
           'selfie_id_card',
-          await MultipartFile.fromFile(
-            selfiePath,
-            filename: 'selfie.jpg',
-          ),
+          await MultipartFile.fromFile(selfiePath, filename: 'selfie.jpg'),
         ),
       );
 
@@ -551,9 +518,7 @@ final class ApiService {
 
       final resp = await _dio.post(
         'users/carrier-wait/',
-        data: {
-          'phone': phone,
-        },
+        data: {'phone': phone},
         options: Options(
           validateStatus: (code) => code != null && code >= 200 && code < 500,
         ),
@@ -592,24 +557,19 @@ final class ApiService {
       final map = _asMap(resp.data);
       return ProfileModel.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить профиль',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить профиль');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<CarrierProfileModel> getCarrierProfile() async {
     try {
       final resp = await _dio.get('users/profile/');
       final map = _asMap(resp.data);
       return CarrierProfileModel.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить профиль',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить профиль');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -621,21 +581,17 @@ final class ApiService {
   }) async {
     final response = await _dio.get(
       'delivery/geo/reverse/',
-      queryParameters: {
-        'lat': lat.toString(),
-        'lon': lon.toString(),
-      },
+      queryParameters: {'lat': lat.toString(), 'lon': lon.toString()},
     );
 
-    return DeliveryReverseGeo.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return DeliveryReverseGeo.fromJson(response.data as Map<String, dynamic>);
   }
+
   Future<Map<String, dynamic>> getJson(
-      String path, {
-        Map<String, dynamic>? queryParameters,
-        String fallbackError = 'Ошибка сети',
-      }) async {
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    String fallbackError = 'Ошибка сети',
+  }) async {
     try {
       final resp = await _dio.get<dynamic>(
         path,
@@ -650,8 +606,8 @@ final class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getDeliveryAutocompleteRaw(
-      String query,
-      ) async {
+    String query,
+  ) async {
     final q = query.trim();
     if (q.isEmpty) return [];
 
@@ -668,11 +624,10 @@ final class ApiService {
 
     return results
         .where((e) => e is Map)
-        .map<Map<String, dynamic>>(
-          (e) => Map<String, dynamic>.from(e as Map),
-    )
+        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
+
   Future<CarrierDayStats> getCarrierStatsForDate(DateTime date) async {
     String _fmtDate(DateTime d) {
       final y = d.year.toString().padLeft(4, '0');
@@ -684,21 +639,17 @@ final class ApiService {
     try {
       final resp = await _dio.get(
         'delivery/stats/',
-        queryParameters: {
-          'date': _fmtDate(date),
-        },
+        queryParameters: {'date': _fmtDate(date)},
       );
       final map = _asMap(resp.data);
       return CarrierDayStats.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить статистику',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить статистику');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<Map<String, dynamic>> createShipment({
     required String title,
     required String description,
@@ -717,10 +668,7 @@ final class ApiService {
       );
       return _asMap(resp.data);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось создать доставку',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось создать доставку');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -733,17 +681,11 @@ final class ApiService {
     try {
       final resp = await _dio.post(
         'delivery/shipments/quote/',
-        data: {
-          'stops': stops,
-          'return_to_start': returnToStart,
-        },
+        data: {'stops': stops, 'return_to_start': returnToStart},
       );
       return _asMap(resp.data);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось рассчитать стоимость',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось рассчитать стоимость');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -753,14 +695,12 @@ final class ApiService {
     try {
       await _dio.delete('delivery/shipments/$id/');
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось отменить доставку',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось отменить доставку');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<void> patchShipmentStatus(int id, {required String status}) async {
     try {
       await _dio.post(
@@ -768,10 +708,7 @@ final class ApiService {
         data: {'status': status},
       );
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось сменить статус',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось сменить статус');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -784,18 +721,12 @@ final class ApiService {
     try {
       final resp = await _dio.get(
         'delivery/shipments/history/',
-        queryParameters: {
-          'page': page,
-          'page_size': pageSize,
-        },
+        queryParameters: {'page': page, 'page_size': pageSize},
       );
       final map = _asMap(resp.data);
       return ShipmentHistoryPage.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить историю доставок',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить историю доставок');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -807,10 +738,7 @@ final class ApiService {
       final map = _asMap(resp.data);
       return ShipmentDetail.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить детали доставки',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить детали доставки');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
@@ -823,22 +751,17 @@ final class ApiService {
     try {
       final resp = await _dio.get(
         'delivery/shipments/nearby/',
-        queryParameters: {
-          'lat': lat,
-          'lon': lon,
-        },
+        queryParameters: {'lat': lat, 'lon': lon},
       );
       final map = _asMap(resp.data);
       return NearbyShipmentsPage.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить ближайшие заказы',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить ближайшие заказы');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<ShipmentDetail> advanceShipment(int id) async {
     try {
       final resp = await _dio.post('delivery/shipments/$id/advance/');
@@ -850,20 +773,19 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<ShipmentDetail> acceptShipment(int id) async {
     try {
       final resp = await _dio.post('delivery/shipments/$id/accept/');
       final map = _asMap(resp.data);
       return ShipmentDetail.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось принять заказ',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось принять заказ');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
   Future<Map<String, dynamic>> postFcmRegister({
     required String token,
     required String platform,
@@ -871,10 +793,7 @@ final class ApiService {
     try {
       final resp = await _dio.post(
         'fcm/register/',
-        data: {
-          'token': token,
-          'platform': platform,
-        },
+        data: {'token': token, 'platform': platform},
       );
       final data = resp.data;
       if (data is Map<String, dynamic>) {
@@ -894,12 +813,17 @@ final class ApiService {
       );
     }
   }
-  Future<Map<String, dynamic>> getShipments({int page = 1, int pageSize = 20}) async {
+
+  Future<Map<String, dynamic>> getShipments({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
     final resp = await dio.get(
       'delivery/shipments/',
       queryParameters: {'page': page, 'page_size': pageSize},
     );
-    if (resp.data is Map<String, dynamic>) return resp.data as Map<String, dynamic>;
+    if (resp.data is Map<String, dynamic>)
+      return resp.data as Map<String, dynamic>;
     if (resp.data is Map) return Map<String, dynamic>.from(resp.data as Map);
     throw ApiException('Некорректный ответ delivery/shipments/');
   }
@@ -916,10 +840,7 @@ final class ApiService {
       final map = _asMap(resp.data);
       return SupportModel.fromJson(map);
     } on DioException catch (e) {
-      throw _mapDioError(
-        e,
-        fallback: 'Не удалось загрузить данные поддержки',
-      );
+      throw _mapDioError(e, fallback: 'Не удалось загрузить данные поддержки');
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }

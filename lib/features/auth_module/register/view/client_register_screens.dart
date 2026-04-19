@@ -5,6 +5,8 @@ import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/eye_password.dart';
 import 'components/register_dots_indicator.dart';
@@ -46,16 +48,12 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
     final pass2 = _pass2.text;
 
     if (firstName.isEmpty || phone.isEmpty || pass.isEmpty || pass2.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Заполните все поля')));
+      AppSnackBar.showError(context, message: 'Заполните все поля');
       return;
     }
 
     if (pass != pass2) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
+      AppSnackBar.showError(context, message: 'Пароли не совпадают');
       return;
     }
 
@@ -75,9 +73,7 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
       context.push('/register/confirm/whatsapp');
     } else {
       final message = provider.error ?? 'Не удалось завершить регистрацию';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      AppSnackBar.showError(context, message: message);
     }
   }
 

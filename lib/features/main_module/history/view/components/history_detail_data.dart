@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/model/shipment_detail_model.dart';
@@ -28,13 +29,19 @@ class _HistoryDetailsBody extends StatelessWidget {
   static const _statusGreen = Color(0xFF2E7D32);
 
   String _fmtDate(DateTime d) {
-    final dd = d.day.toString().padLeft(2, '0');
-    final mm = d.month.toString().padLeft(2, '0');
-    final yyyy = d.year.toString().padLeft(4, '0');
-    final hh = d.hour.toString().padLeft(2, '0');
-    final min = d.minute.toString().padLeft(2, '0');
-    final ss = d.second.toString().padLeft(2, '0');
-    return '$dd.$mm.$yyyy -$hh:$min:$ss';
+    // Используем "d MMM, HH:mm" для формата "16 апр, 23:57"
+    // Но так как нам нужно с секундами (как в логах), сделаем так:
+    try {
+      return DateFormat('dd.MM.yyyy - HH:mm:ss').format(d);
+    } catch (_) {
+      final dd = d.day.toString().padLeft(2, '0');
+      final mm = d.month.toString().padLeft(2, '0');
+      final yyyy = d.year.toString().padLeft(4, '0');
+      final hh = d.hour.toString().padLeft(2, '0');
+      final min = d.minute.toString().padLeft(2, '0');
+      final ss = d.second.toString().padLeft(2, '0');
+      return '$dd.$mm.$yyyy -$hh:$min:$ss';
+    }
   }
 
   String _mapStatus(String code) {
@@ -283,6 +290,24 @@ class _HistoryDetailsBody extends StatelessWidget {
                   value: _fmtDate(d.createdAt),
                 ),
               ),
+              if (d.paidAt != null) ...[
+                const SliverToBoxAdapter(child: _Divider()),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Оплачено:',
+                    value: _fmtDate(d.paidAt!),
+                  ),
+                ),
+              ],
+              if (d.finishedAt != null) ...[
+                const SliverToBoxAdapter(child: _Divider()),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Завершено:',
+                    value: _fmtDate(d.finishedAt!),
+                  ),
+                ),
+              ],
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: _Section(

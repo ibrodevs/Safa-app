@@ -1,3 +1,4 @@
+import 'package:dogo/core/utils/snackbar_utils.dart';
 import 'package:dogo/features/main_module/profile/provider/support_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -30,8 +31,9 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
       mode: LaunchMode.externalApplication,
     );
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось открыть приложение.')),
+      AppSnackBar.showError(
+        context,
+        message: 'Не удалось открыть приложение.',
       );
     }
   }

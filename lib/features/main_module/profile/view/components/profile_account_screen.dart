@@ -1,8 +1,8 @@
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/utils/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
 import '../../../../../data/services/logout_service.dart';
 import '../../provider/profile_provider.dart';
 
@@ -269,7 +269,8 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
       context.go('/');
     } else {
       final err = context.read<ProfileProvider>().error ?? 'Не удалось удалить аккаунт';
-      _showSnack(context, err);
+      if (!context.mounted) return;
+      AppSnackBar.showError(context, message: err);
     }
   }
   Future<void> _openEditDialog(
@@ -488,7 +489,7 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
       },
     );
     if (ok == true && mounted) {
-      _showSnack(context, 'Сохранено');
+      AppSnackBar.showSuccess(context, message: 'Сохранено');
     }
   }
 
@@ -517,7 +518,7 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
   }
 
   void _showSnack(BuildContext context, String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    AppSnackBar.showSuccess(context, message: text);
   }
 }
 

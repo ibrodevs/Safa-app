@@ -10,9 +10,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/utils/snackbar_utils.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'data/model/nearby_shipment.dart';
 
 enum ShipmentStatus {
@@ -275,9 +278,22 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         lon: pos.longitude,
       );
 
+      final rejectedIds = await _getRejectedIds();
+      final allResults = page.results;
+      final filteredResults = allResults.where((s) => !rejectedIds.contains(s.id)).toList();
+
       if (!mounted) return;
 
-      if (page.results.isEmpty) {
+      if (filteredResults.isEmpty) {
+        setState(() {
+          _nearby = const [];
+          _nearbyIndex = 0;
+          _showEmptyOrders = true;
+          _didFitOnce = false;
+          _routePoints = const [];
+          _routeSignature = null;
+        });
+        _startNearbyPolling();
         return;
       }
 
@@ -285,7 +301,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _showEmptyOrders = false;
         _showWelcome = false;
 
-        _nearby = page.results;
+        _nearby = filteredResults;
         _nearbyIndex = 0;
 
         _myLat = pos.latitude;
@@ -316,9 +332,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         lon: pos.longitude,
       );
 
+      final rejectedIds = await _getRejectedIds();
+      final allResults = page.results;
+      final filteredResults = allResults.where((s) => !rejectedIds.contains(s.id)).toList();
+
       if (!mounted) return;
 
-      if (page.results.isEmpty) {
+      if (filteredResults.isEmpty) {
         if (!mounted) return;
         setState(() {
           _nearby = const [];
@@ -334,7 +354,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       setState(() {
         _showWelcome = false;
-        _nearby = page.results;
+        _nearby = filteredResults;
         _nearbyIndex = 0;
 
         _myLat = pos.latitude;
@@ -351,34 +371,31 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForNearby();
     } catch (e) {
       if (!mounted) return;
-
-      final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Разрешите геолокацию в настройках приложения'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
+      // Errors are already handled or will be handled by AppSnackBar default logging
+      if (e is! ApiException) {
+        AppSnackBar.showError(context, error: e);
       }
     } finally {
       if (mounted) setState(() => _loadingOnline = false);
     }
   }
 
-  void _rejectNearby() {
+  Future<void> _rejectNearby() async {
     if (_nearby.isEmpty) return;
+    final currentId = _currentNearby?.id;
+
+    // Immediate feedback
     setState(() {
-      _nearbyIndex++;
-      if (_nearbyIndex >= _nearby.length) _nearbyIndex = 0;
-      _didFitOnce = false;
-      _routeSignature = null;
       _routePoints = const [];
+      _routeSignature = null;
     });
-    _syncRouteAndCameraForNearby();
+
+    if (currentId != null) {
+      await _saveRejectedId(currentId);
+    }
+
+    // Refresh immediately to apply filter
+    await _refreshNearbySilently();
   }
 
   Future<void> _acceptCurrent() async {
@@ -472,9 +489,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     });
 
     if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
+      AppSnackBar.showError(context, message: message);
     }
   }
 
@@ -505,12 +520,12 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       await _syncRouteAndCameraForActive();
 
-      if (parsed.status == ShipmentStatus.completed) {}
+      if (parsed.status == ShipmentStatus.completed) {
+        await _clearRejectedIds();
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Произошла ошибка')));
+      AppSnackBar.showError(context, error: e);
     }
   }
 
@@ -533,21 +548,39 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<bool> _ensureLocationPermission() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      if (!mounted) return false;
+      AppSnackBar.showError(
+        context,
+        message: 'Геолокация отключена. Пожалуйста, включите GPS.',
+        actionLabel: 'Включить',
+        onAction: () => Geolocator.openLocationSettings(),
+      );
       return false;
     }
 
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
-    }
-
-    if (perm == LocationPermission.denied) {
-      return false;
+      if (perm == LocationPermission.denied) {
+        if (!mounted) return false;
+        AppSnackBar.showError(
+          context,
+          message: 'Доступ к геолокации необходим для работы курьера.',
+        );
+        return false;
+      }
     }
 
     if (perm == LocationPermission.deniedForever) {
+      if (!mounted) return false;
+      AppSnackBar.showError(
+        context,
+        message: 'Доступ к геолокации запрещен. Разрешите его в настройках.',
+        actionLabel: 'Настройки',
+        onAction: () => Geolocator.openAppSettings(),
+      );
       return false;
     }
 
@@ -732,6 +765,28 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return d.round();
   }
 
+  static const String _rejectedOrdersKey = 'rejected_shipment_ids';
+
+  Future<Set<int>> _getRejectedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_rejectedOrdersKey) ?? [];
+    return list.map((e) => int.parse(e)).toSet();
+  }
+
+  Future<void> _saveRejectedId(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_rejectedOrdersKey) ?? [];
+    if (!list.contains(id.toString())) {
+      list.add(id.toString());
+      await prefs.setStringList(_rejectedOrdersKey, list);
+    }
+  }
+
+  Future<void> _clearRejectedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rejectedOrdersKey);
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -822,8 +877,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 userAgentPackageName: 'kg.genesis.dogo',
+                subdomains: const ['a', 'b', 'c', 'd'],
               ),
 
               if (_routePoints.isNotEmpty) ...[
@@ -832,12 +888,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                     Polyline(
                       points: _routePoints,
                       strokeWidth: 5,
-                      color: Colors.black.withValues(alpha: 0.75),
+                      color: Colors.black.withValues(alpha: 0.15),
                     ),
-                  ],
-                ),
-                PolylineLayer(
-                  polylines: [
                     Polyline(
                       points: _routePoints,
                       strokeWidth: 3,
