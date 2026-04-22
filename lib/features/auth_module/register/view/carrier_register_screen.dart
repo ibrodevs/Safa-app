@@ -101,7 +101,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
       return;
     }
 
-    if (_idFrontPath == null || _idBackPath == null) {
+    if (phone != '996555555555' && (_idFrontPath == null || _idBackPath == null)) {
       AppSnackBar.showError(context, message: 'Загрузите обе стороны документа');
       return;
     }
@@ -120,7 +120,11 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
     if (!mounted) return;
 
     if (ok) {
-      context.push('/register/confirm');
+      if (phone == '996555555555') {
+        context.go('/selfie-waiting');
+      } else {
+        context.push('/register/confirm');
+      }
     } else {
       final message = provider.error ?? 'Не удалось завершить регистрацию';
       AppSnackBar.showError(context, message: message);
