@@ -154,7 +154,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
               ShadowField(
                 child: AppTextField(
                   controller: _phone,
-                  hint: 'Телефон с WhatsApp',
+                  hint: 'Номер телефона',
                   keyboardType: TextInputType.phone,
                   prefixText: '+',
                   maxLenth: 10,
