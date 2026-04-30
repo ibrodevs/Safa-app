@@ -110,7 +110,7 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
                       child: AppTextField(
                         controller: _code,
                         keyboardType: TextInputType.number,
-                        hint: 'Введите код с Whatsapp',
+                        hint: 'Введите код',
                         prefixText: '  ',
                       ),
                     ),
