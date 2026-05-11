@@ -12,8 +12,8 @@ class AuthRepository {
   }
 
   Future<void> sendWhatsappCode(String phoneNumber) {
-    return api.postDebugWhatsappCode(phoneNumber: phoneNumber);
-    // return api.postWhatsappCode(phoneNumber: phoneNumber);
+    //return api.postDebugWhatsappCode(phoneNumber: phoneNumber);
+    return api.postWhatsappCode(phoneNumber: phoneNumber);
   }
 
   Future<void> verifyCode({required String phone, required String code}) {
