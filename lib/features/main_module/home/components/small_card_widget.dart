@@ -9,6 +9,8 @@ class SmallFeatureCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.tagText,
+    this.tagIconAsset,
+    this.tagWidth,
     required this.imageAsset,
     this.imagePadding = 10,
     this.imagePadding2 = 0,
@@ -20,6 +22,8 @@ class SmallFeatureCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String tagText;
+  final String? tagIconAsset;
+  final double? tagWidth;
   final String imageAsset;
   final VoidCallback onTap;
 
@@ -60,7 +64,21 @@ class SmallFeatureCard extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height:imagePadding),
+              SizedBox(height: imagePadding),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 15,
+                  height: 1.3333,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.105,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 subtitle,
                 maxLines: 3,
@@ -74,7 +92,7 @@ class SmallFeatureCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              TagChip(text: tagText, compact: true),
+              TagChip(text: tagText, iconAsset: tagIconAsset, width: tagWidth, compact: true),
             ],
           ),
         ),

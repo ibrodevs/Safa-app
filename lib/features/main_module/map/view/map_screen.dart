@@ -36,7 +36,7 @@ class OrderMapScreen extends StatefulWidget {
 
 enum _LocationGate { checking, ready, denied, serviceOff }
 
-class _OrderMapScreenState extends State<OrderMapScreen> {
+class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObserver {
   double _myLat = 42.8746;
   double _myLon = 74.6122;
 
@@ -69,6 +69,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
   bool _routing = false;
+  
+  StreamSubscription<ServiceStatus>? _serviceStatusStream;
 
   List<LatLng> _extractStopPoints(List<DeliveryPoint> stops) {
     final pts = <LatLng>[];
@@ -229,6 +231,17 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    
+    _serviceStatusStream = Geolocator.getServiceStatusStream().listen((status) {
+      if (status == ServiceStatus.enabled) {
+        _initLocation();
+      } else {
+        if (mounted) setState(() => _gate = _LocationGate.serviceOff);
+        _promptGps();
+      }
+    });
+
     _initLocation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -265,7 +278,16 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _initLocation();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _serviceStatusStream?.cancel();
     _stopShipmentPolling();
     super.dispose();
   }
@@ -281,16 +303,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) setState(() => _gate = _LocationGate.serviceOff);
-        if (!mounted) return;
-        AppSnackBar.showError(
-          context,
-          message: 'Геолокация отключена. Пожалуйста, включите GPS.',
-          actionLabel: 'Включить',
-          onAction: () async {
-            await Geolocator.openLocationSettings();
-            _initLocation();
-          },
-        );
+        _promptGps();
         return;
       }
 
@@ -308,7 +321,6 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
           actionLabel: 'Настройки',
           onAction: () async {
             await Geolocator.openAppSettings();
-            _initLocation(); // Retry after settings
           },
         );
         return;
@@ -351,6 +363,18 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
         setState(() => _gate = _LocationGate.denied);
       }
     }
+  }
+
+  void _promptGps() {
+    if (!mounted) return;
+    AppSnackBar.showError(
+      context,
+      message: 'Геолокация отключена. Пожалуйста, включите GPS.',
+      actionLabel: 'Включить',
+      onAction: () async {
+        await Geolocator.openLocationSettings();
+      },
+    );
   }
 
   List<LatLng> _spreadSamePoints(List<LatLng> pts) {
@@ -614,15 +638,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomInsets = MediaQuery.viewPaddingOf(context).bottom;
-    if (_gate == _LocationGate.checking) {
-      return const Scaffold(
-        backgroundColor: AppColors.white,
-        body: SafeArea(child: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     final addressProvider = context.watch<DeliveryAddressProvider>();
-
     final gpsAddress = addressProvider.gpsHereAddress;
     final gpsLoading = addressProvider.gpsLoading;
     final gpsError = addressProvider.gpsError;
@@ -631,10 +647,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
     String? bazarTitle;
     String? detailText;
 
-    if (gpsLoading) {
+    if (gpsLoading || _gate == _LocationGate.checking) {
       fromTitle = 'Определяем адрес...';
+    } else if (gpsError != null && gpsError.isNotEmpty) {
+      fromTitle = 'Не удалось получить адрес';
     } else if (gpsAddress == null || gpsAddress.isEmpty) {
-      fromTitle = 'Определяем адрес...';
+      fromTitle = 'Адрес не найден';
     } else {
       final parsed = parseAddressForUi(gpsAddress);
       fromTitle = parsed.fullAfterCity.isNotEmpty
@@ -663,7 +681,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
               children: [
                 HereBubble(
                   address: gpsAddress,
-                  loading: gpsLoading,
+                  loading: gpsLoading || _gate == _LocationGate.checking,
                   error: gpsError,
                   marketTitle: bazarTitle,
                   detail: detailText,
@@ -697,46 +715,43 @@ class _OrderMapScreenState extends State<OrderMapScreen> {
       backgroundColor: AppColors.white,
       body: Stack(
         children: [
-          if (_gate == _LocationGate.ready)
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: LatLng(_centerLat, _centerLon),
-                initialZoom: 15,
-                onPositionChanged: (pos, hasGesture) {
-                  final c = pos.center;
-                  _centerLat = c.latitude;
-                  _centerLon = c.longitude;
-                },
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(_centerLat, _centerLon),
+              initialZoom: 15,
+              onPositionChanged: (pos, hasGesture) {
+                final c = pos.center;
+                _centerLat = c.latitude;
+                _centerLon = c.longitude;
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                userAgentPackageName: 'kg.genesis.dogo',
+                subdomains: const ['a', 'b', 'c', 'd'],
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                  userAgentPackageName: 'kg.genesis.dogo',
-                  subdomains: const ['a', 'b', 'c', 'd'],
+
+              if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 5,
+                      color: Colors.black.withValues(alpha: 0.15),
+                    ),
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 3,
+                      color: Colors.white,
+                    ),
+                  ],
                 ),
 
-                if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: _routePoints,
-                        strokeWidth: 5,
-                        color: Colors.black.withValues(alpha: 0.15),
-                      ),
-                      Polyline(
-                        points: _routePoints,
-                        strokeWidth: 3,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
-
-                MarkerLayer(markers: markers),
-              ],
-            )
-          else
-            const SizedBox.expand(),
+              MarkerLayer(markers: markers),
+            ],
+          ),
 
           Positioned(
             left: 16,

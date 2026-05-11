@@ -29,23 +29,25 @@ class HereBubble extends StatelessWidget {
     if (loading) {
       titleLine = marketTitle ?? 'Определяем адрес...';
       subtitleLine = 'Определяем адрес...';
+    } else if (error != null && error!.isNotEmpty) {
+      titleLine = 'Не удалось получить адрес';
+      subtitleLine = 'Проверьте интернет / геокодинг';
     } else if (address == null || address!.isEmpty) {
-      titleLine = marketTitle ?? 'Определяем адрес...';
-      subtitleLine = 'Определяем адрес...';
+      titleLine = marketTitle ?? 'Адрес не найден';
+      subtitleLine = 'Точка на карте';
     } else {
       if (marketTitle != null || detail != null) {
-        titleLine = marketTitle ?? 'Определяем адрес...';
+        titleLine = marketTitle ?? 'Точка на карте';
         subtitleLine = detail ?? address!;
       } else {
         final parsed = parseAddressForUi(address);
-        titleLine = parsed.marketTitle ?? 'Определяем адрес...';
+        titleLine = parsed.marketTitle ?? 'Точка на карте';
         subtitleLine = parsed.detail ?? parsed.fullAfterCity;
+        if (titleLine == 'Точка на карте' && subtitleLine.isEmpty) {
+            subtitleLine = address!;
+        }
       }
     }
-    if (error != null && error!.isNotEmpty) {
-      titleLine = 'Не удалось получить адрес';
-      subtitleLine = 'Проверь интернет / доступ к геокодингу';
-    } else if (loading) {}
     return Material(
       color: Colors.white,
       elevation: 10,

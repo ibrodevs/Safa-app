@@ -327,7 +327,7 @@ final class ApiService {
     }
 
     final exception = ApiException(message, statusCode: statusCode);
-    AppLogger.e('API Error [${statusCode ?? 'N/A'}]: $message', e, e.stackTrace);
+    AppLogger.e('API Error [$statusCode]: $message', e, e.stackTrace);
     return exception;
   }
 

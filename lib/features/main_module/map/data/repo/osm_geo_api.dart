@@ -90,7 +90,7 @@ class OsmGeoApi {
           'format': 'jsonv2',
           'accept-language': 'ru',
           'zoom': 18,
-          'email': 'senya.kalchoroev@gmail..com',
+          'email': 'senya.kalchoroev@gmail.com',
         },
         options: Options(
           headers: {'User-Agent': _ua},

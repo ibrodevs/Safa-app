@@ -13,8 +13,8 @@ class Avatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Image.network(
           url,
-          width: 76,
-          height: 76,
+          width: 44,
+          height: 44,
           fit: BoxFit.cover,
         ),
       );
@@ -23,8 +23,8 @@ class Avatar extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: Image.asset(
         'assets/images/img_placeholder.png',
-        width: 76,
-        height: 76,
+        width: 44,
+        height: 44,
         fit: BoxFit.cover,
       ),
     );

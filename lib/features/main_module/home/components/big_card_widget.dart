@@ -8,6 +8,8 @@ class BigFeatureCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.tagText,
+    this.tagIconAsset,
+    this.tagWidth,
     required this.imageAsset,
     required this.onTap,
   });
@@ -15,6 +17,8 @@ class BigFeatureCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String tagText;
+  final String? tagIconAsset;
+  final double? tagWidth;
   final String imageAsset;
   final VoidCallback onTap;
 
@@ -70,7 +74,7 @@ class BigFeatureCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 60),
-                      TagChip(text: tagText),
+                      TagChip(text: tagText, iconAsset: tagIconAsset, width: tagWidth),
                     ],
                   ),
                 ),
