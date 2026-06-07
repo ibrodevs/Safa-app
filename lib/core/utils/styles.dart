@@ -8,7 +8,7 @@ class AppTextStyles {
     fontWeight: FontWeight.w600,
     fontSize: 24,
     letterSpacing: -0.5,
-    height: 1.1,
+    height: 1.6,
     color: Colors.black,
   );
 

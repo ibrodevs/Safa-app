@@ -1002,9 +1002,8 @@ class _WelcomeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Center(
-                child: Text(
-                  'Сатурн — шестая планета по удалённости от \nСолнца и вторая по размерам планета',
+               Text(
+                  'Ожидайте новых заказов /\nКогда клиенту потребуется \nтачкист придет уведомление',
                   style: TextStyle(
                     fontSize: 16,
                     letterSpacing: -0.4,
@@ -1013,7 +1012,6 @@ class _WelcomeCard extends StatelessWidget {
                     color: AppColors.grey,
                   ),
                 ),
-              ),
               const SizedBox(height: 22),
               SizedBox(
                 height: 54,

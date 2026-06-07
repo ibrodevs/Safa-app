@@ -21,7 +21,7 @@ class CarrierTitleBlock extends StatelessWidget {
         Text(
           'Данные клиента',
           style: TextStyle(
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
             height: 1.15,
             color: Colors.black,
@@ -29,11 +29,11 @@ class CarrierTitleBlock extends StatelessWidget {
         ),
         SizedBox(height: 6),
         Text(
-          'Отслеживайте и узнавайте адреса\nактуальных складов  для доставки товаров',
+          'Станьте тачкистом и получите дополнительно\nновых клиентов ',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            height: 1.25,
+            height: 1.4,
             color: Color(0xFF9FA4AD),
           ),
         ),

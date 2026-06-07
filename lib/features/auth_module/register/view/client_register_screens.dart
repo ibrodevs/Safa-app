@@ -2,15 +2,14 @@ import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/core/widgets/primary_button.dart';
 import 'package:dogo/core/widgets/shadow_field.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
+import 'package:dogo/features/auth_module/register/view/widgets/client_title_block_widget_second.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
 import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/eye_password.dart';
 import 'components/register_dots_indicator.dart';
-import 'widgets/client_title_block_widget.dart';
 
 class ClientRegisterScreen extends StatefulWidget {
   const ClientRegisterScreen({super.key});
@@ -94,7 +93,7 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const ClientTitleBlock(),
+                  const ClientTitleBlockSecond(),
                   const SizedBox(height: 18),
                   ShadowField(
                     child: AppTextField(

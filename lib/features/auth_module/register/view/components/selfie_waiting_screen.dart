@@ -114,9 +114,9 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                   'Ожидайте подтверждения',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 24,
-                    height: 1.2,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 21,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
                     color: Colors.black,
                   ),
                 ),
@@ -124,14 +124,12 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
               const SizedBox(height: 4),
               const Center(
                 child: Text(
-                  'Сатурн — шестая планета по удалённости от '
-                      'Солнца и вторая по размерам планета',
+                  'После подтверждения доступ откроется сразу',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: -0.4,
-                    height: 1.3,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    height: 1,
+                    fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
                 ),
