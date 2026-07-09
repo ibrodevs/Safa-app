@@ -1,9 +1,12 @@
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/utils/snackbar_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../data/model/delivery_point_model.dart';
+import '../../data/model/delivery_refs_models.dart';
+import '../../data/repo/delivery_refs_repository.dart';
+import '../widgets/ref_suggest_field.dart';
 import '../widgets/sheet_back_pill.dart';
 import 'map_picker_screen.dart';
 
@@ -29,7 +32,14 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
   final TextEditingController _bazarCtrl = TextEditingController();
   final TextEditingController _containerCtrl = TextEditingController();
   final TextEditingController _passageCtrl = TextEditingController();
+
+  final DeliveryRefsRepository _refs = DeliveryRefsRepository();
+
   DeliveryPoint? _pickedOnMap;
+  BazarRef? _bazar;
+  PassageRef? _passage;
+  ContainerRef? _container;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -48,7 +58,83 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
     return 'Проход: $p';
   }
 
-  void _submit() {
+  Future<List<RefSuggestion<BazarRef>>> _fetchBazars(String q) async {
+    final list = await _refs.searchBazars(q);
+    return list.map((b) => RefSuggestion(label: b.name, value: b)).toList();
+  }
+
+  Future<List<RefSuggestion<PassageRef>>> _fetchPassages(String q) async {
+    final list = await _refs.searchPassages(query: q, bazarId: _bazar?.id);
+    return list
+        .map((p) => RefSuggestion(
+              label: p.number,
+              sublabel: p.bazarName,
+              value: p,
+            ))
+        .toList();
+  }
+
+  Future<List<RefSuggestion<ContainerRef>>> _fetchContainers(String q) async {
+    final list = await _refs.searchContainers(
+      query: q,
+      bazarId: _bazar?.id,
+      passageId: _passage?.id,
+    );
+    return list
+        .map((c) => RefSuggestion(
+              label: 'Контейнер ${c.number}',
+              sublabel: '${c.passageNumber} · ${c.bazarName}',
+              fillText: c.number,
+              value: c,
+            ))
+        .toList();
+  }
+
+  void _onBazarSelected(RefSuggestion<BazarRef> s) {
+    setState(() {
+      _bazar = s.value;
+      _pickedOnMap = null;
+      _passage = null;
+      _container = null;
+      _passageCtrl.clear();
+      _containerCtrl.clear();
+    });
+  }
+
+  void _onPassageSelected(RefSuggestion<PassageRef> s) {
+    final p = s.value;
+    setState(() {
+      _passage = p;
+      _pickedOnMap = null;
+      _container = null;
+      _containerCtrl.clear();
+      if (_bazar?.id != p.bazarId) {
+        _bazar = BazarRef(id: p.bazarId, name: p.bazarName);
+        _bazarCtrl.text = p.bazarName;
+      }
+    });
+  }
+
+  void _onContainerSelected(RefSuggestion<ContainerRef> s) {
+    final c = s.value;
+    setState(() {
+      _container = c;
+      _pickedOnMap = null;
+      _bazar = BazarRef(id: c.bazarId, name: c.bazarName);
+      _bazarCtrl.text = c.bazarName;
+      _passage = PassageRef(
+        id: c.passageId,
+        bazarId: c.bazarId,
+        bazarName: c.bazarName,
+        number: c.passageNumber,
+      );
+      _passageCtrl.text = c.passageNumber;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+
     if (_pickedOnMap != null) {
       final p = _pickedOnMap!;
       Navigator.of(context).pop(
@@ -66,19 +152,47 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
       return;
     }
 
-    final bazar = _bazarCtrl.text.trim();
-    final container = _containerCtrl.text.trim();
-    final passage = _passageCtrl.text.trim();
+    var c = _container;
+
+    // Пользователь ввёл номер контейнера руками — ищем его в базе,
+    // чтобы точка всегда была из справочника (с координатами).
+    if (c == null && _containerCtrl.text.trim().isNotEmpty) {
+      setState(() => _submitting = true);
+      try {
+        final found = await _refs.searchContainers(
+          query: _containerCtrl.text.trim(),
+          bazarId: _bazar?.id,
+          passageId: _passage?.id,
+          pageSize: 1,
+        );
+        if (found.isNotEmpty) c = found.first;
+      } catch (_) {
+      } finally {
+        if (mounted) setState(() => _submitting = false);
+      }
+      if (!mounted) return;
+    }
+
+    if (c == null || c.latValue == null || c.lonValue == null) {
+      AppSnackBar.showError(
+        context,
+        message: 'Выберите контейнер из списка или укажите точку на карте',
+      );
+      return;
+    }
+
+    final bazarName =
+        _bazarCtrl.text.trim().isNotEmpty ? _bazarCtrl.text.trim() : c.bazarName;
 
     Navigator.of(context).pop(
       DeliveryPoint(
-        title: bazar.isNotEmpty ? bazar : widget.addressLine,
-        subtitle: _subtitleFrom(container, passage),
-        lat: null,
-        lon: null,
-        bazar: bazar,
-        container: container,
-        passage: passage,
+        title: bazarName.isNotEmpty ? bazarName : widget.addressLine,
+        subtitle: _subtitleFrom(c.number, c.passageNumber),
+        lat: c.latValue,
+        lon: c.lonValue,
+        bazar: bazarName,
+        container: c.number,
+        passage: c.passageNumber,
         q: '',
       ),
     );
@@ -151,96 +265,70 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                               const SizedBox(height: 24),
 
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: Container(
+                                    child: RefSuggestField<BazarRef>(
+                                      controller: _bazarCtrl,
+                                      hint: 'Базар',
+                                      fetch: _fetchBazars,
+                                      onSelected: _onBazarSelected,
+                                      onTextEdited: () {
+                                        _bazar = null;
+                                        _pickedOnMap = null;
+                                      },
                                       height: 56,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: AppColors.tileBorder,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: Row(
-                                        children: [
-                                          SvgPicture.asset(
-                                            'assets/icons/ic_box.svg',
-                                            width: 20,
-                                            height: 20,
-                                            colorFilter: const ColorFilter.mode(
-                                              AppColors.accent,
-                                              BlendMode.srcIn,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: TextField(
-                                              controller: _bazarCtrl,
-                                              decoration: const InputDecoration(
-                                                isCollapsed: true, // ✅ чтобы было по центру по высоте
-                                                border: InputBorder.none,
-                                                hintText: 'Откуда отправка',
-                                                hintStyle: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.chev,
-                                                ),
-                                              ),
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.black,
-                                              ),
-                                              cursorColor: AppColors.black,
-                                              textInputAction: TextInputAction.next,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      radius: 16,
+                                      horizontalPadding: 16,
+                                      fontSize: 16,
                                     ),
                                   ),
 
                                   const SizedBox(width: 12),
 
-                                  TextButton.icon(
-                                    onPressed: () async {
-                                      FocusScope.of(context).unfocus();
+                                  SizedBox(
+                                    height: 56,
+                                    child: Center(
+                                      child: TextButton.icon(
+                                        onPressed: () async {
+                                          FocusScope.of(context).unfocus();
 
-                                      final p = await Navigator.of(context).push<DeliveryPoint>(
-                                        MaterialPageRoute(
-                                          builder: (_) => MapPickerScreen(
-                                            initial: LatLng(widget.lat, widget.lon),
-                                            title: 'Точка отправки',
+                                          final p = await Navigator.of(context).push<DeliveryPoint>(
+                                            MaterialPageRoute(
+                                              builder: (_) => MapPickerScreen(
+                                                initial: LatLng(widget.lat, widget.lon),
+                                                title: 'Промежуточная точка',
+                                              ),
+                                            ),
+                                          );
+                                          if (!mounted || p == null) return;
+
+                                          setState(() {
+                                            _pickedOnMap = p;
+                                            _bazar = null;
+                                            _passage = null;
+                                            _container = null;
+
+                                            // чтобы было понятно, что выбрали
+                                            _bazarCtrl.text = p.title;
+
+                                            _containerCtrl.clear();
+                                            _passageCtrl.clear();
+                                          });
+                                        },
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          foregroundColor: AppColors.accent,
+                                          textStyle: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      );
-                                      if (!mounted || p == null) return;
-
-                                      setState(() {
-                                        _pickedOnMap = p;
-
-                                        // чтобы было понятно, что выбрали
-                                        _bazarCtrl.text = p.title;
-
-                                        _containerCtrl.clear();
-                                        _passageCtrl.clear();
-                                      });
-                                    },
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      foregroundColor: AppColors.accent,
-                                      textStyle: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w600,
+                                        icon: const Icon(Icons.near_me_rounded, size: 20),
+                                        label: const Text('Карта'),
                                       ),
                                     ),
-                                    icon: const Icon(Icons.near_me_rounded, size: 20),
-                                    label: const Text('Карта'),
                                   ),
                                 ],
                               ),
@@ -253,18 +341,37 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                               const SizedBox(height: 18),
 
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: _TagField(
-                                      hint: 'Контейнер',
+                                    child: RefSuggestField<ContainerRef>(
                                       controller: _containerCtrl,
+                                      hint: 'Контейнер',
+                                      fetch: _fetchContainers,
+                                      onSelected: _onContainerSelected,
+                                      onTextEdited: () => _container = null,
+                                      height: 56,
+                                      radius: 16,
+                                      horizontalPadding: 16,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      hintColor: const Color(0xFFC7CFD9),
                                     ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
-                                    child: _TagField(
-                                      hint: 'Проход',
+                                    child: RefSuggestField<PassageRef>(
                                       controller: _passageCtrl,
+                                      hint: 'Проход',
+                                      fetch: _fetchPassages,
+                                      onSelected: _onPassageSelected,
+                                      onTextEdited: () => _passage = null,
+                                      height: 56,
+                                      radius: 16,
+                                      horizontalPadding: 16,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      hintColor: const Color(0xFFC7CFD9),
                                     ),
                                   ),
                                 ],
@@ -275,7 +382,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                 height: 56,
                                 width: double.infinity,
                                 child: ElevatedButton(
-                                  onPressed: _submit,
+                                  onPressed: _submitting ? null : _submit,
                                   style: ElevatedButton.styleFrom(
                                     elevation: 0,
                                     backgroundColor: AppColors.accent,
@@ -288,7 +395,7 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  child: const Text('Далее'),
+                                  child: Text(_submitting ? 'Проверяем…' : 'Далее'),
                                 ),
                               ),
                             ],
@@ -311,63 +418,6 @@ class _IntermediatePointSheetState extends State<IntermediatePointSheet> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _TagField extends StatelessWidget {
-  const _TagField({required this.hint, required this.controller});
-
-  final String hint;
-  final TextEditingController controller;
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFFC7CFD9);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _tileBorder, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          SvgPicture.asset(
-            'assets/icons/ic_box.svg',
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: hint,
-                hintStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: _greyText,
-                ),
-              ),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-              cursorColor: Colors.black,
-              textInputAction: TextInputAction.next,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

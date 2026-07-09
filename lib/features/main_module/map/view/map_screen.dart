@@ -19,6 +19,7 @@ import '../data/model/delivery_point_model.dart';
 import '../data/model/shipment_status.dart';
 import '../provider/active_shipment_provider.dart';
 import 'components/from_point_sheet.dart';
+import 'components/order_completed_sheet.dart';
 import 'components/order_fulfillment_sheet.dart';
 import 'widgets/add_adress_button.dart';
 import 'widgets/here_bubble.dart';
@@ -436,6 +437,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
           status == ShipmentStatus.canceled) {
         _stopShipmentPolling();
         _resetShipmentState();
+        if (status == ShipmentStatus.completed) {
+          _deliveryPoint = null;
+          _fromPoint = null;
+          _intermediatePoints.clear();
+          _showOrderCompletedSheet();
+        }
         return;
       }
 
@@ -452,6 +459,16 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
 
       _syncRouteAndCamera();
     } catch (_) {}
+  }
+
+  void _showOrderCompletedSheet() {
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.transparent,
+      builder: (_) => const OrderCompletedSheet(),
+    );
   }
 
   void _startShipmentPolling(int shipmentId) {
@@ -565,6 +582,17 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
 
   Future<void> _handleCreateShipment(List<DeliveryPoint> stops) async {
     if (_creatingShipment || stops.isEmpty) return;
+
+    // Сервер требует координаты у каждой точки — без них будет 400.
+    final missingCoords = stops.any((s) => s.lat == null || s.lon == null);
+    if (missingCoords) {
+      AppSnackBar.showError(
+        context,
+        message:
+            'Для каждой точки выберите контейнер из справочника или место на карте',
+      );
+      return;
+    }
 
     setState(() => _creatingShipment = true);
 
