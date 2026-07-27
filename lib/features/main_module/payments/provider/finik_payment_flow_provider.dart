@@ -17,8 +17,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   FinikPaymentFlowProvider({
     required ShipmentsRepository shipmentsRepo,
     required FinikPaymentsRepository paymentsRepo,
-  })  : _shipmentsRepo = shipmentsRepo,
-        _paymentsRepo = paymentsRepo;
+  }) : _shipmentsRepo = shipmentsRepo,
+       _paymentsRepo = paymentsRepo;
 
   final ShipmentsRepository _shipmentsRepo;
   final FinikPaymentsRepository _paymentsRepo;
@@ -44,7 +44,9 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   }
 
   Future<void> startExistingShipmentPayment(int id) async {
-    if (status != FinikFlowStatus.initial && status != FinikFlowStatus.failed) return;
+    if (status != FinikFlowStatus.initial && status != FinikFlowStatus.failed) {
+      return;
+    }
 
     try {
       shipmentId = id;
@@ -71,7 +73,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   }) async {
     if (status != FinikFlowStatus.initial) return;
 
-    try { 
+    try {
       status = FinikFlowStatus.waiting;
       errorText = null;
       notifyListeners();
@@ -97,7 +99,10 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     }
   }
 
-  void startPollingPaid({Duration interval = const Duration(seconds: 2), int maxSeconds = 40}) {
+  void startPollingPaid({
+    Duration interval = const Duration(seconds: 2),
+    int maxSeconds = 40,
+  }) {
     final id = shipmentId;
     if (id == null) return;
 
@@ -124,7 +129,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
         if (_pollTicks >= maxTicks) {
           t.cancel();
           status = FinikFlowStatus.failed;
-          errorText = 'Оплата не подтвердилась. Попробуйте обновить статус позже.';
+          errorText =
+              'Оплата не подтвердилась. Попробуйте обновить статус позже.';
           notifyListeners();
         }
       } catch (e) {

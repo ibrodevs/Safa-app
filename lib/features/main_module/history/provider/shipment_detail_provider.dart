@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/utils/friendly_error.dart';
 import '../data/model/shipment_detail_model.dart';
 import '../data/repo/shipment_detail_repo.dart';
 
@@ -25,7 +26,8 @@ class ShipmentDetailProvider extends ChangeNotifier {
     try {
       _detail = await _repo.fetchDetail(id);
     } catch (e) {
-      _error = e.toString();
+      // Технический текст ошибки пользователю не показываем.
+      _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить заказ');
     } finally {
       _loading = false;
       notifyListeners();

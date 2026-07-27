@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/design/app_design.dart';
+import '../../../../core/utils/kg_phone_format.dart';
 import '../../../../core/utils/snackbar_utils.dart';
+import '../../../../core/widgets/app_widgets.dart';
+import '../../../../data/services/logout_service.dart';
 import '../provider/profile_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
-
-  static const _tileBorder = Color(0xFFE9EDF2);
 
   @override
   Widget build(BuildContext context) {
@@ -20,31 +21,54 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _ProfileBody extends StatelessWidget {
+class _ProfileBody extends StatefulWidget {
   const _ProfileBody();
-  String formatKgPhone(String? input) {
-    if (input == null) return '—';
 
-    var digits = input.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return '—';
+  @override
+  State<_ProfileBody> createState() => _ProfileBodyState();
+}
 
-    if (digits.startsWith('0') && digits.length == 10) {
-      digits = digits.substring(1);
+class _ProfileBodyState extends State<_ProfileBody> {
+  bool _loggingOut = false;
+
+  String _roleLabel(String? role) {
+    switch (role?.trim().toLowerCase()) {
+      case 'carrier':
+        return 'Специалист';
+      case 'client':
+        return 'Клиент';
+      case '':
+      case null:
+        return 'Пользователь';
+      default:
+        return 'Пользователь';
     }
+  }
 
-    if (digits.length == 9) {
-      digits = '996$digits';
-    }
+  Future<void> _logout() async {
+    final confirmed = await AppConfirmDialog.show(
+      context,
+      title: 'Выйти из аккаунта?',
+      message: 'Придётся войти заново по номеру телефона и паролю.',
+      confirmLabel: 'Выйти',
+      cancelLabel: 'Остаться',
+      danger: true,
+      icon: Icons.logout_rounded,
+    );
 
-    if (digits.length == 12 && digits.startsWith('996')) {
-      final op = digits.substring(3, 6);   // 997
-      final a = digits.substring(6, 8);    // 91
-      final b = digits.substring(8, 10);   // 91
-      final c = digits.substring(10, 12);  // 70
-      return '+996 $op $a-$b-$c';
-    }
+    // Токены очищаются только после подтверждения пользователя.
+    if (!confirmed || !mounted) return;
 
-    return input.trim().startsWith('+') ? input.trim() : '+$digits';
+    setState(() => _loggingOut = true);
+    await const LogoutService().logout();
+
+    if (!mounted) return;
+    setState(() => _loggingOut = false);
+    context.go('/select_role');
+  }
+
+  void _showSoon() {
+    AppSnackBar.showSoon(context);
   }
 
   @override
@@ -52,271 +76,201 @@ class _ProfileBody extends StatelessWidget {
     final state = context.watch<ProfileProvider>();
     final profile = state.profile;
 
-    final name = profile != null && profile.firstName.isNotEmpty
-        ? profile.firstName
-        : (state.loading ? 'Загрузка...' : '—');
+    final name = (profile?.firstName ?? '').trim().isNotEmpty
+        ? profile!.firstName.trim()
+        : (state.loading ? 'Загружаем…' : 'Профиль');
 
-    final phone = state.loading ? '—' : formatKgPhone(profile?.phoneNumber);
+    final phone = state.loading && profile == null
+        ? '—'
+        : formatKgPhone(profile?.phoneNumber);
+
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          backgroundColor: Colors.white,
-          color: const Color(0xFFFF8A00),
+          backgroundColor: AppColors.surface,
+          color: AppColors.primary,
           onRefresh: () => context.read<ProfileProvider>().loadProfile(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Профиль',
-                  style: TextStyle(
-                    fontSize: 20,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black,
+            padding: EdgeInsets.fromLTRB(
+              horizontal,
+              AppSpacing.xs,
+              horizontal,
+              AppSpacing.xl + safeBottom,
+            ),
+            child: AppContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Профиль',
+                    style: AppResponsive.useCompactTitle(context)
+                        ? AppTypography.screenTitleCompact
+                        : AppTypography.screenTitle,
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _Avatar(avatarUrl: profile?.avatar),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _HeaderInfo(
-                        name: name,
-                        phone: phone,
-                        city: profile?.city,
-                      ),
+                  AppSpacing.gapMd,
+                  _ProfileHeaderCard(
+                    name: name,
+                    phone: phone,
+                    city: profile?.city,
+                    role: _roleLabel(profile?.role),
+                    avatarUrl: profile?.avatar,
+                    onEdit: () => context.push('/profile/account'),
+                  ),
+                  if (state.error != null) ...[
+                    AppSpacing.gapMd,
+                    AppErrorState(
+                      error: state.error,
+                      title: 'Не удалось загрузить профиль',
+                      compact: true,
+                      onRetry: () =>
+                          context.read<ProfileProvider>().loadProfile(),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: ProfileScreen._tileBorder,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(
-                      color: ProfileScreen._tileBorder,
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x11000000),
-                        blurRadius: 20,
-                        offset: Offset(0, 8),
-                      ),
-                      BoxShadow(
-                        color: Color(0x08000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
+                  AppSpacing.gapLg,
+
+                  AppTileGroup(
+                    title: 'Аккаунт',
                     children: [
-                      _ProfileTile(
-                        iconAsset: 'assets/icons/ic_notification.svg',
-                        title: 'Уведомление',
-                        onTap: () => context.push('/profile/notifications'),
-                      ),
-                      const SizedBox(height: 2),
-                      _ProfileTile(
-                        iconAsset: 'assets/icons/ic_human.svg',
-                        title: 'Аккаунт',
+                      AppListTile(
+                        title: 'Личные данные',
+                        subtitle: 'Имя, город, фотография',
+                        iconAsset: AppIcons.human,
                         onTap: () => context.push('/profile/account'),
                       ),
-                      const SizedBox(height: 2),
-                      _ProfileTile(
-                        iconAsset: 'assets/icons/ic_clock.svg',
-                        title: 'История пополнений/трат',
-                        onTap: () =>  _showSoonSnack(context),
-                      ),
-                      const SizedBox(height: 2),
-                      _ProfileTile(
-                        iconAsset: 'assets/icons/ic_phone.svg',
-                        title: 'Служба поддержки',
-                        onTap: () => context.push('/profile/support'),
+                      AppListTile(
+                        title: 'История пополнений и трат',
+                        iconAsset: AppIcons.clock,
+                        onTap: _showSoon,
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 200),
-                if (state.error != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  AppSpacing.gapMd,
+
+                  AppTileGroup(
+                    title: 'Настройки',
+                    children: [
+                      AppListTile(
+                        title: 'Уведомления',
+                        subtitle: 'Push-сообщения о статусе заказов',
+                        iconAsset: AppIcons.notification,
+                        onTap: () => context.push('/profile/notifications'),
+                      ),
+                    ],
+                  ),
+                  AppSpacing.gapMd,
+
+                  AppTileGroup(
+                    title: 'Поддержка',
+                    children: [
+                      AppListTile(
+                        title: 'Служба поддержки',
+                        subtitle: 'Задать вопрос и получить помощь',
+                        iconAsset: AppIcons.phone,
+                        onTap: () => context.push('/profile/support'),
+                      ),
+                      AppListTile(
+                        title: 'Политика конфиденциальности',
+                        icon: Icons.shield_outlined,
+                        onTap: () => context.push('/privacy-policy'),
+                      ),
+                    ],
+                  ),
+                  AppSpacing.gapXl,
+
+                  AppSecondaryButton(
+                    label: 'Выйти из аккаунта',
+                    icon: Icons.logout_rounded,
+                    danger: true,
+                    loading: _loggingOut,
+                    onPressed: _logout,
                   ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
-  void _showSoonSnack(BuildContext context) {
-    AppSnackBar.showSuccess(
-      context,
-      message: 'Интеграция будет добавлена позже.',
-    );
-  }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({this.avatarUrl});
-
-  final String? avatarUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = avatarUrl?.trim();
-    if (url != null && url.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          url,
-          width: 76,
-          height: 76,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Image.asset(
-        'assets/images/img_placeholder.png',
-        width: 76,
-        height: 76,
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-}
-
-class _HeaderInfo extends StatelessWidget {
-  const _HeaderInfo({
+class _ProfileHeaderCard extends StatelessWidget {
+  const _ProfileHeaderCard({
     required this.name,
     required this.phone,
-    this.city,
+    required this.role,
+    required this.city,
+    required this.avatarUrl,
+    required this.onEdit,
   });
 
   final String name;
   final String phone;
+  final String role;
   final String? city;
-
-  static const _greyText = Color(0xFF9FA4AD);
+  final String? avatarUrl;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
     final hasCity = city != null && city!.trim().isNotEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 17,
-            height: 1.1,
-            fontWeight: FontWeight.w900,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          phone,
-          style: const TextStyle(
-            fontSize: 17,
-            height: 1.1,
-            fontWeight: FontWeight.w700,
-            color: _greyText,
-          ),
-        ),
-        if (hasCity) ...[
-          const SizedBox(height: 4),
-          Text(
-            city!,
-            style: const TextStyle(
-              fontSize: 17,
-              height: 1.1,
-              fontWeight: FontWeight.w700,
-              color: _greyText,
+    return AppCard(
+      onTap: onEdit,
+      semanticLabel: 'Профиль: $name, $phone, $role',
+      child: Row(
+        children: [
+          AppAvatar(url: avatarUrl, name: name, size: 56),
+          AppSpacing.hGapSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.cardTitle,
+                ),
+                const SizedBox(height: 2),
+                Text(phone, style: AppTypography.caption),
+                AppSpacing.gapXs,
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xxs,
+                  children: [
+                    AppStatusBadge(
+                      label: role,
+                      tone: AppBadgeTone.primary,
+                      icon: Icons.badge_outlined,
+                      dense: true,
+                    ),
+                    if (hasCity)
+                      AppStatusBadge(
+                        label: city!.trim(),
+                        icon: Icons.location_city_outlined,
+                        dense: true,
+                      ),
+                  ],
+                ),
+              ],
             ),
+          ),
+          AppSpacing.hGapXxs,
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 22,
+            color: AppColors.textTertiary,
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({
-    required this.iconAsset,
-    required this.title,
-    this.onTap,
-  });
-
-  final String iconAsset;
-  final String title;
-  final VoidCallback? onTap;
-
-  static const _accent = Color(0xFFFF8A00);
-  static const _chev = Color(0xFFC7CFD9);
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 8, 18),
-        child: Row(
-          children: [
-            SvgPicture.asset(
-              iconAsset,
-              width: 22,
-              height: 22,
-              colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
-              placeholderBuilder: (_) =>
-              const Icon(Icons.circle, size: 22, color: _accent),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  height: 1.1,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, size: 24, color: _chev),
-          ],
-        ),
       ),
     );
   }

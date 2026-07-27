@@ -1,10 +1,19 @@
-import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/main_module/payments/provider/finik_payment_flow_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../core/design/app_design.dart';
+import '../../../../../core/utils/friendly_error.dart';
+import '../../../../../core/widgets/app_widgets.dart';
+import 'map_panel_shell.dart';
 
+/// Панель оплаты найденного заказа.
+///
+/// Логика оплаты через Finik не изменена: `startExistingShipmentPayment`
+/// и переход на именованный маршрут `finik_pay`. Изменилось только
+/// оформление и обработка ошибки — вместо `Ошибка инициализации оплаты: $e`
+/// пользователь видит человекочитаемый текст.
 class ShipmentPaymentSheet extends StatefulWidget {
   const ShipmentPaymentSheet({
     super.key,
@@ -23,28 +32,31 @@ class ShipmentPaymentSheet extends StatefulWidget {
 
 class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
   bool _loading = false;
+  String? _error;
 
   Future<void> _handlePay() async {
     if (_loading) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
       final flow = context.read<FinikPaymentFlowProvider>();
       await flow.startExistingShipmentPayment(widget.shipmentId);
 
       if (!mounted) return;
 
-      final success = await GoRouter.of(context).pushNamed<bool>(
-        'finik_pay',
-      );
-
-      if (success == true) {
-        // Payment success logic handled by polling in MapScreen or Provider
-      }
+      // Результат оплаты подхватывается поллингом статуса заказа.
+      await GoRouter.of(context).pushNamed<bool>('finik_pay');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка инициализации оплаты: $e')),
+      setState(
+        () => _error = friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось начать оплату. Попробуйте ещё раз.',
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -53,161 +65,79 @@ class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      elevation: 20,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Тачкист найден!',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.green,
-                          fontFamily: 'SFProDisplay',
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Заказ #${widget.shipmentId}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.grey,
-                          fontFamily: 'SFProText',
-                        ),
-                      ),
-                    ],
-                  ),
+    return MapPanelShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppColors.successSoft,
+                  shape: BoxShape.circle,
                 ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.green.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: AppColors.green,
-                    size: 32,
+                child: const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: AppColors.success,
+                  size: 22,
+                ),
+              ),
+              AppSpacing.hGapSm,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Исполнитель найден', style: AppTypography.cardTitle),
+                    Text(
+                      'Заказ №${widget.shipmentId}',
+                      style: AppTypography.captionMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.gapMd,
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: AppRadius.allMd,
+            ),
+            child: Row(
+              children: [
+                Expanded(child: Text('К оплате', style: AppTypography.body)),
+                Text(
+                  '${widget.amount} сом',
+                  style: AppTypography.sectionTitle.copyWith(
+                    color: AppColors.primary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.tileBorder, width: 1),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'К оплате',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.black,
-                    ),
-                  ),
-                  Text(
-                    '${widget.amount} сом',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _handlePay,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _loading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Text(
-                        'Оплатить через Finik',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: 'SFProText',
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: OutlinedButton(
-                onPressed: _loading ? null : widget.onCancel,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: AppColors.cancelColor.withValues(alpha: 0.4),
-                    width: 1.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'Отменить заказ',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.grey2,
-                    fontFamily: 'SFProText',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+          AppSpacing.gapMd,
+          AppFormError(message: _error),
+          if (_error != null) AppSpacing.gapSm,
+          AppPrimaryButton(
+            label: 'Оплатить через Finik',
+            loadingLabel: 'Открываем оплату…',
+            loading: _loading,
+            size: AppButtonSize.medium,
+            onPressed: _handlePay,
+          ),
+          AppSpacing.gapXs,
+          AppSecondaryButton(
+            label: 'Отменить заказ',
+            danger: true,
+            size: AppButtonSize.medium,
+            enabled: !_loading,
+            onPressed: widget.onCancel,
+          ),
+        ],
       ),
     );
   }

@@ -16,7 +16,7 @@ class NotificationService {
   static const _channelDesc = 'Delivery updates and alerts';
 
   final FlutterLocalNotificationsPlugin _fln =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
   bool _inited = false;
 
   Future<void> init() async {
@@ -40,7 +40,7 @@ class NotificationService {
         }
       },
       onDidReceiveBackgroundNotificationResponse:
-      NotificationService._onBackgroundTap,
+          NotificationService._onBackgroundTap,
     );
 
     const channel = AndroidNotificationChannel(
@@ -52,7 +52,8 @@ class NotificationService {
 
     await _fln
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
 
     _inited = true;
@@ -93,11 +94,13 @@ class NotificationService {
   Future<void> showFromMessage(RemoteMessage msg) async {
     final notif = msg.notification;
     final data = msg.data;
-    final title = notif?.title ??
+    final title =
+        notif?.title ??
         (data['title']?.toString().isNotEmpty == true
             ? data['title'].toString()
             : 'Уведомление');
-    final body = notif?.body ??
+    final body =
+        notif?.body ??
         (data['body']?.toString().isNotEmpty == true
             ? data['body'].toString()
             : '');

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -44,20 +46,18 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
     final auth = context.read<AuthProvider>();
     final ok = await auth.uploadSelfie(selfie.path);
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (ok) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('carrier_pending', true);
       await prefs.setBool('is_logged_in', false);
 
-      if (!mounted) return;
+      if (!context.mounted) return;
       context.go('/selfie-waiting');
     } else {
       final msg = auth.error ?? 'Не удалось загрузить селфи';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -134,17 +134,19 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
                       onPressed: loading
                           ? null
                           : () {
-                        if (!hasPhoto) {
-                          _takeSelfie(context);
-                        } else {
-                          _submit(context);
-                        }
-                      },
+                              if (!hasPhoto) {
+                                _takeSelfie(context);
+                              } else {
+                                _submit(context);
+                              }
+                            },
                       style: ButtonStyle(
-                        backgroundColor:
-                        const WidgetStatePropertyAll(Color(0xFFE67E22)),
-                        foregroundColor:
-                        const WidgetStatePropertyAll(Colors.white),
+                        backgroundColor: const WidgetStatePropertyAll(
+                          AppColors.primary,
+                        ),
+                        foregroundColor: const WidgetStatePropertyAll(
+                          Colors.white,
+                        ),
                         shape: WidgetStatePropertyAll(
                           RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
@@ -161,26 +163,25 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
                       ),
                       child: loading
                           ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              valueColor:
-                              AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Отправляем селфи'),
-                        ],
-                      )
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Text('Отправляем селфи'),
+                              ],
+                            )
                           : Text(
-                        hasPhoto ? 'Отправить селфи' : 'Сделать селфи',
-                      ),
+                              hasPhoto ? 'Отправить селфи' : 'Сделать селфи',
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -238,23 +239,20 @@ class _SelfieFrame extends StatelessWidget {
           children: [
             Positioned.fill(
               child: selfie != null
-                  ? Image.file(
-                File(selfie!.path),
-                fit: BoxFit.cover,
-              )
+                  ? Image.file(File(selfie!.path), fit: BoxFit.cover)
                   : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF020617),
-                      Color(0xFF020617),
-                      Color(0xFF020617),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0xFF020617),
+                            Color(0xFF020617),
+                            Color(0xFF020617),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
             ),
             if (selfie == null)
               Positioned.fill(
@@ -271,16 +269,9 @@ class _SelfieFrame extends StatelessWidget {
                   ),
                 ),
               ),
-            const Align(
-              alignment: Alignment(0, -0.60),
-
-              child: _HeadTarget(),
-            ),
+            const Align(alignment: Alignment(0, -0.60), child: _HeadTarget()),
             SizedBox(height: 20),
-            const Align(
-              alignment: Alignment(0, 0.5),
-              child: _CardTarget(),
-            ),
+            const Align(alignment: Alignment(0, 0.5), child: _CardTarget()),
           ],
         ),
       ),
@@ -298,10 +289,7 @@ class _HeadTarget extends StatelessWidget {
       height: 170,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: const Color(0xFFFFF3E0),
-          width: 3,
-        ),
+        border: Border.all(color: const Color(0xFFFFF3E0), width: 3),
         color: Colors.black.withValues(alpha: 0.18),
       ),
       child: Icon(
@@ -323,10 +311,7 @@ class _CardTarget extends StatelessWidget {
       height: 140,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFFFF3E0),
-          width: 3,
-        ),
+        border: Border.all(color: const Color(0xFFFFF3E0), width: 3),
         color: Colors.black.withValues(alpha: 0.26),
       ),
       child: Row(

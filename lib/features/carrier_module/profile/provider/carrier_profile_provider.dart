@@ -64,7 +64,11 @@ class CarrierProfileProvider extends ChangeNotifier {
     final today = _normalize(DateTime.now());
 
     final res = <DateTime>[];
-    for (var d = today; !d.isBefore(created); d = d.subtract(const Duration(days: 1))) {
+    for (
+      var d = today;
+      !d.isBefore(created);
+      d = d.subtract(const Duration(days: 1))
+    ) {
       res.add(d);
     }
     return res;
@@ -115,6 +119,6 @@ class CarrierProfileProvider extends ChangeNotifier {
 
   String _key(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'
-          '${d.month.toString().padLeft(2, '0')}-'
-          '${d.day.toString().padLeft(2, '0')}';
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 }

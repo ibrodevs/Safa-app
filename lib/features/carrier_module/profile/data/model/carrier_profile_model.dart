@@ -20,13 +20,13 @@ class CarrierProfileModel {
   });
 
   factory CarrierProfileModel.fromJson(Map<String, dynamic> json) {
-    int _asInt(dynamic v) {
+    int asInt(dynamic v) {
       if (v is int) return v;
       if (v is num) return v.toInt();
       return int.tryParse(v?.toString() ?? '0') ?? 0;
     }
 
-    DateTime _asDate(dynamic v) {
+    DateTime asDate(dynamic v) {
       if (v == null) return DateTime.now();
       final s = v.toString();
       return DateTime.tryParse(s) ?? DateTime.now();
@@ -39,11 +39,11 @@ class CarrierProfileModel {
       role: json['role']?.toString() ?? '',
       phoneNumber: json['phone_number']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
-      city: cityRaw == null ? null : cityRaw.toString(),
-      avatar: avatarRaw == null ? null : avatarRaw.toString(),
-      rate: _asInt(json['rate']),
-      clientRateCount: _asInt(json['client_rate_count']),
-      createdAt: _asDate(json['created_at']),
+      city: cityRaw?.toString(),
+      avatar: avatarRaw?.toString(),
+      rate: asInt(json['rate']),
+      clientRateCount: asInt(json['client_rate_count']),
+      createdAt: asDate(json['created_at']),
     );
   }
 }

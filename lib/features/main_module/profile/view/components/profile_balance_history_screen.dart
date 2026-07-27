@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:dogo/core/design/app_colors.dart';
+
 class ProfileBalanceHistoryScreen extends StatelessWidget {
   const ProfileBalanceHistoryScreen({super.key});
 
@@ -66,11 +68,7 @@ class ProfileBalanceHistoryScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(
-              height: 1,
-              thickness: 1,
-              color: _tileBorder,
-            ),
+            const Divider(height: 1, thickness: 1, color: _tileBorder),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Container(
@@ -133,11 +131,7 @@ class ProfileBalanceHistoryScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Row(
                 children: [
-                  _FilterChip(
-                    label: 'Все',
-                    selected: true,
-                    onTap: () {},
-                  ),
+                  _FilterChip(label: 'Все', selected: true, onTap: () {}),
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: 'Пополнения',
@@ -145,11 +139,7 @@ class ProfileBalanceHistoryScreen extends StatelessWidget {
                     onTap: () {},
                   ),
                   const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'Списания',
-                    selected: false,
-                    onTap: () {},
-                  ),
+                  _FilterChip(label: 'Списания', selected: false, onTap: () {}),
                 ],
               ),
             ),
@@ -158,15 +148,15 @@ class ProfileBalanceHistoryScreen extends StatelessWidget {
               child: operations.isEmpty
                   ? const _EmptyHistory()
                   : ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: operations.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final op = operations[index];
-                  return _OperationTile(operation: op);
-                },
-              ),
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      itemCount: operations.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final op = operations[index];
+                        return _OperationTile(operation: op);
+                      },
+                    ),
             ),
           ],
         ),
@@ -186,7 +176,7 @@ class _FilterChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +248,9 @@ class _OperationTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              operation.isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              operation.isIncome
+                  ? Icons.arrow_downward_rounded
+                  : Icons.arrow_upward_rounded,
               size: 18,
               color: color,
             ),
@@ -319,11 +311,7 @@ class _EmptyHistory extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(
-              Icons.receipt_long_rounded,
-              size: 48,
-              color: _greyText,
-            ),
+            Icon(Icons.receipt_long_rounded, size: 48, color: _greyText),
             SizedBox(height: 12),
             Text(
               'Пока нет операций',
@@ -337,7 +325,7 @@ class _EmptyHistory extends StatelessWidget {
             SizedBox(height: 6),
             Text(
               'Когда вы начнёте пополнять баланс и оплачивать заказы, '
-                  'здесь появится история.',
+              'здесь появится история.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,

@@ -69,24 +69,16 @@ class ShipmentHistoryPage {
   final int count;
   final List<ShipmentHistoryItem> results;
 
-  const ShipmentHistoryPage({
-    required this.count,
-    required this.results,
-  });
+  const ShipmentHistoryPage({required this.count, required this.results});
 
   factory ShipmentHistoryPage.fromJson(Map<String, dynamic> json) {
     final list = (json['results'] as List? ?? const [])
-        .where((e) => e is Map)
+        .whereType<Map>()
         .map<ShipmentHistoryItem>(
-          (e) => ShipmentHistoryItem.fromJson(
-        Map<String, dynamic>.from(e as Map),
-      ),
-    )
+          (e) => ShipmentHistoryItem.fromJson(Map<String, dynamic>.from(e)),
+        )
         .toList();
 
-    return ShipmentHistoryPage(
-      count: _asInt(json['count']),
-      results: list,
-    );
+    return ShipmentHistoryPage(count: _asInt(json['count']), results: list);
   }
 }

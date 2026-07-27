@@ -50,7 +50,10 @@ class NotificationsRepository {
       if (d is String && d.isNotEmpty) {
         throw ApiException(d, statusCode: status);
       }
-      throw ApiException('Не удалось загрузить уведомления', statusCode: status);
+      throw ApiException(
+        'Не удалось загрузить уведомления',
+        statusCode: status,
+      );
     } catch (_) {
       throw ApiException('Не удалось загрузить уведомления');
     }
@@ -58,9 +61,7 @@ class NotificationsRepository {
 
   Future<void> markRead(int id) async {
     try {
-      await _api.dio.post<dynamic>(
-        'fcm/notifications/$id/read/',
-      );
+      await _api.dio.post<dynamic>('fcm/notifications/$id/read/');
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       final d = e.response?.data;
@@ -75,7 +76,10 @@ class NotificationsRepository {
       if (d is String && d.isNotEmpty) {
         throw ApiException(d, statusCode: status);
       }
-      throw ApiException('Не удалось отметить как прочитанное', statusCode: status);
+      throw ApiException(
+        'Не удалось отметить как прочитанное',
+        statusCode: status,
+      );
     } catch (_) {
       throw ApiException('Не удалось отметить как прочитанное');
     }

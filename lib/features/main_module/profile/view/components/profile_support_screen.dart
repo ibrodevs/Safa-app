@@ -1,9 +1,10 @@
 import 'package:dogo/core/utils/snackbar_utils.dart';
 import 'package:dogo/features/main_module/profile/provider/support_provider.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 
 class ProfileSupportScreen extends StatefulWidget {
   const ProfileSupportScreen({super.key});
@@ -13,7 +14,7 @@ class ProfileSupportScreen extends StatefulWidget {
 }
 
 class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
 
@@ -26,15 +27,9 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
   }
 
   Future<void> _launchUri(BuildContext context, Uri uri) async {
-    final ok = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
-      AppSnackBar.showError(
-        context,
-        message: 'Не удалось открыть приложение.',
-      );
+      AppSnackBar.showError(context, message: 'Не удалось открыть приложение.');
     }
   }
 
@@ -50,25 +45,24 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
   }
 
   Future<void> _openTelegram(BuildContext context, String telegram) async {
+    // Сначала пробуем нативное приложение Telegram, затем веб-ссылку.
+    final Uri appUri;
+    final Uri webUri;
+
     if (telegram.startsWith('@')) {
       final domain = telegram.substring(1);
-      final tgUri = Uri.parse('tg://resolve?domain=$domain');
-      if (await canLaunchUrl(tgUri)) {
-        await _launchUri(context, tgUri);
-        return;
-      }
-      final webUri = Uri.parse('https://t.me/$domain');
-      await _launchUri(context, webUri);
+      appUri = Uri.parse('tg://resolve?domain=$domain');
+      webUri = Uri.parse('https://t.me/$domain');
     } else {
       final digits = telegram.replaceAll(RegExp(r'[^\d]'), '');
-      final tgUri = Uri.parse('tg://resolve?phone=$digits');
-      if (await canLaunchUrl(tgUri)) {
-        await _launchUri(context, tgUri);
-        return;
-      }
-      final webUri = Uri.parse('https://t.me/+$digits');
-      await _launchUri(context, webUri);
+      appUri = Uri.parse('tg://resolve?phone=$digits');
+      webUri = Uri.parse('https://t.me/+$digits');
     }
+
+    final canOpenApp = await canLaunchUrl(appUri);
+    if (!context.mounted) return;
+
+    await _launchUri(context, canOpenApp ? appUri : webUri);
   }
 
   @override
@@ -77,9 +71,12 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
     final support = provider.support;
 
     final phoneDisplay = support?.phone ?? '+996 509 10 67 88';
-    final workingHours = support?.workingHours ?? 'Ежедневно с 09:00 до 21:00 по Бишкеку.';
+    final workingHours =
+        support?.workingHours ?? 'Ежедневно с 09:00 до 21:00 по Бишкеку.';
     final telegram = support?.telegram ?? '996509106788';
-    final message = support?.message ?? 'Если что-то пошло не так — напишите нам или позвоните. Мы поможем с заказами, оплатой и приложением.';
+    final message =
+        support?.message ??
+        'Если что-то пошло не так — напишите нам или позвоните. Мы поможем с заказами, оплатой и приложением.';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -129,11 +126,7 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
                 ],
               ),
             ),
-            const Divider(
-              height: 1,
-              thickness: 1,
-              color: _tileBorder,
-            ),
+            const Divider(height: 1, thickness: 1, color: _tileBorder),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: provider.fetchSupport,
@@ -216,8 +209,9 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
                                   backgroundColor: _accent,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
-                                  padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -274,14 +268,14 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
                       const _FaqTile(
                         question: 'Заказ не подтверждается, что делать?',
                         answer:
-                        'Проверьте интернет, попробуйте перезапустить приложение. '
+                            'Проверьте интернет, попробуйте перезапустить приложение. '
                             'Если не помогает — напишите нам в поддержку.',
                       ),
                       const SizedBox(height: 6),
                       const _FaqTile(
                         question: 'Списали деньги, но заказ не создался.',
                         answer:
-                        'Сделайте скриншот операции и отправьте в поддержку — мы разберёмся.',
+                            'Сделайте скриншот операции и отправьте в поддержку — мы разберёмся.',
                       ),
                     ],
                   ),
@@ -306,7 +300,7 @@ class _SupportButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _tileBorder = Color(0xFFE9EDF2);
 
   @override
@@ -339,10 +333,7 @@ class _SupportButton extends StatelessWidget {
 }
 
 class _FaqTile extends StatelessWidget {
-  const _FaqTile({
-    required this.question,
-    required this.answer,
-  });
+  const _FaqTile({required this.question, required this.answer});
 
   final String question;
   final String answer;

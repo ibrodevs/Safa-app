@@ -28,8 +28,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final flow = context.read<FinikPaymentFlowProvider>();
-      if (flow.status == FinikFlowStatus.awaitingFinikUi) {
-      }
+      if (flow.status == FinikFlowStatus.awaitingFinikUi) {}
     });
   }
 
@@ -95,12 +94,12 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
     final requiredFields = init.requiredFields.entries
         .map(
           (e) => RequiredField(
-        fieldId: e.key,
-        label: e.key,
-        value: e.value?.toString(),
-        isHidden: true,
-      ),
-    )
+            fieldId: e.key,
+            label: e.key,
+            value: e.value?.toString(),
+            isHidden: true,
+          ),
+        )
         .toList(growable: false);
 
     return Scaffold(
@@ -118,8 +117,12 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
             enableSupportButtons: true,
             tapableSupportButtons: true,
             onBackPressed: () {
-              context.read<FinikPaymentFlowProvider>().markFailed('Оплата отменена');
-              if (Navigator.of(context).canPop()) Navigator.of(context).pop(false);
+              context.read<FinikPaymentFlowProvider>().markFailed(
+                'Оплата отменена',
+              );
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop(false);
+              }
             },
             onPayment: (data) {
               final status = (data?['status'] ?? '').toString().toUpperCase();
@@ -128,7 +131,9 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
                 flow.startPollingPaid();
               } else if (status == 'FAILED') {
                 flow.markFailed('Платёж отклонён');
-                if (Navigator.of(context).canPop()) Navigator.of(context).pop(false);
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop(false);
+                }
               }
             },
             widget: CreateItemHandlerWidget(
@@ -142,9 +147,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               visibilityType: VisibilityType.PRIVATE,
             ),
           ),
-          const Positioned.fill(
-            child: _FinikStatusOverlay(),
-          ),
+          const Positioned.fill(child: _FinikStatusOverlay()),
         ],
       ),
     );
@@ -181,8 +184,8 @@ class _FinikStatusOverlay extends StatelessWidget {
                   child: status == FinikFlowStatus.polling
                       ? _buildPollingCard()
                       : status == FinikFlowStatus.succeeded
-                          ? _buildSuccessCard(context)
-                          : _buildFailedCard(context, flow.errorText),
+                      ? _buildSuccessCard(context)
+                      : _buildFailedCard(context, flow.errorText),
                 ),
               ),
             ),
@@ -299,7 +302,11 @@ class _FinikStatusOverlay extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: AppColors.cancelColor, size: 64),
+          const Icon(
+            Icons.error_outline,
+            color: AppColors.cancelColor,
+            size: 64,
+          ),
           const SizedBox(height: 24),
           const Text(
             'Оплата не удалась',

@@ -7,8 +7,7 @@ import 'package:dio/dio.dart';
 class DeliveryGeoRepository {
   final OsmGeoApi _osm;
 
-  DeliveryGeoRepository(ApiService _)
-      : _osm = OsmGeoApi(Dio());
+  DeliveryGeoRepository(ApiService _) : _osm = OsmGeoApi(Dio());
 
   Future<DeliveryReverseGeo> getAddress({
     required double lat,

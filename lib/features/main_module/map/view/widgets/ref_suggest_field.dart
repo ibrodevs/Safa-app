@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
+
+import '../../../../../core/design/app_design.dart';
+import '../../../../../core/widgets/app_widgets.dart';
 
 /// Элемент подсказки для [RefSuggestField].
 class RefSuggestion<T> {
@@ -24,10 +26,15 @@ class RefSuggestion<T> {
   final T value;
 }
 
-/// Текстовое поле в стиле полей щитов (иконка + рамка) с выпадающим
-/// списком подсказок из справочника. Список появляется под полем при
-/// фокусе и при вводе (с дебаунсом), ничего в существующем дизайне
-/// не убирает — только добавляет подсказки.
+/// Поле с подсказками из справочника (базары, проходы, контейнеры).
+///
+/// Логика загрузки сохранена: дебаунс 350 ms, отбрасывание устаревших ответов
+/// по номеру запроса, задержка перед закрытием, чтобы успел сработать тап
+/// по подсказке.
+///
+/// Изменено оформление: поле построено на [AppTextField], а список подсказок
+/// ограничен по высоте и скроллится внутри себя, поэтому не выталкивает
+/// содержимое формы за экран.
 class RefSuggestField<T> extends StatefulWidget {
   const RefSuggestField({
     super.key,
@@ -35,19 +42,15 @@ class RefSuggestField<T> extends StatefulWidget {
     required this.hint,
     required this.fetch,
     required this.onSelected,
+    this.label,
     this.onTextEdited,
-    this.height = 52,
-    this.fillColor = Colors.white,
-    this.radius = 16,
-    this.horizontalPadding = 18,
-    this.fontSize = 16,
-    this.fontWeight = FontWeight.w600,
-    this.hintColor = const Color(0xFF9FA4AD),
-    this.iconAsset = 'assets/icons/ic_box.svg',
+    this.prefixIcon = Icons.storefront_outlined,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
   final String hint;
+  final String? label;
 
   /// Загрузка подсказок по введённому тексту.
   final Future<List<RefSuggestion<T>>> Function(String query) fetch;
@@ -59,24 +62,14 @@ class RefSuggestField<T> extends StatefulWidget {
   /// больше не актуально.
   final VoidCallback? onTextEdited;
 
-  final double height;
-  final Color fillColor;
-  final double radius;
-  final double horizontalPadding;
-  final double fontSize;
-  final FontWeight fontWeight;
-  final Color hintColor;
-  final String iconAsset;
+  final IconData prefixIcon;
+  final bool enabled;
 
   @override
   State<RefSuggestField<T>> createState() => _RefSuggestFieldState<T>();
 }
 
 class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
-  static const _accent = Color(0xFFFF8A00);
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
-
   final FocusNode _focus = FocusNode();
   Timer? _debounce;
   List<RefSuggestion<T>> _items = const [];
@@ -93,6 +86,7 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _focus.removeListener(_onFocusChanged);
     _focus.dispose();
     super.dispose();
   }
@@ -103,7 +97,7 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
       _load(widget.controller.text);
     } else {
       // Небольшая задержка, чтобы успел сработать тап по подсказке.
-      Future.delayed(const Duration(milliseconds: 200), () {
+      Future.delayed(AppDurations.slow, () {
         if (mounted && !_focus.hasFocus) setState(() => _open = false);
       });
     }
@@ -123,7 +117,9 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
     List<RefSuggestion<T>> items = const [];
     try {
       items = await widget.fetch(q);
-    } catch (_) {}
+    } catch (_) {
+      // Пустой список показывается как «Ничего не найдено».
+    }
 
     if (!mounted || seq != _requestSeq) return;
     setState(() {
@@ -135,8 +131,9 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
   void _select(RefSuggestion<T> item) {
     _debounce?.cancel();
     widget.controller.text = item.fillText;
-    widget.controller.selection =
-        TextSelection.collapsed(offset: item.fillText.length);
+    widget.controller.selection = TextSelection.collapsed(
+      offset: item.fillText.length,
+    );
     setState(() {
       _open = false;
       _items = const [];
@@ -148,125 +145,79 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          height: widget.height,
-          decoration: BoxDecoration(
-            color: widget.fillColor,
-            borderRadius: BorderRadius.circular(widget.radius),
-            border: Border.all(color: _tileBorder),
-          ),
-          padding:
-              EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
-          child: Row(
-            children: [
-              SvgPicture.asset(
-                widget.iconAsset,
-                width: 20,
-                height: 20,
-                colorFilter:
-                    const ColorFilter.mode(_accent, BlendMode.srcIn),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: _focus,
-                  onChanged: _onChanged,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    hintText: widget.hint,
-                    hintStyle: TextStyle(
-                      fontSize: widget.fontSize,
-                      fontWeight: widget.fontWeight,
-                      color: widget.hintColor,
-                    ),
-                  ),
-                  style: TextStyle(
-                    fontSize: widget.fontSize,
-                    fontWeight: widget.fontWeight,
-                    color: Colors.black,
-                  ),
-                  cursorColor: Colors.black,
-                  textInputAction: TextInputAction.next,
-                ),
-              ),
-            ],
-          ),
+        AppTextField(
+          controller: widget.controller,
+          focusNode: _focus,
+          hint: widget.hint,
+          label: widget.label,
+          enabled: widget.enabled,
+          prefixIcon: widget.prefixIcon,
+          textInputAction: TextInputAction.next,
+          onChanged: _onChanged,
         ),
-        if (_open) _buildSuggestions(),
+        AnimatedSize(
+          duration: AppDurations.fast,
+          alignment: Alignment.topCenter,
+          child: _open ? _buildSuggestions() : const SizedBox.shrink(),
+        ),
       ],
     );
   }
 
   Widget _buildSuggestions() {
     Widget child;
+
     if (_loading) {
       child = const Padding(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.md),
         child: Center(
           child: SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: _accent,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
       );
     } else if (_items.isEmpty) {
-      child = const Padding(
-        padding: EdgeInsets.all(14),
-        child: Text(
-          'Ничего не найдено',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: _greyText,
-          ),
-        ),
+      child = Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Text('Ничего не найдено', style: AppTypography.captionMuted),
       );
     } else {
       child = ListView.separated(
         shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.zero,
         itemCount: _items.length,
         separatorBuilder: (_, __) =>
-            const Divider(height: 1, color: _tileBorder),
+            const Divider(height: 1, color: AppColors.border),
         itemBuilder: (context, i) {
-          final it = _items[i];
+          final item = _items[i];
           return InkWell(
-            onTap: () => _select(it),
+            onTap: () => _select(item),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs + 2,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    it.label,
+                    item.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
+                    style: AppTypography.body.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
                     ),
                   ),
-                  if (it.sublabel != null && it.sublabel!.isNotEmpty)
+                  if (item.sublabel != null && item.sublabel!.isNotEmpty)
                     Text(
-                      it.sublabel!,
+                      item.sublabel!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: _greyText,
-                      ),
+                      style: AppTypography.captionMuted,
                     ),
                 ],
               ),
@@ -277,13 +228,15 @@ class _RefSuggestFieldState<T> extends State<RefSuggestField<T>> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(top: 6),
-      constraints: const BoxConstraints(maxHeight: 216),
+      margin: const EdgeInsets.only(top: AppSpacing.xxs + 2),
+      constraints: const BoxConstraints(maxHeight: 200),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _tileBorder),
+        color: AppColors.surface,
+        borderRadius: AppRadius.allMd,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
       ),
+      clipBehavior: Clip.antiAlias,
       child: child,
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'core/design/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
 import 'data/network/api_service.dart';
@@ -36,9 +37,7 @@ Future<void> _safeInitServices() async {
     );
   } catch (_) {}
   try {
-    await PushService.instance.init().timeout(
-      const Duration(seconds: 5),
-    );
+    await PushService.instance.init().timeout(const Duration(seconds: 5));
   } catch (_) {}
 }
 
@@ -46,12 +45,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: 'assets/finik_key.env');
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
 
@@ -63,12 +58,8 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(authRepo),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => DeliveryAddressProvider(geoRepo),
-        ),
+        ChangeNotifierProvider(create: (_) => AuthProvider(authRepo)),
+        ChangeNotifierProvider(create: (_) => DeliveryAddressProvider(geoRepo)),
         ChangeNotifierProvider(
           create: (_) => DeliveryAutocompleteProvider(geoRepo),
         ),
@@ -103,17 +94,17 @@ class DoGoApp extends StatelessWidget {
     return MaterialApp.router(
       routerConfig: AppRouter.router,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
-        scaffoldBackgroundColor: Colors.white,
-        fontFamily: 'Inter',
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(fontWeight: FontWeight.w700),
-          headlineMedium: TextStyle(fontWeight: FontWeight.w600),
-          bodyLarge: TextStyle(fontWeight: FontWeight.w500),
-        ),
-      ),
+      theme: AppTheme.light,
+      builder: (context, child) {
+        // Ограничиваем системный масштаб текста: интерфейс проверен на
+        // 1.0–1.4, выше плотные экраны (карта, карточки заказов)
+        // перестают читаться.
+        return MediaQuery.withClampedTextScaling(
+          minScaleFactor: 1.0,
+          maxScaleFactor: 1.4,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

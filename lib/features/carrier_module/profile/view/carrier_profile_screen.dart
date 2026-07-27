@@ -1,4 +1,3 @@
-
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +9,11 @@ import '../../../../core/utils/snackbar_utils.dart';
 import '../data/repo/carrier_profile_repository.dart';
 import '../provider/carrier_profile_provider.dart';
 
-const _accent = Color(0xFFFF8A00);
+const _accent = AppColors.primary;
 const _greyText = Color(0xFF9FA4AD);
 const _tileBorder = Color(0xFFE9EDF2);
 const _chev = Color(0xFFC7CFD9);
 const _green = Color(0xFF22C55E);
-
 
 class CarrierProfileScreen extends StatelessWidget {
   const CarrierProfileScreen({super.key});
@@ -23,9 +21,9 @@ class CarrierProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => CarrierProfileProvider(
-        CarrierProfileRepository(ApiService.instance),
-      )..load(),
+      create: (_) =>
+          CarrierProfileProvider(CarrierProfileRepository(ApiService.instance))
+            ..load(),
       child: const _CarrierProfileBody(),
     );
   }
@@ -39,6 +37,7 @@ class _CarrierProfileBody extends StatelessWidget {
       message: 'Интеграция будет добавлена позже.',
     );
   }
+
   String formatKgPhone(String? input) {
     if (input == null) return '—';
 
@@ -54,10 +53,10 @@ class _CarrierProfileBody extends StatelessWidget {
     }
 
     if (digits.length == 12 && digits.startsWith('996')) {
-      final op = digits.substring(3, 6);   // 997
-      final a = digits.substring(6, 8);    // 91
-      final b = digits.substring(8, 10);   // 91
-      final c = digits.substring(10, 12);  // 70
+      final op = digits.substring(3, 6); // 997
+      final a = digits.substring(6, 8); // 91
+      final b = digits.substring(8, 10); // 91
+      final c = digits.substring(10, 12); // 70
       return '+996 $op $a-$b-$c';
     }
 
@@ -80,12 +79,7 @@ class _CarrierProfileBody extends StatelessWidget {
     if (provider.error != null && profile == null) {
       return Scaffold(
         backgroundColor: Colors.white,
-        body: Center(
-          child: Text(
-            provider.error!,
-            textAlign: TextAlign.center,
-          ),
-        ),
+        body: Center(child: Text(provider.error!, textAlign: TextAlign.center)),
       );
     }
 
@@ -129,21 +123,21 @@ class _CarrierProfileBody extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       child: avatar != null && avatar.isNotEmpty
                           ? Image.network(
-                        avatar,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                      )
+                              avatar,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            )
                           : Container(
-                        width: 80,
-                        height: 80,
-                        color: const Color(0xFFE5E7EB),
-                        child: const Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Colors.white,
-                        ),
-                      ),
+                              width: 80,
+                              height: 80,
+                              color: const Color(0xFFE5E7EB),
+                              child: const Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -194,13 +188,13 @@ class _CarrierProfileBody extends StatelessWidget {
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_wallet.svg',
                         title: 'Пополнить счет',
-                        onTap: () =>  _showSoonSnack(context),
+                        onTap: () => _showSoonSnack(context),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_clock.svg',
                         title: 'История пополнений/трат',
-                        onTap: () =>  _showSoonSnack(context),
+                        onTap: () => _showSoonSnack(context),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(
@@ -230,8 +224,10 @@ class _CarrierProfileBody extends StatelessWidget {
                       ),
                     ],
                   ),
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 18,
+                  ),
                   child: Row(
                     children: [
                       Text(
@@ -342,7 +338,6 @@ class _HeaderInfo extends StatelessWidget {
   }
 }
 
-
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
     required this.iconAsset,
@@ -369,7 +364,7 @@ class _ProfileTile extends StatelessWidget {
               height: 24,
               colorFilter: const ColorFilter.mode(_accent, BlendMode.srcIn),
               placeholderBuilder: (_) =>
-              const Icon(Icons.circle, size: 24, color: _accent),
+                  const Icon(Icons.circle, size: 24, color: _accent),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -383,11 +378,7 @@ class _ProfileTile extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              size: 24,
-              color: _chev,
-            ),
+            const Icon(Icons.chevron_right_rounded, size: 24, color: _chev),
           ],
         ),
       ),
@@ -410,9 +401,7 @@ class _ProfileInnerDivider extends StatelessWidget {
 }
 
 class _StatisticsCard extends StatelessWidget {
-  const _StatisticsCard({
-    required this.createdAt,
-  });
+  const _StatisticsCard({required this.createdAt});
 
   final DateTime createdAt;
 
@@ -503,65 +492,65 @@ class _StatisticsCard extends StatelessWidget {
           ],
           const SizedBox(height: 18),
 
-            _StatLine(
-              leftText: grossTotal.toString(),
-              rightTopText: deltaText,
-              rightTopStyle: TextStyle(
-                fontSize: 16,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: deltaColor,
-              ),
-              rightBottomText: 'Заработано\nза сегодня',
-              rightBottomStyle: const TextStyle(
-                fontSize: 16,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-                color: Color(0x9E1E1E3E),
-              ),
-              valueStyle: const TextStyle(
-                fontSize: 40,
-                height: 1.0,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-              ),
+          _StatLine(
+            leftText: grossTotal.toString(),
+            rightTopText: deltaText,
+            rightTopStyle: TextStyle(
+              fontSize: 16,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              color: deltaColor,
             ),
-            const SizedBox(height: 18),
-            _StatLine(
-              leftText: commission.toString(),
-              rightTopText: null,
-              rightBottomText: 'Комиссия',
-              rightBottomStyle: const TextStyle(
-                fontSize: 16,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-                color: Color(0x9E1E1E3E),
-              ),
-              valueStyle: const TextStyle(
-                fontSize: 32,
-                height: 1.0,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-              ),
+            rightBottomText: 'Заработано\nза сегодня',
+            rightBottomStyle: const TextStyle(
+              fontSize: 16,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: Color(0x9E1E1E3E),
             ),
-            const SizedBox(height: 18),
-            _StatLine(
-              leftText: clients.toString(),
-              rightTopText: null,
-              rightBottomText: 'Клиентов',
-              rightBottomStyle: const TextStyle(
-                fontSize: 16,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-                color: Color(0x9E1E1E3E),
-              ),
-              valueStyle: const TextStyle(
-                fontSize: 32,
-                height: 1.0,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-              ),
+            valueStyle: const TextStyle(
+              fontSize: 40,
+              height: 1.0,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
             ),
+          ),
+          const SizedBox(height: 18),
+          _StatLine(
+            leftText: commission.toString(),
+            rightTopText: null,
+            rightBottomText: 'Комиссия',
+            rightBottomStyle: const TextStyle(
+              fontSize: 16,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: Color(0x9E1E1E3E),
+            ),
+            valueStyle: const TextStyle(
+              fontSize: 32,
+              height: 1.0,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _StatLine(
+            leftText: clients.toString(),
+            rightTopText: null,
+            rightBottomText: 'Клиентов',
+            rightBottomStyle: const TextStyle(
+              fontSize: 16,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: Color(0x9E1E1E3E),
+            ),
+            valueStyle: const TextStyle(
+              fontSize: 32,
+              height: 1.0,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
         ],
       ),
     );
@@ -596,7 +585,8 @@ class _StatLine extends StatelessWidget {
           SizedBox(
             width: leftWidth,
             child: Align(
-              alignment: Alignment.centerLeft, // или centerRight если хочешь прижать числа к линии
+              alignment: Alignment
+                  .centerLeft, // или centerRight если хочешь прижать числа к линии
               child: Text(leftText, style: valueStyle, maxLines: 1),
             ),
           ),
@@ -621,7 +611,6 @@ class _StatLine extends StatelessWidget {
     );
   }
 }
-
 
 class _StatChip extends StatelessWidget {
   const _StatChip({
@@ -689,7 +678,6 @@ class _StatChip extends StatelessWidget {
     );
   }
 }
-
 
 String _formatRuDate(DateTime d) {
   const months = [

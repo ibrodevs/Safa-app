@@ -116,12 +116,15 @@ class ShipmentsListItemDto {
         final lon = _toDouble(m['lon']);
 
         final subtitleParts = <String>[];
-        if (bazar != null && bazar.trim().isNotEmpty)
+        if (bazar != null && bazar.trim().isNotEmpty) {
           subtitleParts.add(bazar.trim());
-        if (container != null && container.trim().isNotEmpty)
+        }
+        if (container != null && container.trim().isNotEmpty) {
           subtitleParts.add('Контейнер $container');
-        if (passage != null && passage.trim().isNotEmpty)
+        }
+        if (passage != null && passage.trim().isNotEmpty) {
           subtitleParts.add('Проход $passage');
+        }
 
         stops.add(
           DeliveryPoint(

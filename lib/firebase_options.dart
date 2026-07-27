@@ -65,5 +65,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'dogoapp-7b7a2.firebasestorage.app',
     iosBundleId: 'kg.genesis.safaapp',
   );
-
 }

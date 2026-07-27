@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -33,7 +35,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
       _checkStatus();
       _timer = Timer.periodic(
         const Duration(seconds: 15),
-            (_) => _checkStatus(),
+        (_) => _checkStatus(),
       );
     });
   }
@@ -48,9 +50,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
 
     if (status == null) {
       final msg = auth.error ?? 'Ошибка при проверке статуса';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       return;
     }
 
@@ -66,23 +66,18 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
       _timer?.cancel();
       if (!mounted) return;
       context.go('/home-carrier');
-    }
-    else if (status == 403) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Профиль на проверке'),
-        ),
-      );
+    } else if (status == 403) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Профиль на проверке')));
     } else if (status == 404) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Перевозчик не найден'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Перевозчик не найден')));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Неизвестный статус: $status')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Неизвестный статус: $status')));
     }
   }
 
@@ -105,9 +100,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 3),
-              Center(
-                child: SvgPicture.asset('assets/icons/ic_clock1.svg'),
-              ),
+              Center(child: SvgPicture.asset('assets/icons/ic_clock1.svg')),
               const SizedBox(height: 12),
               const Center(
                 child: Text(
@@ -140,10 +133,10 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                 child: ElevatedButton(
                   onPressed: _checkStatus,
                   style: ButtonStyle(
-                    backgroundColor:
-                    const WidgetStatePropertyAll(Color(0xFFE67E22)),
-                    foregroundColor:
-                    const WidgetStatePropertyAll(Colors.white),
+                    backgroundColor: const WidgetStatePropertyAll(
+                      AppColors.primary,
+                    ),
+                    foregroundColor: const WidgetStatePropertyAll(Colors.white),
                     shape: WidgetStatePropertyAll(
                       RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -168,7 +161,7 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setBool('carrier_pending', false);
                     await prefs.setBool('is_logged_in', false);
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     context.go('/select_role');
                   },
                   child: const Text(

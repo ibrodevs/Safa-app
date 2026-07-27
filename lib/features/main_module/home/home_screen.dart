@@ -1,12 +1,15 @@
-import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/design/app_design.dart';
+import 'package:dogo/core/widgets/app_widgets.dart';
 import 'package:dogo/features/main_module/profile/provider/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../data/notifications/service/push_service.dart';
-import 'components/big_card_widget.dart';
-import 'components/header_widget.dart';
-import 'components/small_card_widget.dart';
+import '../map/provider/active_shipment_provider.dart';
+import '../services/service_config.dart';
+import 'components/active_order_banner.dart';
+import 'components/home_header.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -33,110 +36,151 @@ class _HomeBodyState extends State<_HomeBody> {
     super.initState();
     Future.microtask(() {
       PushService.instance.registerOnServerOnce(kind: 'client');
+      if (mounted) context.read<ActiveShipmentProvider>().load();
     });
+  }
+
+  String _greeting(String name) {
+    final hour = DateTime.now().hour;
+    final String part;
+    if (hour < 6) {
+      part = 'Доброй ночи';
+    } else if (hour < 12) {
+      part = 'Доброе утро';
+    } else if (hour < 18) {
+      part = 'Добрый день';
+    } else {
+      part = 'Добрый вечер';
+    }
+    return '$part, $name';
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([
+      context.read<ProfileProvider>().loadProfile(),
+      context.read<ActiveShipmentProvider>().load(),
+    ]);
+  }
+
+  void _openService(ServiceConfig config) {
+    context.go('/map?service=${config.type}');
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ProfileProvider>();
     final profile = state.profile;
-    String name = 'друг';
-    if (profile != null) {
-      final topFirst = profile.firstName.trim();
-      if (topFirst.isNotEmpty) {
-        name = topFirst;
-      }
-    }
-    final greeting = 'Добрый день, $name';
-    final avatarUrl = profile?.avatar;
+
+    final firstName = profile?.firstName.trim() ?? '';
+    final name = firstName.isNotEmpty ? firstName : 'друг';
+
+    final activeShipment = context.watch<ActiveShipmentProvider>().active;
+    final horizontal = AppResponsive.horizontalPadding(context);
+
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color: AppColors.accent,
-          backgroundColor: AppColors.white,
+          color: AppColors.primary,
+          backgroundColor: AppColors.surface,
           strokeWidth: 2.4,
           displacement: 32,
-          onRefresh: () => context.read<ProfileProvider>().loadProfile(),
+          onRefresh: _refresh,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                HeaderRow(avatarUrl: avatarUrl, title: greeting),
-                const SizedBox(height: 24),
-                const Text(
-                  'Основное',
-                  style: TextStyle(
-                    fontSize: 21,
-                    height: 1.15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black,
+            padding: EdgeInsets.fromLTRB(
+              horizontal,
+              AppSpacing.md,
+              horizontal,
+              AppSpacing.xl,
+            ),
+            child: AppContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  HomeHeader(
+                    greeting: _greeting(name),
+                    prompt: 'Куда отправим сегодня?',
+                    avatarUrl: profile?.avatar,
+                    name: firstName.isEmpty ? null : firstName,
+                    onNotifications: () =>
+                        context.push('/profile/notifications'),
+                    onProfile: () => context.go('/profile'),
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Отслеживайте и узнавайте адреса\n'
-                  'актуальных складов для доставки товаров',
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.greyText,
+                  if (activeShipment != null) ...[
+                    AppSpacing.gapLg,
+                    ActiveOrderBanner(
+                      shipment: activeShipment,
+                      onTap: () => context.go('/map'),
+                    ),
+                  ],
+                  AppSpacing.gapXl,
+                  const AppSectionHeader(
+                    title: 'Что нужно сделать?',
+                    subtitle: 'Выберите сервис — маршрут соберём вместе',
                   ),
-                ),
-                const SizedBox(height: 18),
-                BigFeatureCard(
-                  title: 'Доставка',
-                  subtitle:
-                      'Стандартная доставка\nиз начальной точки\nв конечную',
-                  tagText: 'Новый раздел',
-                  tagIconAsset: 'assets/icons/ic_box.svg',
-                  tagWidth: 112.0,
-                  imageAsset: 'assets/images/boxes2.png',
-                  onTap: () => context.go('/map?service=delivery'),
-                ),
-                const SizedBox(height: 18),
-                BigFeatureCard(
-                  title: 'Тачки',
-                  subtitle:
-                      'Перевозка с несколькими\nточками маршрута\nи контейнерами',
-                  tagText: 'Маршрут',
-                  tagIconAsset: 'assets/icons/ic_map.svg',
-                  tagWidth: 82.0,
-                  imageAsset: 'assets/images/img_home_car2.png',
-                  onTap: () => context.go('/map?service=cars'),
-                ),
-                const SizedBox(height: 18),
-                SmallFeatureCard(
-                  title: 'Аманат',
-                  subtitle: 'Передача посылки по существующему сценарию',
-                  tagText: 'Посылка',
-                  tagIconAsset: 'assets/icons/ic_box.svg',
-                  tagWidth: 76.0,
-                  imageAsset: 'assets/images/img_home_amanat.png',
-                  imageHeight: 55,
-                  imageScale: 0.9,
-                  imagePadding: 18,
-                  imagePadding2: 8,
-                  onTap: () => context.go('/map?service=amanat'),
-                ),
-                if (state.error != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
+                  AppSpacing.gapSm,
+                  for (final config in ServiceConfig.all) ...[
+                    AppServiceCard(
+                      title: config.title,
+                      description: config.shortDescription,
+                      icon: config.icon,
+                      accent: config.accent,
+                      accentSoft: config.accentSoft,
+                      imageAsset: config.imageAsset,
+                      onTap: () => _openService(config),
+                    ),
+                    if (config != ServiceConfig.all.last) AppSpacing.gapSm,
+                  ],
+                  AppSpacing.gapXl,
+                  AppSectionHeader(
+                    title: 'Мои заказы',
+                    subtitle: 'История и статусы всех обращений',
+                    actionLabel: 'Открыть',
+                    onAction: () => context.go('/history'),
+                  ),
+                  AppSpacing.gapSm,
+                  AppCard(
+                    onTap: () => context.go('/history'),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMuted,
+                            borderRadius: AppRadius.allXs,
+                          ),
+                          child: const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        AppSpacing.hGapSm,
+                        Expanded(
+                          child: Text(
+                            'Посмотреть все заказы и их статусы',
+                            style: AppTypography.body,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 22,
+                          color: AppColors.textTertiary,
+                        ),
+                      ],
                     ),
                   ),
+                  if (state.error != null) ...[
+                    AppSpacing.gapMd,
+                    AppFormError(message: state.error),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

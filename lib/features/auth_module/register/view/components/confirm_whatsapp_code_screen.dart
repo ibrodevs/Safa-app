@@ -1,16 +1,12 @@
-import 'package:dogo/core/utils/app_colors.dart';
-import 'package:dogo/core/widgets/app_text_field.dart';
-import 'package:dogo/core/widgets/primary_button.dart';
+import 'package:dogo/core/design/app_design.dart';
+import 'package:dogo/core/widgets/app_widgets.dart';
+import 'package:dogo/features/auth_module/login/widgets/auth_brand_header.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
-
-import '../../../../../core/utils/snackbar_utils.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
-import '../../../../../core/utils/styles.dart';
-import '../../../../../core/widgets/shadow_field.dart';
 
 class ConfirmWhatsappCodeScreen extends StatefulWidget {
   const ConfirmWhatsappCodeScreen({super.key});
@@ -22,42 +18,59 @@ class ConfirmWhatsappCodeScreen extends StatefulWidget {
 
 class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
   final _code = TextEditingController();
-  final _focus = FocusNode();
+
+  String? _codeError;
+  String? _formError;
+  bool _sending = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleWhatsappCode();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sendCode());
   }
 
   @override
   void dispose() {
     _code.dispose();
-    _focus.dispose();
     super.dispose();
   }
 
-  void _scheduleWhatsappCode() {
-    Future.delayed(const Duration(seconds: 2), () async {
-      if (!mounted) return;
-      final provider = context.read<AuthProvider>();
-      final ok = await provider.sendWhatsappCode();
-      if (!mounted) return;
+  Future<void> _sendCode() async {
+    if (_sending) return;
+    setState(() {
+      _sending = true;
+      _formError = null;
+    });
+
+    final provider = context.read<AuthProvider>();
+    final ok = await provider.sendWhatsappCode();
+    if (!mounted) return;
+
+    setState(() {
+      _sending = false;
       if (!ok) {
-        final msg = provider.error ?? 'Не удалось отправить код в WhatsApp';
-        AppSnackBar.showError(context, message: msg);
+        _formError = provider.error ?? 'Не удалось отправить код в WhatsApp';
       }
     });
   }
 
   Future<void> _onNext() async {
+    FocusScope.of(context).unfocus();
+
     final code = _code.text.trim();
     if (code.isEmpty) {
-      AppSnackBar.showError(context, message: 'Введите код из WhatsApp');
+      setState(() => _codeError = 'Введите код из WhatsApp');
       return;
     }
+    if (code.length < 4) {
+      setState(() => _codeError = 'Код слишком короткий');
+      return;
+    }
+
+    setState(() {
+      _codeError = null;
+      _formError = null;
+    });
 
     final provider = context.read<AuthProvider>();
     final ok = await provider.verifyCodeAndLogin(code: code);
@@ -66,101 +79,80 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
 
     if (ok) {
       context.go('/privacy-policy');
-    } else {
-      final msg = provider.error ?? 'Неверный код из WhatsApp';
-      AppSnackBar.showError(context, message: msg);
+      return;
     }
+
+    setState(() => _codeError = provider.error ?? 'Неверный код из WhatsApp');
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
     final loading = context.watch<AuthProvider>().loading;
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        backgroundColor: Colors.white,
-        body: Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 80),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Подтверждение',
-                      style: AppTextStyles.titleBlackStyle,
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Отслеживайте и узнавайте адреса\nактуальных складов  для доставки товаров',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        height: 1.25,
-                        color: AppColors.subtitleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    ShadowField(
-                      child: AppTextField(
-                        controller: _code,
-                        keyboardType: TextInputType.number,
-                        hint: 'Введите код',
-                        prefixText: '  ',
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 64,
-                      child: PrimaryButton(
-                        text: loading ? 'Проверка...' : 'Далее',
-                        onPressed: loading ? null : _onNext,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Center(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => context.go('/select_role'),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6),
-                          child: Text(
-                            'Отменить регистрацию',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 15,
-                              height: 1.2,
-                              fontFamily: 'SFProDisplay',
-                              color: AppColors.grey3,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 405),
-                  ],
-                ),
-              ),
+
+    return AppScreenScaffold(
+      backgroundColor: AppColors.surface,
+      showBackButton: true,
+      footer: Column(
+        children: [
+          AppFormError(message: _formError),
+          if (_formError != null) AppSpacing.gapSm,
+          AppPrimaryButton(
+            label: 'Подтвердить',
+            loadingLabel: 'Проверяем…',
+            loading: loading,
+            onPressed: _onNext,
+          ),
+          AppSpacing.gapSm,
+          const Hero(
+            tag: 'register_dots',
+            child: RegisterDotsIndicator(activeIndex: 2),
+          ),
+          AppTextButton(
+            label: 'Отменить регистрацию',
+            muted: true,
+            enabled: !loading,
+            onPressed: () => context.go('/select_role'),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AuthBrandHeader(
+            title: 'Подтверждение',
+            subtitle:
+                'Мы отправили код в WhatsApp на указанный номер. '
+                'Введите его, чтобы завершить регистрацию.',
+          ),
+          AppSpacing.gapXl,
+          AppTextField(
+            controller: _code,
+            hint: 'Код из WhatsApp',
+            label: 'Код подтверждения',
+            errorText: _codeError,
+            enabled: !loading,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            prefixIcon: Icons.sms_outlined,
+            maxLength: 8,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofillHints: const [AutofillHints.oneTimeCode],
+            onChanged: (_) {
+              if (_codeError != null) setState(() => _codeError = null);
+            },
+            onSubmitted: (_) => _onNext(),
+          ),
+          AppSpacing.gapXs,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppTextButton(
+              label: _sending ? 'Отправляем код…' : 'Отправить код повторно',
+              enabled: !_sending && !loading,
+              onPressed: _sendCode,
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomPadding ,
-              child: const Center(
-                child: Hero(
-                  tag: 'register_dots',
-                  child: RegisterDotsIndicator(activeIndex: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

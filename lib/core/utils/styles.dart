@@ -1,47 +1,26 @@
+import 'package:flutter/painting.dart';
 
-import 'package:dogo/core/utils/app_colors.dart';
-import 'package:flutter/material.dart';
+import '../design/app_colors.dart';
+import '../design/app_typography.dart';
 
+/// Обратная совместимость: типографика переехала в
+/// `core/design/app_typography.dart`.
+///
+/// Имена сохранены (используются в `select_role_screen`,
+/// `confirm_whatsapp_code_screen`, `carrier_title_block_widget`), но значения
+/// теперь берутся из [AppTypography]. Заодно убраны опасные `height: 0.2`,
+/// из-за которых текст обрезался при системном масштабе 1.4.
 class AppTextStyles {
-  static const titleBlackStyle = TextStyle(
-    fontFamily: 'SFProDisplay',
-    fontWeight: FontWeight.w600,
-    fontSize: 24,
-    letterSpacing: -0.5,
-    height: 1.6,
-    color: Colors.black,
-  );
+  const AppTextStyles._();
 
-  static const titleGreyStyle = TextStyle(
-    fontFamily: 'SFProDisplay',
-    fontWeight: FontWeight.w600,
-    fontSize: 24,
-    letterSpacing: -0.5,
-    height: 1.1,
-    color: AppColors.subtitleGrey,
-  );
+  static const TextStyle titleBlackStyle = AppTypography.screenTitleCompact;
 
-  static const cardTitleStyle = TextStyle(
-    fontFamily: 'SFProDisplay',
-    fontWeight: FontWeight.w600,
-    fontSize: 15,
-    height: 0.2,
-    color: Colors.black,
-  );
-  static const cardSubtitleStyle = TextStyle(
-    fontFamily: 'SFProDisplay',
-    fontWeight: FontWeight.w500,
-    fontSize: 13,
-    height: 1,
-    color: AppColors.greyText,
-  );
+  static final TextStyle titleGreyStyle = AppTypography.screenTitleCompact
+      .copyWith(color: AppColors.textTertiary);
 
-  static const subtitleStyle = TextStyle(
-    fontFamily: 'SFProText',
-    fontWeight: FontWeight.w500,
-    fontSize: 13,
-    height: 1.2,
-    letterSpacing: -0.6,
-    color: AppColors.subtitleGrey,
-  );
+  static const TextStyle cardTitleStyle = AppTypography.cardTitle;
+
+  static const TextStyle cardSubtitleStyle = AppTypography.caption;
+
+  static const TextStyle subtitleStyle = AppTypography.captionMuted;
 }

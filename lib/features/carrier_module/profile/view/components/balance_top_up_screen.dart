@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:dogo/core/design/app_colors.dart';
+
 class BalanceTopUpScreen extends StatefulWidget {
   const BalanceTopUpScreen({super.key});
 
@@ -8,7 +10,7 @@ class BalanceTopUpScreen extends StatefulWidget {
 }
 
 class _BalanceTopUpScreenState extends State<BalanceTopUpScreen> {
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _tileBorder = Color(0xFFE9EDF2);
   static const _greyText = Color(0xFF9FA4AD);
 
@@ -33,17 +35,13 @@ class _BalanceTopUpScreenState extends State<BalanceTopUpScreen> {
     final amount = int.tryParse(text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Введите корректную сумму пополнения.'),
-        ),
+        const SnackBar(content: Text('Введите корректную сумму пополнения.')),
       );
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Пополнение на $amount с (заглушка).'),
-      ),
+      SnackBar(content: Text('Пополнение на $amount с (заглушка).')),
     );
   }
 
@@ -88,16 +86,14 @@ class _BalanceTopUpScreenState extends State<BalanceTopUpScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Divider(
-                height: 1,
-                thickness: 1,
-                color: _tileBorder,
-              ),
+              const Divider(height: 1, thickness: 1, color: _tileBorder),
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 18,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -209,12 +205,16 @@ class _BalanceTopUpScreenState extends State<BalanceTopUpScreen> {
                     fontWeight: FontWeight.w500,
                     color: _greyText,
                   ),
-                  contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide:
-                    const BorderSide(color: _tileBorder, width: 1.2),
+                    borderSide: const BorderSide(
+                      color: _tileBorder,
+                      width: 1.2,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -249,7 +249,7 @@ class _BalanceTopUpScreenState extends State<BalanceTopUpScreen> {
               const SizedBox(height: 12),
               const Text(
                 'Сейчас это демонстрационный экран. Позже сюда можно '
-                    'подключить реальный способ оплаты (карта, кошелёк и т.п.).',
+                'подключить реальный способ оплаты (карта, кошелёк и т.п.).',
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.3,
@@ -276,7 +276,7 @@ class _QuickAmountChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _tileBorder = Color(0xFFE9EDF2);
 
   @override

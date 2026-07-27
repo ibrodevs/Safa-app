@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +16,7 @@ class CarrierHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) =>
-      ShipmentsHistoryProvider(ShipmentsHistoryRepository())..refresh(),
+          ShipmentsHistoryProvider(ShipmentsHistoryRepository())..refresh(),
       child: const _HistoryBody(),
     );
   }
@@ -39,7 +41,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
   void _onScroll() {
     final provider = context.read<ShipmentsHistoryProvider>();
     if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200 &&
+            _scrollController.position.maxScrollExtent - 200 &&
         provider.canLoadMore &&
         !provider.loadingMore &&
         !provider.loading) {
@@ -76,12 +78,11 @@ class _HistoryBodyState extends State<_HistoryBody> {
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
-        color: const Color(0xFFE67E22),
+        color: AppColors.primary,
         backgroundColor: Colors.white,
         strokeWidth: 2.4,
         displacement: 32,
-        onRefresh: () =>
-            context.read<ShipmentsHistoryProvider>().refresh(),
+        onRefresh: () => context.read<ShipmentsHistoryProvider>().refresh(),
         child: Consumer<ShipmentsHistoryProvider>(
           builder: (context, state, _) {
             if (state.loading && state.items.isEmpty) {
@@ -105,10 +106,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                     ),
                   ),
                   const SizedBox(height: 40),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
+                  Text(state.error!, style: const TextStyle(color: Colors.red)),
                 ],
               );
             }
@@ -141,8 +139,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                 parent: BouncingScrollPhysics(),
               ),
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-              itemCount:
-              state.items.length + 1 + (state.canLoadMore ? 1 : 0),
+              itemCount: state.items.length + 1 + (state.canLoadMore ? 1 : 0),
               separatorBuilder: (_, __) => const SizedBox(height: 18),
               itemBuilder: (context, index) {
                 if (index == 0) {
@@ -171,7 +168,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                         height: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Color(0xFFE67E22),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -209,10 +206,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                   status: statusText,
                   chips: chips,
                   onDetails: () {
-                    context.push(
-                      '/history-carrier/detail',
-                      extra: item.id,
-                    );
+                    context.push('/history-carrier/detail', extra: item.id);
                   },
                 );
               },
@@ -239,7 +233,7 @@ class _HistoryCard extends StatelessWidget {
   final List<_HistoryChip> chips;
   final VoidCallback onDetails;
 
-  static const _accent = Color(0xFFE67E22);
+  static const _accent = AppColors.primary;
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
   static const _statusGreen = Color(0xFF2E7D32);

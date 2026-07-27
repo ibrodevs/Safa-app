@@ -1,6 +1,12 @@
-import 'package:dogo/features/main_module/map/view/widgets/parsed_adress.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../../core/design/app_design.dart';
+import 'parsed_adress.dart';
+
+/// Подпись «Вы здесь» над маркером текущей геолокации.
+///
+/// Ширина ограничена сверху, но не задана жёстко, а текст переносится —
+/// длинный адрес больше не обрезается посередине.
 class HereBubble extends StatelessWidget {
   const HereBubble({
     super.key,
@@ -18,88 +24,90 @@ class HereBubble extends StatelessWidget {
   final String? marketTitle;
   final String? detail;
   final String? error;
-  static const _tileBorder = Color(0xFFE9EDF2);
-  static const _greyText = Color(0xFF9FA4AD);
 
   @override
   Widget build(BuildContext context) {
-    String titleLine;
-    String subtitleLine;
+    final String titleLine;
+    final String subtitleLine;
 
     if (loading) {
-      titleLine = marketTitle ?? 'Определяем адрес...';
-      subtitleLine = 'Определяем адрес...';
+      titleLine = marketTitle ?? 'Определяем адрес…';
+      subtitleLine = 'Уточняем ваше местоположение';
     } else if (error != null && error!.isNotEmpty) {
-      titleLine = 'Не удалось получить адрес';
-      subtitleLine = 'Проверьте интернет / геокодинг';
+      titleLine = 'Адрес недоступен';
+      subtitleLine = 'Проверьте интернет и попробуйте снова';
     } else if (address == null || address!.isEmpty) {
       titleLine = marketTitle ?? 'Адрес не найден';
       subtitleLine = 'Точка на карте';
+    } else if (marketTitle != null || detail != null) {
+      titleLine = marketTitle ?? 'Точка на карте';
+      subtitleLine = detail ?? address!;
     } else {
-      if (marketTitle != null || detail != null) {
-        titleLine = marketTitle ?? 'Точка на карте';
-        subtitleLine = detail ?? address!;
-      } else {
-        final parsed = parseAddressForUi(address);
-        titleLine = parsed.marketTitle ?? 'Точка на карте';
-        subtitleLine = parsed.detail ?? parsed.fullAfterCity;
-        if (titleLine == 'Точка на карте' && subtitleLine.isEmpty) {
-            subtitleLine = address!;
-        }
+      final parsed = parseAddressForUi(address);
+      final resolvedTitle = parsed.marketTitle ?? 'Точка на карте';
+      var resolvedSubtitle = parsed.detail ?? parsed.fullAfterCity;
+      if (resolvedTitle == 'Точка на карте' && resolvedSubtitle.isEmpty) {
+        resolvedSubtitle = address!;
       }
+      titleLine = resolvedTitle;
+      subtitleLine = resolvedSubtitle;
     }
-    return Material(
-      color: Colors.white,
-      elevation: 10,
-      shadowColor: const Color(0x22000000),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 188,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _tileBorder, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Вы здесь',
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.1,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
+
+    return Semantics(
+      label: 'Вы здесь. $titleLine. $subtitleLine',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 200),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.allMd,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.raised,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.my_location_rounded,
+                    size: 12,
+                    color: AppColors.primary,
+                  ),
+                  AppSpacing.hGapXxs,
+                  Text(
+                    'Вы здесь',
+                    style: AppTypography.badge.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              titleLine,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+              const SizedBox(height: 2),
+              Text(
+                titleLine,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitleLine,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: _greyText,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-          ],
+              if (subtitleLine.isNotEmpty)
+                Text(
+                  subtitleLine,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.captionMuted,
+                ),
+            ],
+          ),
         ),
       ),
     );

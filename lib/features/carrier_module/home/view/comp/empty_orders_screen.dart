@@ -69,7 +69,11 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
                 Center(
                   child: Text(
                     'Пока нет активных\nзаказов',
-                    style: TextStyle(fontSize: 21,fontFamily: 'SFProDisplay',fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontFamily: 'SFProDisplay',
+                      fontWeight: FontWeight.w600,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),

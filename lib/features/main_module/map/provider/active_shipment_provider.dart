@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/utils/friendly_error.dart';
 import '../../payments/data/repo/shipments_repository.dart';
 
 enum ActiveShipmentLoadState { idle, loading, ready, error }
@@ -25,7 +26,12 @@ final class ActiveShipmentProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       state = ActiveShipmentLoadState.error;
-      errorText = e.toString();
+      // Пользователю нельзя показывать `e.toString()`: там оказывается
+      // HTML-ответ сервера или `DioException [...]`.
+      errorText = friendlyErrorMessage(
+        e,
+        fallback: 'Не удалось загрузить активный заказ',
+      );
       notifyListeners();
     }
   }
@@ -41,4 +47,3 @@ final class ActiveShipmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

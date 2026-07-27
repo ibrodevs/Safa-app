@@ -4,10 +4,7 @@ class NearbyShipmentsPage {
   final int count;
   final List<NearbyShipment> results;
 
-  NearbyShipmentsPage({
-    required this.count,
-    required this.results,
-  });
+  NearbyShipmentsPage({required this.count, required this.results});
 
   factory NearbyShipmentsPage.fromJson(Map<String, dynamic> json) {
     final results = (json['results'] as List? ?? [])

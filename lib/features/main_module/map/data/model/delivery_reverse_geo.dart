@@ -1,9 +1,7 @@
 class DeliveryReverseGeo {
   final String address;
 
-  const DeliveryReverseGeo({
-    required this.address,
-  });
+  const DeliveryReverseGeo({required this.address});
 
   factory DeliveryReverseGeo.fromJson(Map<String, dynamic> json) {
     return DeliveryReverseGeo(
@@ -11,7 +9,5 @@ class DeliveryReverseGeo {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'address': address,
-  };
+  Map<String, dynamic> toJson() => {'address': address};
 }

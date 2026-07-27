@@ -160,7 +160,6 @@ class NotificationsProvider extends ChangeNotifier {
 
     _marking.add(id);
 
-
     final updated = old.copyWith(isRead: true, readAt: DateTime.now());
     if (_filter == NotificationsReadFilter.unread) {
       _items.removeAt(idx);

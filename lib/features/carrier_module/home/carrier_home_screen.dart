@@ -53,7 +53,7 @@ class CarrierHomeScreen extends StatefulWidget {
 }
 
 class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
 
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
   final MapController _mapController = MapController();
@@ -111,7 +111,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     _posSub?.cancel();
     super.dispose();
   }
-
 
   Future<void> _initLocation() async {
     try {
@@ -183,9 +182,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
 
     return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
   }
 
@@ -261,6 +258,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       fare: fare,
     );
   }
+
   Future<void> _refreshNearbySilently() async {
     if (_hasActive) return;
     try {
@@ -280,7 +278,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       final rejectedIds = await _getRejectedIds();
       final allResults = page.results;
-      final filteredResults = allResults.where((s) => !rejectedIds.contains(s.id)).toList();
+      final filteredResults = allResults
+          .where((s) => !rejectedIds.contains(s.id))
+          .toList();
 
       if (!mounted) return;
 
@@ -315,9 +315,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       });
 
       await _syncRouteAndCameraForNearby();
-    } catch (_) {
-
-    }
+    } catch (_) {}
   }
 
   Future<void> _goOnline() async {
@@ -334,7 +332,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       final rejectedIds = await _getRejectedIds();
       final allResults = page.results;
-      final filteredResults = allResults.where((s) => !rejectedIds.contains(s.id)).toList();
+      final filteredResults = allResults
+          .where((s) => !rejectedIds.contains(s.id))
+          .toList();
 
       if (!mounted) return;
 
@@ -350,7 +350,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _startNearbyPolling();
         return;
       }
-
 
       setState(() {
         _showWelcome = false;
@@ -455,11 +454,12 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForActive();
     } catch (_) {}
   }
+
   void _startNearbyPolling() {
     _nearbyPollTimer?.cancel();
     _nearbyPollTimer = Timer.periodic(
       const Duration(seconds: 7),
-          (_) => _refreshNearbySilently(),
+      (_) => _refreshNearbySilently(),
     );
     _refreshNearbySilently();
   }
@@ -877,7 +877,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
@@ -979,7 +980,10 @@ class _WelcomeCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.7),
+              width: 1,
+            ),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x1A000000),
@@ -1002,16 +1006,16 @@ class _WelcomeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-               Text(
-                  'Ожидайте новых заказов /\nКогда клиенту потребуется \nтачкист придет уведомление',
-                  style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: -0.4,
-                    height: 1.3,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.grey,
-                  ),
+              Text(
+                'Ожидайте новых заказов /\nКогда клиенту потребуется \nтачкист придет уведомление',
+                style: TextStyle(
+                  fontSize: 16,
+                  letterSpacing: -0.4,
+                  height: 1.3,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.grey,
                 ),
+              ),
               const SizedBox(height: 22),
               SizedBox(
                 height: 54,
@@ -1019,7 +1023,7 @@ class _WelcomeCard extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: loading ? null : onTap,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF8A00),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -1237,11 +1241,9 @@ class _ActiveProgressSheet extends StatelessWidget {
     final ci = stops.isEmpty ? 0 : currentIndex.clamp(0, stops.length - 1);
     final showTwoStops = (ci == 0 && stops.length >= 2);
 
-    final buttonText =
-    (status == ShipmentStatus.assigned || showTwoStops)
+    final buttonText = (status == ShipmentStatus.assigned || showTwoStops)
         ? 'Начать'
         : (isLast ? 'Выполнено' : 'Следующая точка');
-
 
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {
@@ -1297,7 +1299,10 @@ class _ActiveProgressSheet extends StatelessWidget {
                       width: 16,
                       child: SvgPicture.asset(
                         'assets/icons/ic_map.svg',
-                        colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
+                        colorFilter: const ColorFilter.mode(
+                          AppColors.primary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1481,7 +1486,6 @@ class _ProgressStopsCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _TwoStopsCard extends StatelessWidget {
@@ -1597,7 +1601,6 @@ String _pointLabelRu(int idx0) {
   }
 }
 
-
 class _TrailingHere extends StatelessWidget {
   const _TrailingHere({required this.title, required this.subtitle});
 
@@ -1683,10 +1686,7 @@ class _TrailingHere extends StatelessWidget {
 }
 
 class _TrailingStatus extends StatelessWidget {
-  const _TrailingStatus({
-    required this.text,
-    required this.color,
-  });
+  const _TrailingStatus({required this.text, required this.color});
 
   final String text;
   final Color color;
@@ -2002,7 +2002,13 @@ class _StatCard extends StatelessWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: SvgPicture.asset(icon, colorFilter: ColorFilter.mode(AppColors.green, BlendMode.srcIn)),
+                child: SvgPicture.asset(
+                  icon,
+                  colorFilter: ColorFilter.mode(
+                    AppColors.green,
+                    BlendMode.srcIn,
+                  ),
+                ),
               ),
               const SizedBox(width: 4),
               Expanded(
@@ -2046,7 +2052,10 @@ class _Chip extends StatelessWidget {
           SizedBox(
             height: 18,
             width: 16,
-            child: SvgPicture.asset(icon, colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn)),
+            child: SvgPicture.asset(
+              icon,
+              colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
+            ),
           ),
           const SizedBox(width: 6),
           Expanded(

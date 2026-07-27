@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +9,6 @@ import 'package:provider/provider.dart';
 import '../../../../main_module/history/data/model/shipment_detail_model.dart';
 import '../../../../main_module/history/data/repo/shipment_detail_repo.dart';
 import '../../../../main_module/history/provider/shipment_detail_provider.dart';
-
 
 class CarrierHistoryDetailsScreen extends StatelessWidget {
   const CarrierHistoryDetailsScreen({super.key, required this.shipmentId});
@@ -18,7 +19,7 @@ class CarrierHistoryDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) =>
-      ShipmentDetailProvider(ShipmentDetailRepository())..load(shipmentId),
+          ShipmentDetailProvider(ShipmentDetailRepository())..load(shipmentId),
       child: const _HistoryDetailsBody(),
     );
   }
@@ -27,7 +28,7 @@ class CarrierHistoryDetailsScreen extends StatelessWidget {
 class _HistoryDetailsBody extends StatelessWidget {
   const _HistoryDetailsBody();
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _statusGreen = Color(0xFF2E7D32);
 
   String _fmtDate(DateTime d) {
@@ -84,11 +85,7 @@ class _HistoryDetailsBody extends StatelessWidget {
           return Scaffold(
             backgroundColor: Colors.white,
             body: Padding(
-              padding: EdgeInsets.only(
-                top: top + 32,
-                left: 24,
-                right: 24,
-              ),
+              padding: EdgeInsets.only(top: top + 32, left: 24, right: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -102,10 +99,7 @@ class _HistoryDetailsBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
+                  Text(state.error!, style: const TextStyle(color: Colors.red)),
                 ],
               ),
             ),
@@ -128,18 +122,17 @@ class _HistoryDetailsBody extends StatelessWidget {
               'Остановок: ${d.stopsCount}',
             ),
           if (d.fragile)
-            const _DetailChip(
-              'assets/icons/ic_warning.svg',
-              'Хрупкая посылка',
-            ),
-          if (d.segment != null && (d.segment!['name']?.toString() ?? '').isNotEmpty)
+            const _DetailChip('assets/icons/ic_warning.svg', 'Хрупкая посылка'),
+          if (d.segment != null &&
+              (d.segment!['name']?.toString() ?? '').isNotEmpty)
             _DetailChip(
               'assets/icons/ic_box.svg',
               'Тип: ${d.segment!['name']}',
             ),
         ];
-        final flightNumberText =
-        d.publicCode.isNotEmpty ? d.publicCode : d.id.toString();
+        final flightNumberText = d.publicCode.isNotEmpty
+            ? d.publicCode
+            : d.id.toString();
 
         final orderCostText = (d.finalFare > 0)
             ? '${d.finalFare} сом'
@@ -148,17 +141,13 @@ class _HistoryDetailsBody extends StatelessWidget {
             : '—';
 
         final commissionValue = int.tryParse(d.commission) ?? 0;
-        final commissionText =
-        (d.commission.isNotEmpty && commissionValue > 0) ? '${d.commission} сом' : '—';
-
+        final commissionText = (d.commission.isNotEmpty && commissionValue > 0)
+            ? '${d.commission} сом'
+            : '—';
 
         final routeText = d.stops.isEmpty
             ? 'Маршрут не указан'
-            : d.stops
-            .map(
-              (s) => '${s.position}. ${s.title}',
-        )
-            .join('\n');
+            : d.stops.map((s) => '${s.position}. ${s.title}').join('\n');
 
         final compositionBuffer = StringBuffer();
         if (d.description.isNotEmpty) {
@@ -308,24 +297,15 @@ class _HistoryDetailsBody extends StatelessWidget {
               ],
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Маршрут:',
-                  value: routeText,
-                ),
+                child: _Section(title: 'Маршрут:', value: routeText),
               ),
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Составляющие:',
-                  value: compositionText,
-                ),
+                child: _Section(title: 'Составляющие:', value: compositionText),
               ),
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Номер рейса',
-                  value: flightNumberText,
-                ),
+                child: _Section(title: 'Номер рейса', value: flightNumberText),
               ),
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
@@ -370,8 +350,7 @@ class _HistoryDetailsBody extends StatelessWidget {
               ),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height:
-                  32 + MediaQuery.viewPaddingOf(context).bottom,
+                  height: 32 + MediaQuery.viewPaddingOf(context).bottom,
                 ),
               ),
             ],
@@ -428,11 +407,7 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.fromLTRB(20, 2, 20, 2),
-      child: Divider(
-        height: 1,
-        thickness: 1,
-        color: Color(0xFFE9EDF2),
-      ),
+      child: Divider(height: 1, thickness: 1, color: Color(0xFFE9EDF2)),
     );
   }
 }
