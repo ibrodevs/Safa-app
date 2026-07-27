@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../data/network/api_service.dart';
 import '../../../../data/network/model/api_exeptions_model.dart';
+import '../../../../data/services/secure_storage_service.dart';
 import '../data/models/register_request_model.dart';
 import '../data/models/register_response_model.dart';
 import '../data/repo/auth_repo.dart';
@@ -25,6 +27,46 @@ class AuthProvider extends ChangeNotifier {
   RegisterResponse? get user => _user;
   String? get pendingPhone => _pendingPhone;
   bool get loggedIn => _loggedIn;
+
+  Future<String> _loadRoleFromProfile() async {
+    final profile = await ApiService.instance.getProfile();
+    final role = profile.role.trim().isNotEmpty
+        ? profile.role.trim()
+        : 'client';
+    _role = role == 'carrier' ? UserRole.carrier : UserRole.client;
+    return role;
+  }
+
+  Future<bool> restoreSession() async {
+    final access = await SecureStorageService().getAccessToken();
+    final refresh = await SecureStorageService().getRefreshToken();
+    if ((access == null || access.isEmpty) &&
+        (refresh == null || refresh.isEmpty)) {
+      _loggedIn = false;
+      return false;
+    }
+
+    try {
+      if (access != null && access.isNotEmpty) {
+        await ApiService.instance.setBearer(access);
+      }
+      final role = await _loadRoleFromProfile();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_logged_in', true);
+      await prefs.setString('user_role', role);
+      _loggedIn = true;
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      await SecureStorageService().resetAll();
+      await ApiService.instance.setBearer(null);
+      _loggedIn = false;
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
 
   void setRole(UserRole role) {
     _role = role;
@@ -69,14 +111,12 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException catch (e) {
-      final alreadyExists = e.statusCode == 400 &&
+      final alreadyExists =
+          e.statusCode == 400 &&
           e.message.toLowerCase().contains('уже существует');
       if (alreadyExists) {
         try {
-          await _repo.login(
-            phoneNumber: phoneNumber,
-            password: password,
-          );
+          await _repo.login(phoneNumber: phoneNumber, password: password);
           _pendingPhone = phoneNumber;
           _loggedIn = true;
           _error = null;
@@ -96,6 +136,40 @@ class AuthProvider extends ChangeNotifier {
       }
       _loading = false;
       _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> login({
+    required String phoneNumber,
+    required String password,
+  }) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repo.login(phoneNumber: phoneNumber, password: password);
+      final role = await _loadRoleFromProfile();
+      _loggedIn = true;
+      _pendingPhone = phoneNumber;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_logged_in', true);
+      await prefs.setString('pending_phone', phoneNumber);
+      await prefs.setString('user_role', role);
+      await prefs.remove('carrier_pending');
+
+      _loading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _loading = false;
+      _loggedIn = false;
+      _error = e.statusCode == 401
+          ? 'Неверный номер телефона или пароль'
+          : e.message;
       notifyListeners();
       return false;
     }
@@ -162,7 +236,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-
   Future<bool> uploadSelfie(String path) async {
     final phone = _pendingPhone;
     if (phone == null || phone.isEmpty) {
@@ -176,10 +249,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _repo.uploadSelfie(
-        selfiePath: path,
-        phone: phone,
-      );
+      await _repo.uploadSelfie(selfiePath: path, phone: phone);
       _loading = false;
       notifyListeners();
       return true;

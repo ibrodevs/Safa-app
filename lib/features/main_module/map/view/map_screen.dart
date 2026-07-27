@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
@@ -16,6 +17,8 @@ import '../../../../core/utils/app_colors.dart';
 import '../../../../data/network/api_service.dart';
 import '../../payments/data/repo/shipments_repository.dart';
 import '../data/model/delivery_point_model.dart';
+import '../data/model/delivery_refs_models.dart';
+import '../data/repo/delivery_refs_repository.dart';
 import '../data/model/shipment_status.dart';
 import '../provider/active_shipment_provider.dart';
 import 'components/from_point_sheet.dart';
@@ -29,7 +32,9 @@ import 'widgets/me_dot.dart';
 import 'widgets/parsed_adress.dart';
 
 class OrderMapScreen extends StatefulWidget {
-  const OrderMapScreen({super.key});
+  const OrderMapScreen({super.key, this.serviceType = 'delivery'});
+
+  final String serviceType;
 
   @override
   State<OrderMapScreen> createState() => _OrderMapScreenState();
@@ -37,7 +42,8 @@ class OrderMapScreen extends StatefulWidget {
 
 enum _LocationGate { checking, ready, denied, serviceOff }
 
-class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObserver {
+class _OrderMapScreenState extends State<OrderMapScreen>
+    with WidgetsBindingObserver {
   double _myLat = 42.8746;
   double _myLon = 74.6122;
 
@@ -45,6 +51,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
   double _centerLon = 74.6122;
 
   final MapController _mapController = MapController();
+  final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
 
   DeliveryPoint? _deliveryPoint;
   DeliveryPoint? _fromPoint;
@@ -70,8 +77,12 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
   bool _routing = false;
-  
+
   StreamSubscription<ServiceStatus>? _serviceStatusStream;
+  Timer? _containersDebounce;
+  List<ContainerRef> _visibleContainers = const [];
+  bool _containersLoading = false;
+  int _containersRequestSerial = 0;
 
   List<LatLng> _extractStopPoints(List<DeliveryPoint> stops) {
     final pts = <LatLng>[];
@@ -165,6 +176,93 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
     return full;
   }
 
+  void _scheduleContainersRefresh() {
+    _containersDebounce?.cancel();
+    _containersDebounce = Timer(
+      const Duration(milliseconds: 450),
+      _refreshVisibleContainers,
+    );
+  }
+
+  Future<void> _refreshVisibleContainers() async {
+    if (!mounted || _containersLoading) return;
+
+    final bounds = _mapController.camera.visibleBounds;
+    final serial = ++_containersRequestSerial;
+    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.25;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.25;
+
+    setState(() => _containersLoading = true);
+
+    try {
+      final containers = await _refsRepository.loadContainersInBounds(
+        minLat: bounds.south - latPadding,
+        maxLat: bounds.north + latPadding,
+        minLon: bounds.west - lonPadding,
+        maxLon: bounds.east + lonPadding,
+      );
+
+      if (!mounted || serial != _containersRequestSerial) return;
+      setState(() => _visibleContainers = containers);
+    } catch (_) {
+      if (!mounted || serial != _containersRequestSerial) return;
+      setState(() => _visibleContainers = const []);
+    } finally {
+      if (mounted && serial == _containersRequestSerial) {
+        setState(() => _containersLoading = false);
+      }
+    }
+  }
+
+  List<LatLng> _containerPolygonPoints(ContainerRef container) {
+    final lat = container.latValue;
+    final lon = container.lonValue;
+    if (lat == null || lon == null) return const [];
+
+    const dLat = 0.000055;
+    const dLon = 0.000075;
+
+    return [
+      LatLng(lat - dLat, lon - dLon),
+      LatLng(lat - dLat, lon + dLon),
+      LatLng(lat + dLat, lon + dLon),
+      LatLng(lat + dLat, lon - dLon),
+    ];
+  }
+
+  Future<void> _focusContainers() async {
+    if (_containersLoading) return;
+
+    setState(() => _containersLoading = true);
+    try {
+      final containers = await _refsRepository.searchContainers(pageSize: 200);
+      final points = containers
+          .where((c) => c.latValue != null && c.lonValue != null)
+          .map((c) => LatLng(c.latValue!, c.lonValue!))
+          .toList();
+
+      if (!mounted) return;
+      setState(() => _visibleContainers = containers);
+
+      if (points.isNotEmpty) {
+        final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(points),
+            padding: EdgeInsets.fromLTRB(42, 120, 42, 300 + bottomSafe),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, error: e);
+    } finally {
+      if (mounted) setState(() => _containersLoading = false);
+    }
+  }
+
   void _fitToPoints(List<LatLng> pts) {
     if (pts.isEmpty) return;
 
@@ -233,7 +331,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     _serviceStatusStream = Geolocator.getServiceStatusStream().listen((status) {
       if (status == ServiceStatus.enabled) {
         _initLocation();
@@ -269,7 +367,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
         _fare = active.fare;
         _showFulfillmentSheet =
             (status == ShipmentStatus.assigned && active.isPaid) ||
-                status == ShipmentStatus.inTransit;
+            status == ShipmentStatus.inTransit;
       });
 
       _startShipmentPolling(active.id);
@@ -289,6 +387,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _serviceStatusStream?.cancel();
+    _containersDebounce?.cancel();
     _stopShipmentPolling();
     super.dispose();
   }
@@ -318,7 +417,8 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
         if (!mounted) return;
         AppSnackBar.showError(
           context,
-          message: 'Доступ к местоположению запрещен. Пожалуйста, разрешите его для работы карты.',
+          message:
+              'Доступ к местоположению запрещен. Пожалуйста, разрешите его для работы карты.',
           actionLabel: 'Настройки',
           onAction: () async {
             await Geolocator.openAppSettings();
@@ -448,7 +548,7 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
 
       final shouldShowFulfillment =
           (status == ShipmentStatus.assigned && dto.isPaid) ||
-              status == ShipmentStatus.inTransit;
+          status == ShipmentStatus.inTransit;
 
       setState(() {
         _activeStops = dto.stops;
@@ -606,13 +706,15 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
         description: '',
         stops: stops.map((s) => s.toStopJson()).toList(),
         returnToStart: false,
+        serviceType: widget.serviceType,
       );
 
       if (!mounted) return;
 
       setState(() {
         _activeShipmentId = shipmentId;
-        _isPaid = true; // initially we assume we don't need payment sheet until assigned
+        _isPaid =
+            true; // initially we assume we don't need payment sheet until assigned
       });
       _startShipmentPolling(shipmentId);
     } catch (e) {
@@ -694,6 +796,35 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
     final myPoint = LatLng(_myLat, _myLon);
 
     final markers = <Marker>[];
+    final containerPolygons = <Polygon>[];
+
+    for (final container in _visibleContainers) {
+      final lat = container.latValue;
+      final lon = container.lonValue;
+      if (lat == null || lon == null) continue;
+
+      final polygonPoints = _containerPolygonPoints(container);
+      if (polygonPoints.isNotEmpty) {
+        containerPolygons.add(
+          Polygon(
+            points: polygonPoints,
+            color: const Color(0x334CAF50),
+            borderColor: const Color(0xFF1E8E3E),
+            borderStrokeWidth: 1.4,
+          ),
+        );
+      }
+
+      markers.add(
+        Marker(
+          point: LatLng(lat, lon),
+          width: 54,
+          height: 44,
+          alignment: Alignment.center,
+          child: _ContainerMarker(container: container),
+        ),
+      );
+    }
 
     if (!_searchMode) {
       markers.add(
@@ -748,20 +879,27 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
             options: MapOptions(
               initialCenter: LatLng(_centerLat, _centerLon),
               initialZoom: 15,
+              onMapReady: _scheduleContainersRefresh,
               onPositionChanged: (pos, hasGesture) {
                 final c = pos.center;
                 _centerLat = c.latitude;
                 _centerLon = c.longitude;
+                _scheduleContainersRefresh();
               },
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
 
-              if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
+              if (containerPolygons.isNotEmpty)
+                PolygonLayer(polygons: containerPolygons),
+
+              if ((_showFulfillmentSheet || _searchMode) &&
+                  _routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
                     Polyline(
@@ -782,29 +920,39 @@ class _OrderMapScreenState extends State<OrderMapScreen> with WidgetsBindingObse
           ),
 
           Positioned(
+            top: MediaQuery.viewPaddingOf(context).top + 12,
+            right: 16,
+            child: _ContainersButton(
+              loading: _containersLoading,
+              onTap: _focusContainers,
+            ),
+          ),
+
+          Positioned(
             left: 16,
             right: 16,
             bottom: 16 + bottomInsets,
             child: _activeShipmentId != null
                 ? (_showFulfillmentSheet
-                    ? OrderFulfillmentSheet(stops: _activeStops)
-                    : (_currentStatus == ShipmentStatus.assigned && !_isPaid)
-                        ? ShipmentPaymentSheet(
-                            shipmentId: _activeShipmentId!,
-                            amount: _fare,
-                            onCancel: () => _cancelShipment(targetStatus: 'pending'),
-                          )
-                        : SearchingSheet(
-                            stops: _activeStops.isNotEmpty
-                                ? _activeStops
-                                : _buildStopsForSearchSheet(
-                                    fromTitle: fromTitle,
-                                    bazarTitle: bazarTitle,
-                                    detailText: detailText,
-                                  ),
-                            cancelling: _cancellingShipment,
-                            onCancel: _cancelShipment,
-                          ))
+                      ? OrderFulfillmentSheet(stops: _activeStops)
+                      : (_currentStatus == ShipmentStatus.assigned && !_isPaid)
+                      ? ShipmentPaymentSheet(
+                          shipmentId: _activeShipmentId!,
+                          amount: _fare,
+                          onCancel: () =>
+                              _cancelShipment(targetStatus: 'pending'),
+                        )
+                      : SearchingSheet(
+                          stops: _activeStops.isNotEmpty
+                              ? _activeStops
+                              : _buildStopsForSearchSheet(
+                                  fromTitle: fromTitle,
+                                  bazarTitle: bazarTitle,
+                                  detailText: detailText,
+                                ),
+                          cancelling: _cancellingShipment,
+                          onCancel: _cancelShipment,
+                        ))
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -917,4 +1065,129 @@ class _StopDotMarker extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ContainersButton extends StatelessWidget {
+  const _ContainersButton({required this.loading, required this.onTap});
+
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5EAF0)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E8E3E),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              const Text(
+                'Контейнеры',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1F2933),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContainerMarker extends StatelessWidget {
+  const _ContainerMarker({required this.container});
+
+  final ContainerRef container;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: container.displayTitle,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 24,
+            constraints: const BoxConstraints(minWidth: 34, maxWidth: 52),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E8E3E),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.white, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              container.number,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ),
+          CustomPaint(
+            size: const Size(10, 7),
+            painter: _ContainerMarkerPointerPainter(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContainerMarkerPointerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = ui.Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+
+    canvas.drawPath(path, Paint()..color = const Color(0xFF1E8E3E));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

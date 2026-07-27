@@ -39,12 +39,13 @@ class RoleSelectScreen extends StatelessWidget {
                           imageAsset: 'assets/images/img_client.jpg',
                           title: 'Я являюсь клиентом',
                           subtitle:
-                          'Узнайте размер и вес посылки для расчета прайса',
-                          onTap: onTapClient ??
-                                  () {
-                                context
-                                    .read<AuthProvider>()
-                                    .setRole(UserRole.client);
+                              'Узнайте размер и вес посылки для расчета прайса',
+                          onTap:
+                              onTapClient ??
+                              () {
+                                context.read<AuthProvider>().setRole(
+                                  UserRole.client,
+                                );
                                 context.push('/register-client');
                               },
                         ),
@@ -53,14 +54,29 @@ class RoleSelectScreen extends StatelessWidget {
                           imageAsset: 'assets/images/img_spec.jpg',
                           title: 'Я являюсь специалистом',
                           subtitle:
-                          'Узнайте размер и вес посылки для расчета прайса',
-                          onTap: onTapCarrier ??
-                                  () {
-                                context
-                                    .read<AuthProvider>()
-                                    .setRole(UserRole.carrier);
+                              'Узнайте размер и вес посылки для расчета прайса',
+                          onTap:
+                              onTapCarrier ??
+                              () {
+                                context.read<AuthProvider>().setRole(
+                                  UserRole.carrier,
+                                );
                                 context.push('/register-carrier');
                               },
+                        ),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => context.push('/login'),
+                            child: const Text(
+                              'Уже есть аккаунт? Войти',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE67E22),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -88,7 +104,6 @@ class RoleSelectScreen extends StatelessWidget {
   }
 }
 
-
 class _Header extends StatelessWidget {
   const _Header();
 
@@ -97,8 +112,14 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Кыргызский сервис\nнового поколения —',  style: AppTextStyles.titleBlackStyle,),
-        Text('всё, что нужно,\nв одном приложении',  style: AppTextStyles.titleGreyStyle,),
+        Text(
+          'Кыргызский сервис\nнового поколения —',
+          style: AppTextStyles.titleBlackStyle,
+        ),
+        Text(
+          'всё, что нужно,\nв одном приложении',
+          style: AppTextStyles.titleGreyStyle,
+        ),
       ],
     );
   }
@@ -128,7 +149,7 @@ class _RoleCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(6,24,10,24),
+          padding: const EdgeInsets.fromLTRB(6, 24, 10, 24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),

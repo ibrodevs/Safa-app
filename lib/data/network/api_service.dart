@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
 import '../../features/carrier_module/home/data/model/nearby_shipments_page.dart';
@@ -23,7 +22,10 @@ final class ApiService {
   static final ApiService instance = ApiService._internal();
   factory ApiService() => instance;
 
-  static const String _baseUrl = 'http://46.101.255.131:8001/api/';
+  static String get _baseUrl => const String.fromEnvironment(
+    'DOGO_API_BASE_URL',
+    defaultValue: 'http://46.101.255.131:8001/api/',
+  );
 
   final SecureStorageService _storage = SecureStorageService();
   late final Dio _dio;
@@ -52,102 +54,6 @@ final class ApiService {
     );
     _dio.interceptors.add(HttpLoggerInterceptor());
     _authDio.interceptors.add(HttpLoggerInterceptor());
-    _dio.interceptors.add(
-      QueuedInterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final connected = await _hasInternet();
-          if (!connected) {
-            return handler.reject(
-              DioException(
-                requestOptions: options,
-                type: DioExceptionType.unknown,
-                error: 'Нет подключения к интернету',
-              ),
-            );
-          }
-
-          if (_isAuthEndpoint(options)) {
-            options.headers.remove('Authorization');
-          } else {
-            final access = await _storage.getAccessToken();
-            if (access?.isNotEmpty == true) {
-              options.headers['Authorization'] = 'Bearer $access';
-            } else {
-              options.headers.remove('Authorization');
-            }
-          }
-
-          if (!kReleaseMode) {
-            final raw = options.headers['Authorization']?.toString();
-            if (raw != null && raw.isNotEmpty) {
-              final token = raw.startsWith('Bearer ') ? raw.substring(7) : raw;
-              debugPrint('💉 JWT access token: $token');
-            } else {
-              debugPrint('💉 JWT access token: <none>');
-            }
-          }
-
-          handler.next(options);
-        },
-        onError: (e, handler) async {
-          final status = e.response?.statusCode;
-          final retried = e.requestOptions.extra['__retried__'] == true;
-          final isAuthError = status == 401 || status == 403;
-
-          if (!isAuthError || retried || _isAuthEndpoint(e.requestOptions)) {
-            return handler.next(e);
-          }
-
-          final refresh = await _storage.getRefreshToken();
-          if (refresh == null || refresh.isEmpty) {
-            return handler.next(e);
-          }
-
-          try {
-            if (_refreshing) {
-              final ok =
-                  await (_refreshCompleter?.future ?? Future.value(false));
-              if (!ok) return handler.next(e);
-            } else {
-              _refreshing = true;
-              _refreshCompleter = Completer<bool>();
-              try {
-                final ok = await _refreshTokens(refresh);
-                _refreshCompleter?.complete(ok);
-              } catch (_) {
-                _refreshCompleter?.complete(false);
-                rethrow;
-              } finally {
-                _refreshing = false;
-              }
-            }
-
-            final newAccess = await _storage.getAccessToken();
-            final req = _cloneForRetry(e.requestOptions, newAccess);
-            req.extra['__retried__'] = true;
-            final cloned = await _dio.fetch<dynamic>(req);
-            return handler.resolve(cloned);
-          } catch (_) {
-            await _storage.resetAll();
-            await setBearer(null);
-            return handler.next(e);
-          }
-        },
-      ),
-    );
-
-    if (!kReleaseMode) {
-      _dio.interceptors.add(
-        LogInterceptor(
-          request: true,
-          requestHeader: false,
-          requestBody: true,
-          responseBody: true,
-          error: true,
-        ),
-      );
-    }
-
     _dio.interceptors.add(
       QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -655,12 +561,14 @@ final class ApiService {
     required String description,
     required List<Map<String, dynamic>> stops,
     bool returnToStart = false,
+    String serviceType = 'delivery',
   }) async {
     try {
       final resp = await _dio.post(
         'delivery/shipments/',
         data: {
           'title': title,
+          'service_type': serviceType,
           'description': description,
           'stops': stops,
           'return_to_start': returnToStart,

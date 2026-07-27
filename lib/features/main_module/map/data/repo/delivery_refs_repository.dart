@@ -94,4 +94,29 @@ class DeliveryRefsRepository {
         .where((c) => c.isActive)
         .toList();
   }
+
+  Future<List<ContainerRef>> loadContainersInBounds({
+    required double minLat,
+    required double maxLat,
+    required double minLon,
+    required double maxLon,
+    int pageSize = 200,
+  }) async {
+    final json = await _api.getJson(
+      'delivery/containers/',
+      queryParameters: {
+        'page_size': pageSize,
+        'min_lat': minLat,
+        'max_lat': maxLat,
+        'min_lon': minLon,
+        'max_lon': maxLon,
+      },
+      fallbackError: 'Не удалось загрузить контейнеры',
+    );
+
+    return _resultsOf(json)
+        .map(ContainerRef.fromJson)
+        .where((c) => c.isActive && c.latValue != null && c.lonValue != null)
+        .toList();
+  }
 }

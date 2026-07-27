@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'core/config/finik_config.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
 import 'data/network/api_service.dart';
@@ -50,10 +49,6 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
-  debugPrint('FINIK_API_KEY empty: ${FinikConfig.apiKey.isEmpty}');
-  debugPrint('FINIK_API_KEY len: ${FinikConfig.apiKey.length}');
-  debugPrint('FINIK_ACCOUNT_ID: ${FinikConfig.accountId}');
-  debugPrint('FINIK_BETA: ${FinikConfig.isBeta}');
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

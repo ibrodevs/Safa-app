@@ -19,12 +19,14 @@ final class ShipmentsRepository {
     required String description,
     required List<Map<String, dynamic>> stops,
     bool returnToStart = false,
+    String serviceType = 'delivery',
   }) async {
     try {
       final resp = await _api.dio.post(
         'delivery/shipments/',
         data: {
           'title': title,
+          'service_type': serviceType,
           'description': description,
           'stops': stops,
           'return_to_start': returnToStart,
@@ -37,7 +39,9 @@ final class ShipmentsRepository {
       if (parsed == null) throw ApiException('Shipment id не найден в ответе');
       return parsed;
     } on DioException catch (e) {
-      throw ApiException(e.response?.data?.toString() ?? 'Не удалось создать доставку');
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось создать доставку',
+      );
     }
   }
 
@@ -45,10 +49,7 @@ final class ShipmentsRepository {
     required List<Map<String, dynamic>> stops,
     bool returnToStart = false,
   }) async {
-    return _api.getShipmentQuote(
-      stops: stops,
-      returnToStart: returnToStart,
-    );
+    return _api.getShipmentQuote(stops: stops, returnToStart: returnToStart);
   }
 
   Future<bool> isShipmentPaid(int shipmentId) async {
@@ -59,11 +60,13 @@ final class ShipmentsRepository {
       if (v is bool) return v;
       return (v?.toString() ?? '').toLowerCase() == 'true';
     } on DioException catch (e) {
-      throw ApiException(e.response?.data?.toString() ?? 'Не удалось проверить оплату');
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось проверить оплату',
+      );
     }
   }
-
 }
+
 class ShipmentsListItemDto {
   final int id;
   final String status;
@@ -105,16 +108,20 @@ class ShipmentsListItemDto {
             ? containerRaw
             : (containerNumber?.trim().isNotEmpty == true)
             ? containerNumber
-            : (containerLabel?.trim().isNotEmpty == true ? containerLabel : null);
-
+            : (containerLabel?.trim().isNotEmpty == true
+                  ? containerLabel
+                  : null);
 
         final lat = _toDouble(m['lat']);
         final lon = _toDouble(m['lon']);
 
         final subtitleParts = <String>[];
-        if (bazar != null && bazar.trim().isNotEmpty) subtitleParts.add(bazar.trim());
-        if (container != null && container.trim().isNotEmpty) subtitleParts.add('Контейнер $container');
-        if (passage != null && passage.trim().isNotEmpty) subtitleParts.add('Проход $passage');
+        if (bazar != null && bazar.trim().isNotEmpty)
+          subtitleParts.add(bazar.trim());
+        if (container != null && container.trim().isNotEmpty)
+          subtitleParts.add('Контейнер $container');
+        if (passage != null && passage.trim().isNotEmpty)
+          subtitleParts.add('Проход $passage');
 
         stops.add(
           DeliveryPoint(
@@ -146,6 +153,7 @@ class ShipmentsListItemDto {
     );
   }
 }
+
 extension ShipmentsRepositoryById on ShipmentsRepository {
   Future<ShipmentsListItemDto> getShipmentById(int id) async {
     final resp = await _api.dio.get('delivery/shipments/$id/');
@@ -177,7 +185,9 @@ extension ShipmentsRepositoryActive on ShipmentsRepository {
 
       return null;
     } on DioException catch (e) {
-      throw ApiException(e.response?.data?.toString() ?? 'Не удалось загрузить доставки');
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось загрузить доставки',
+      );
     }
   }
 }

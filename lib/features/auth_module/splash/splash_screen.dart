@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../register/data/models/register_request_model.dart';
+import '../register/provider/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     Future.delayed(
       const Duration(milliseconds: 1050),
-          () => _textCtrl.forward(),
+      () => _textCtrl.forward(),
     );
 
     _navTimer = Timer(const Duration(milliseconds: 2900), _navigateNext);
@@ -55,10 +58,13 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateNext() async {
     if (!mounted) return;
 
+    final auth = context.read<AuthProvider>();
     final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+    final isLoggedIn = await auth.restoreSession();
     final carrierPending = prefs.getBool('carrier_pending') ?? false;
-    final userRole = prefs.getString('user_role');
+    final userRole = auth.role == UserRole.carrier
+        ? 'carrier'
+        : prefs.getString('user_role');
 
     if (!mounted) return;
 

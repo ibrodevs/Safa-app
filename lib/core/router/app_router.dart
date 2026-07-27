@@ -1,4 +1,5 @@
 import 'package:dogo/features/auth_module/register/view/carrier_register_screen.dart';
+import 'package:dogo/features/auth_module/login/login_screen.dart';
 import 'package:dogo/features/auth_module/register/view/client_register_screens.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_waiting_screen.dart';
@@ -52,37 +53,26 @@ final class AppRouter {
           Tween<Offset>(
             begin: const Offset(1.0, 0.0),
             end: Offset.zero,
-          ).chain(
-            CurveTween(curve: _curve),
-          ),
+          ).chain(CurveTween(curve: _curve)),
         );
 
         final secondary = secondaryAnimation.drive(
           Tween<Offset>(
             begin: Offset.zero,
             end: const Offset(-0.12, 0.0),
-          ).chain(
-            CurveTween(curve: _curve),
-          ),
+          ).chain(CurveTween(curve: _curve)),
         );
 
         return SlideTransition(
           position: primary,
-          child: SlideTransition(
-            position: secondary,
-            child: child,
-          ),
+          child: SlideTransition(position: secondary, child: child),
         );
       },
     );
   }
 
-
   static Page<dynamic> _build(GoRouterState state, Widget child) =>
-      _page(
-        state: state,
-        child: child,
-      );
+      _page(state: state, child: child);
 
   static final GoRouter router = GoRouter(
     navigatorKey: _navKey,
@@ -101,6 +91,10 @@ final class AppRouter {
         path: '/select_role',
         pageBuilder: (context, state) =>
             _build(state, const RoleSelectScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => _build(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/register-client',
@@ -174,11 +168,13 @@ final class AppRouter {
       GoRoute(
         path: '/finik_pay',
         name: 'finik_pay',
-        pageBuilder: (context, state) => _build(state, const FinikPaymentScreen()),
+        pageBuilder: (context, state) =>
+            _build(state, const FinikPaymentScreen()),
       ),
       GoRoute(
         path: '/privacy-policy',
-        pageBuilder: (context, state) => _build(state, const PrivacyPolicyScreen()),
+        pageBuilder: (context, state) =>
+            _build(state, const PrivacyPolicyScreen()),
       ),
 
       StatefulShellRoute.indexedStack(
@@ -198,8 +194,13 @@ final class AppRouter {
             routes: [
               GoRoute(
                 path: '/map',
-                pageBuilder: (context, state) =>
-                    _build(state, const OrderMapScreen()),
+                pageBuilder: (context, state) => _build(
+                  state,
+                  OrderMapScreen(
+                    serviceType:
+                        state.uri.queryParameters['service'] ?? 'delivery',
+                  ),
+                ),
               ),
             ],
           ),
