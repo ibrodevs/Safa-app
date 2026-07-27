@@ -52,7 +52,9 @@ ParsedAddress parseAddressForUi(String? address) {
   if (marketIdx != -1) {
     final raw = rest[marketIdx];
     const prefix = 'рынок ';
-    var name = raw.startsWith(prefix) ? raw.substring(prefix.length).trim() : raw;
+    var name = raw.startsWith(prefix)
+        ? raw.substring(prefix.length).trim()
+        : raw;
     if (name.isEmpty) {
       name = raw;
     }

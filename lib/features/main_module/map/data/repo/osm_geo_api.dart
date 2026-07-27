@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 
+import '../../../../../core/utils/app_logger.dart';
+
 class OsmGeoApi {
   OsmGeoApi(this._dio);
 
@@ -11,11 +13,7 @@ class OsmGeoApi {
   Future<List<Map<String, dynamic>>> autocompleteRaw(String query) async {
     final r = await _dio.get(
       'https://photon.komoot.io/api/',
-      queryParameters: {
-        'q': query,
-        'limit': 8,
-        'lang': 'ru',
-      },
+      queryParameters: {'q': query, 'limit': 8, 'lang': 'ru'},
       options: Options(
         headers: {'User-Agent': _ua},
         sendTimeout: const Duration(seconds: 6),
@@ -27,7 +25,7 @@ class OsmGeoApi {
     final sc = r.statusCode ?? -1;
     final t = r.data.runtimeType.toString();
     final preview = _preview(r.data);
-    print('PHOTON_AUTOCOMPLETE sc=$sc type=$t body=$preview');
+    AppLogger.d('PHOTON_AUTOCOMPLETE sc=$sc type=$t body=$preview');
 
     if (sc != 200) return const [];
 
@@ -40,11 +38,19 @@ class OsmGeoApi {
       final props = (f is Map ? f['properties'] : null);
       final geometry = (f is Map ? f['geometry'] : null);
 
-      final propsMap = (props is Map) ? props.cast<String, dynamic>() : <String, dynamic>{};
-      final coords = ((geometry is Map ? geometry['coordinates'] : null) as List?) ?? const [0, 0];
+      final propsMap = (props is Map)
+          ? props.cast<String, dynamic>()
+          : <String, dynamic>{};
+      final coords =
+          ((geometry is Map ? geometry['coordinates'] : null) as List?) ??
+          const [0, 0];
 
-      final lon = (coords.isNotEmpty && coords[0] is num) ? (coords[0] as num).toDouble() : 0.0;
-      final lat = (coords.length > 1 && coords[1] is num) ? (coords[1] as num).toDouble() : 0.0;
+      final lon = (coords.isNotEmpty && coords[0] is num)
+          ? (coords[0] as num).toDouble()
+          : 0.0;
+      final lat = (coords.length > 1 && coords[1] is num)
+          ? (coords[1] as num).toDouble()
+          : 0.0;
 
       final name = (propsMap['name'] ?? '').toString();
       final city = (propsMap['city'] ?? propsMap['state'] ?? '').toString();
@@ -104,7 +110,7 @@ class OsmGeoApi {
       final t = r.data.runtimeType.toString();
       final preview = _preview(r.data);
 
-      print('NOMINATIM sc=$sc type=$t body=$preview');
+      AppLogger.d('NOMINATIM sc=$sc type=$t body=$preview');
 
       if (sc != 200) return '';
 
@@ -115,7 +121,7 @@ class OsmGeoApi {
 
       return '';
     } catch (e, st) {
-      print('NOMINATIM EX: $e\n$st');
+      AppLogger.d('NOMINATIM EX: $e\n$st');
       return '';
     }
   }
@@ -145,7 +151,7 @@ class OsmGeoApi {
       final t = r.data.runtimeType.toString();
       final preview = _preview(r.data);
 
-      print('PHOTON sc=$sc type=$t body=$preview');
+      AppLogger.d('PHOTON sc=$sc type=$t body=$preview');
 
       if (sc != 200) return '';
       if (r.data is! Map<String, dynamic>) return '';
@@ -158,7 +164,9 @@ class OsmGeoApi {
       if (f is! Map) return '';
 
       final props = f['properties'];
-      final propsMap = (props is Map) ? props.cast<String, dynamic>() : <String, dynamic>{};
+      final propsMap = (props is Map)
+          ? props.cast<String, dynamic>()
+          : <String, dynamic>{};
 
       final name = (propsMap['name'] ?? '').toString();
       final city = (propsMap['city'] ?? propsMap['state'] ?? '').toString();
@@ -174,7 +182,7 @@ class OsmGeoApi {
 
       return address.trim();
     } catch (e, st) {
-      print('PHOTON EX: $e\n$st');
+      AppLogger.d('PHOTON EX: $e\n$st');
       return '';
     }
   }

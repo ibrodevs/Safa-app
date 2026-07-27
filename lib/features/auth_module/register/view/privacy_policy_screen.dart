@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/utils/app_colors.dart';
-import '../../../../core/utils/styles.dart';
-import '../../../../core/widgets/primary_button.dart';
+
+import '../../../../core/design/app_design.dart';
+import '../../../../core/widgets/app_widgets.dart';
 
 class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
@@ -14,15 +14,11 @@ class PrivacyPolicyScreen extends StatefulWidget {
 
 class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   bool _accepted = false;
-  final ScrollController _scrollController = ScrollController();
+  bool _showHint = false;
 
   Future<void> _onAccept() async {
     if (!_accepted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пожалуйста, примите политику конфиденциальности'),
-        ),
-      );
+      setState(() => _showHint = true);
       return;
     }
 
@@ -32,161 +28,152 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     if (!mounted) return;
 
     final userRole = prefs.getString('user_role');
-    if (userRole == 'carrier') {
-      context.go('/home-carrier');
-    } else {
-      context.go('/home');
-    }
+    context.go(userRole == 'carrier' ? '/home-carrier' : '/home');
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Политика конфиденциальности',
-                      style: AppTextStyles.titleBlackStyle,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ваша конфиденциальность важна для нас',
-                      style: AppTextStyles.subtitleStyle.copyWith(fontSize: 15),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSection(
-                      '1. Какие данные мы собираем',
-                      'Мы собираем данные, необходимые для работы сервиса доставки: ваше имя, номер телефона, данные о местоположении для отслеживания посылок в реальном времени, а также информацию о ваших заказах.',
-                    ),
-                    _buildSection(
-                      '2. Как мы используем данные',
-                      'Ваше местоположение используется для построения маршрута курьером и информирования клиента о статусе доставки. Номер телефона необходим для связи и подтверждения заказов.',
-                    ),
-                    _buildSection(
-                      '3. Передача данных третьим лицам',
-                      'Мы не продаем ваши данные. Данные передаются только участникам процесса доставки (курьеру или клиенту) исключительно для выполнения услуги.',
-                    ),
-                    _buildSection(
-                      '4. Безопасность',
-                      'Мы используем современные методы шифрования для защиты вашей личной информации и данных о платежах.',
-                    ),
-                    _buildSection(
-                      '5. Ваши права',
-                      'Вы имеете право запросить удаление вашего аккаунта и всех связанных данных в любой момент через службу поддержки.',
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Нажимая "Принять", вы соглашаетесь с условиями использования и политикой конфиденциальности SafaApp.',
-                      style: AppTextStyles.subtitleStyle.copyWith(
-                        color: AppColors.grey2,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    return AppScreenScaffold(
+      backgroundColor: AppColors.surface,
+      title: 'Политика конфиденциальности',
+      subtitle: 'Ваша конфиденциальность важна для нас',
+      footer: Column(
+        children: [
+          if (_showHint && !_accepted) ...[
+            const AppFormError(
+              message: 'Чтобы продолжить, примите политику конфиденциальности',
             ),
-            Container(
-              padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _accepted = !_accepted),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: Checkbox(
-                            value: _accepted,
-                            activeColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            onChanged: (val) {
-                              setState(() => _accepted = val ?? false);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Я принимаю политику конфиденциальности',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: PrimaryButton(
-                      text: 'Принять и продолжить',
-                      onPressed: _accepted ? _onAccept : null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            AppSpacing.gapSm,
           ],
-        ),
+          _AcceptCheckbox(
+            value: _accepted,
+            onChanged: (value) => setState(() {
+              _accepted = value;
+              if (value) _showHint = false;
+            }),
+          ),
+          AppSpacing.gapSm,
+          AppPrimaryButton(label: 'Принять и продолжить', onPressed: _onAccept),
+        ],
       ),
-    );
-  }
-
-  Widget _buildSection(String title, String content) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: Colors.black,
-            ),
+          const _Section(
+            title: '1. Какие данные мы собираем',
+            body:
+                'Мы собираем данные, необходимые для работы сервиса '
+                'доставки: ваше имя, номер телефона, данные о местоположении '
+                'для отслеживания посылок в реальном времени, а также '
+                'информацию о ваших заказах.',
           ),
-          const SizedBox(height: 6),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: Colors.black.withOpacity(0.7),
+          const _Section(
+            title: '2. Как мы используем данные',
+            body:
+                'Ваше местоположение используется для построения маршрута '
+                'курьером и информирования клиента о статусе доставки. '
+                'Номер телефона необходим для связи и подтверждения заказов.',
+          ),
+          const _Section(
+            title: '3. Передача данных третьим лицам',
+            body:
+                'Мы не продаём ваши данные. Данные передаются только '
+                'участникам процесса доставки (курьеру или клиенту) '
+                'исключительно для выполнения услуги.',
+          ),
+          const _Section(
+            title: '4. Безопасность',
+            body:
+                'Мы используем современные методы шифрования для защиты '
+                'вашей личной информации и данных о платежах.',
+          ),
+          const _Section(
+            title: '5. Ваши права',
+            body:
+                'Вы имеете право запросить удаление вашего аккаунта и всех '
+                'связанных данных в любой момент через службу поддержки.',
+          ),
+          AppSpacing.gapXs,
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: AppRadius.allSm,
+            ),
+            child: Text(
+              'Нажимая «Принять и продолжить», вы соглашаетесь с условиями '
+              'использования и политикой конфиденциальности Safa App.',
+              style: AppTypography.caption,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.cardTitle),
+          AppSpacing.gapXxs,
+          Text(body, style: AppTypography.bodySecondary),
+        ],
+      ),
+    );
+  }
+}
+
+class _AcceptCheckbox extends StatelessWidget {
+  const _AcceptCheckbox({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      checked: value,
+      label: 'Я принимаю политику конфиденциальности',
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: AppRadius.allSm,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: value,
+                  activeColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  onChanged: (v) => onChanged(v ?? false),
+                ),
+              ),
+              AppSpacing.hGapSm,
+              Expanded(
+                child: Text(
+                  'Я принимаю политику конфиденциальности',
+                  style: AppTypography.body,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

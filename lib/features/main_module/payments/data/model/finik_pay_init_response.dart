@@ -25,7 +25,8 @@ class FinikPayInitResponse {
       currency: j['currency']?.toString() ?? 'KGS',
       requiredFields: (j['requiredFields'] ?? j['required_fields']) is Map
           ? Map<String, dynamic>.from(
-              j['requiredFields'] ?? j['required_fields'])
+              j['requiredFields'] ?? j['required_fields'],
+            )
           : const {},
     );
   }

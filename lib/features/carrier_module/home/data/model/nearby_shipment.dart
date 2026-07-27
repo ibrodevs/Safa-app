@@ -68,7 +68,8 @@ class NearbyShipment {
 
   static DateTime _asDateTime(dynamic v) {
     if (v == null) return DateTime.fromMillisecondsSinceEpoch(0);
-    return DateTime.tryParse(v.toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return DateTime.tryParse(v.toString()) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   static DateTime? _asNullableDateTime(dynamic v) {

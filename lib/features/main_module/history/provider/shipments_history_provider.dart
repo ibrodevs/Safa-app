@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/utils/friendly_error.dart';
 import '../data/model/shipment_history_models.dart';
 import '../data/repo/shipments_history_repo.dart';
 
@@ -41,7 +42,9 @@ class ShipmentsHistoryProvider extends ChangeNotifier {
         ..clear()
         ..addAll(page.results);
     } catch (e) {
-      _error = e.toString();
+      // Пользователю показывается человекочитаемый текст, а не `e.toString()`
+      // с HTML-ответом сервера или `DioException [...]`.
+      _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить заказы');
     } finally {
       _loading = false;
       notifyListeners();
@@ -62,7 +65,7 @@ class ShipmentsHistoryProvider extends ChangeNotifier {
       _items.addAll(page.results);
     } catch (e) {
       _page -= 1;
-      _error = e.toString();
+      _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить заказы');
     } finally {
       _loadingMore = false;
       notifyListeners();

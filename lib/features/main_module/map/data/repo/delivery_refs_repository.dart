@@ -89,10 +89,9 @@ class DeliveryRefsRepository {
       fallbackError: 'Не удалось загрузить список контейнеров',
     );
 
-    return _resultsOf(json)
-        .map(ContainerRef.fromJson)
-        .where((c) => c.isActive)
-        .toList();
+    return _resultsOf(
+      json,
+    ).map(ContainerRef.fromJson).where((c) => c.isActive).toList();
   }
 
   Future<List<ContainerRef>> loadContainersInBounds({

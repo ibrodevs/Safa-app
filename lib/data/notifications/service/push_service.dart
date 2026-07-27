@@ -86,8 +86,7 @@ class PushService {
 
   Future<void> subscribeTo(String topic) => _fm.subscribeToTopic(topic);
 
-  Future<void> unsubscribeFrom(String topic) =>
-      _fm.unsubscribeFromTopic(topic);
+  Future<void> unsubscribeFrom(String topic) => _fm.unsubscribeFromTopic(topic);
 
   Future<void> registerOnServerOnce({required String kind}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -107,14 +106,12 @@ class PushService {
       return;
     }
 
-    final platform =
-    defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final platform = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : 'android';
 
     try {
-      await api.postFcmRegister(
-        token: token,
-        platform: platform,
-      );
+      await api.postFcmRegister(token: token, platform: platform);
       await prefs.setBool(key, true);
       if (kDebugMode) {
         print('FCM registered on server [$platform/$kind]');

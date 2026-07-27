@@ -1,33 +1,36 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
-import 'package:dogo/features/main_module/map/view/components/deliveri_point_sheet.dart';
-import 'package:dogo/features/main_module/map/view/widgets/input_tile.dart';
-import 'package:dogo/features/main_module/map/view/components/search_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/design/app_design.dart';
+import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/snackbar_utils.dart';
-import '../../../../core/utils/app_colors.dart';
+import '../../../../core/widgets/app_widgets.dart';
 import '../../../../data/network/api_service.dart';
 import '../../payments/data/repo/shipments_repository.dart';
+import '../../services/service_config.dart';
 import '../data/model/delivery_point_model.dart';
 import '../data/model/delivery_refs_models.dart';
-import '../data/repo/delivery_refs_repository.dart';
 import '../data/model/shipment_status.dart';
+import '../data/repo/delivery_refs_repository.dart';
 import '../provider/active_shipment_provider.dart';
-import 'components/from_point_sheet.dart';
+import 'components/container_details_sheet.dart';
 import 'components/order_completed_sheet.dart';
 import 'components/order_fulfillment_sheet.dart';
-import 'widgets/add_adress_button.dart';
-import 'widgets/here_bubble.dart';
-import 'components/intermediate_point_sheet.dart';
+import 'components/order_summary_sheet.dart';
+import 'components/point_picker_sheet.dart';
+import 'components/search_sheet.dart';
+import 'components/service_order_panel.dart';
 import 'components/shipment_payment_sheet.dart';
+import 'widgets/container_map_marker.dart';
+import 'widgets/here_bubble.dart';
 import 'widgets/me_dot.dart';
 import 'widgets/parsed_adress.dart';
 
@@ -44,14 +47,22 @@ enum _LocationGate { checking, ready, denied, serviceOff }
 
 class _OrderMapScreenState extends State<OrderMapScreen>
     with WidgetsBindingObserver {
+  /// Ниже этого масштаба подписи контейнеров скрываются, чтобы карта
+  /// не превращалась в визуальный хаос.
+  static const double _containerLabelMinZoom = 16;
+
+  late final ServiceConfig _config = ServiceConfig.fromType(widget.serviceType);
+
   double _myLat = 42.8746;
   double _myLon = 74.6122;
 
   double _centerLat = 42.8746;
   double _centerLon = 74.6122;
+  double _zoom = 15;
 
   final MapController _mapController = MapController();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
+  final TextEditingController _descriptionController = TextEditingController();
 
   DeliveryPoint? _deliveryPoint;
   DeliveryPoint? _fromPoint;
@@ -60,6 +71,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   int? _activeShipmentId;
   bool _creatingShipment = false;
   bool _cancellingShipment = false;
+  String? _panelError;
 
   bool get _searchMode => _activeShipmentId != null;
   bool _showFulfillmentSheet = false;
@@ -71,6 +83,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
   Timer? _shipmentPollTimer;
   ShipmentStatus _currentStatus = ShipmentStatus.unknown;
+  String _currentStatusCode = 'pending';
   bool _isPaid = true;
   int _fare = 0;
 
@@ -81,8 +94,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   StreamSubscription<ServiceStatus>? _serviceStatusStream;
   Timer? _containersDebounce;
   List<ContainerRef> _visibleContainers = const [];
+  ContainerRef? _selectedContainer;
   bool _containersLoading = false;
   int _containersRequestSerial = 0;
+
+  // --- Маршрут OSRM -----------------------------------------------------
 
   List<LatLng> _extractStopPoints(List<DeliveryPoint> stops) {
     final pts = <LatLng>[];
@@ -112,7 +128,6 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     );
 
     const profiles = <String>['foot', 'walking', 'driving'];
-
     final coords = '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
 
     for (final profile in profiles) {
@@ -143,7 +158,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         }
 
         if (out.isNotEmpty) return out;
-      } catch (_) {}
+      } catch (_) {
+        // Пробуем следующий профиль маршрутизации.
+      }
     }
 
     return const [];
@@ -168,6 +185,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         }
       }
 
+      // Публичный OSRM ограничивает частоту запросов — пауза сохранена.
       if (i != pts.length - 2) {
         await Future.delayed(const Duration(milliseconds: 1100));
       }
@@ -176,10 +194,12 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     return full;
   }
 
-  void _scheduleContainersRefresh() {
+  // --- Контейнеры -------------------------------------------------------
+
+  void _scheduleContainersRefresh({bool immediate = false}) {
     _containersDebounce?.cancel();
     _containersDebounce = Timer(
-      const Duration(milliseconds: 450),
+      immediate ? Duration.zero : const Duration(milliseconds: 450),
       _refreshVisibleContainers,
     );
   }
@@ -187,7 +207,13 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   Future<void> _refreshVisibleContainers() async {
     if (!mounted || _containersLoading) return;
 
-    final bounds = _mapController.camera.visibleBounds;
+    late final LatLngBounds bounds;
+    try {
+      bounds = _mapController.camera.visibleBounds;
+    } catch (_) {
+      return;
+    }
+
     final serial = ++_containersRequestSerial;
     final latPadding =
         (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.25;
@@ -205,31 +231,26 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       );
 
       if (!mounted || serial != _containersRequestSerial) return;
-      setState(() => _visibleContainers = containers);
-    } catch (_) {
-      if (!mounted || serial != _containersRequestSerial) return;
-      setState(() => _visibleContainers = const []);
-    } finally {
-      if (mounted && serial == _containersRequestSerial) {
-        setState(() => _containersLoading = false);
+
+      // Выбранный контейнер остаётся на карте, даже если вышел за границы
+      // текущего запроса.
+      final selected = _selectedContainer;
+      final merged = List<ContainerRef>.from(containers);
+      if (selected != null && !merged.any((item) => item.id == selected.id)) {
+        merged.add(selected);
       }
+
+      // Один setState на успешный ответ вместо трёх.
+      setState(() {
+        _visibleContainers = merged;
+        _containersLoading = false;
+      });
+    } catch (_) {
+      // При кратковременной сетевой ошибке сохраняем последние успешно
+      // загруженные маркеры — раньше они пропадали с карты.
+      if (!mounted || serial != _containersRequestSerial) return;
+      setState(() => _containersLoading = false);
     }
-  }
-
-  List<LatLng> _containerPolygonPoints(ContainerRef container) {
-    final lat = container.latValue;
-    final lon = container.lonValue;
-    if (lat == null || lon == null) return const [];
-
-    const dLat = 0.000055;
-    const dLon = 0.000075;
-
-    return [
-      LatLng(lat - dLat, lon - dLon),
-      LatLng(lat - dLat, lon + dLon),
-      LatLng(lat + dLat, lon + dLon),
-      LatLng(lat + dLat, lon - dLon),
-    ];
   }
 
   Future<void> _focusContainers() async {
@@ -244,22 +265,25 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           .toList();
 
       if (!mounted) return;
-      setState(() => _visibleContainers = containers);
+      setState(() {
+        _visibleContainers = containers;
+        _containersLoading = false;
+      });
 
       if (points.isNotEmpty) {
-        final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
-        _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints(points),
-            padding: EdgeInsets.fromLTRB(42, 120, 42, 300 + bottomSafe),
-          ),
-        );
+        _fitToPoints(points);
       }
     } catch (e) {
       if (!mounted) return;
-      AppSnackBar.showError(context, error: e);
-    } finally {
-      if (mounted) setState(() => _containersLoading = false);
+      setState(() => _containersLoading = false);
+      AppSnackBar.showError(
+        context,
+        error: e,
+        message: friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось загрузить контейнеры',
+        ),
+      );
     }
   }
 
@@ -267,16 +291,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     if (pts.isEmpty) return;
 
     final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
-
-    final padding = EdgeInsets.fromLTRB(36, 90, 36, 320 + bottomSafe);
-
-    final bounds = LatLngBounds.fromPoints(pts);
+    final padding = EdgeInsets.fromLTRB(36, 96, 36, 300 + bottomSafe);
 
     _mapController.fitCamera(
-      CameraFit.bounds(bounds: bounds, padding: padding),
+      CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: padding),
     );
-
-    // _mapController.fitBounds(bounds, options: FitBoundsOptions(padding: padding));
   }
 
   Future<void> _syncRouteAndCamera() async {
@@ -309,13 +328,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
     final sig = _makeSignature(pts);
     if (_routeSignature == sig) return;
-
     if (_routing) return;
-    _routing = true;
 
+    _routing = true;
     try {
       final route = await _buildOsrmRouteMultiLeg(pts);
-
       if (!mounted) return;
 
       setState(() {
@@ -326,6 +343,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _routing = false;
     }
   }
+
+  // --- Жизненный цикл ---------------------------------------------------
 
   @override
   void initState() {
@@ -352,7 +371,6 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
       final active = p.active;
       if (active == null) return;
-
       if (_activeShipmentId != null) return;
       if (_bootstrappedActive) return;
       _bootstrappedActive = true;
@@ -363,6 +381,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _activeShipmentId = active.id;
         _activeStops = active.stops;
         _currentStatus = status;
+        _currentStatusCode = active.status;
         _isPaid = active.isPaid;
         _fare = active.fare;
         _showFulfillmentSheet =
@@ -371,7 +390,6 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       });
 
       _startShipmentPolling(active.id);
-
       _syncRouteAndCamera();
     });
   }
@@ -388,17 +406,18 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     WidgetsBinding.instance.removeObserver(this);
     _serviceStatusStream?.cancel();
     _containersDebounce?.cancel();
+    _descriptionController.dispose();
     _stopShipmentPolling();
     super.dispose();
   }
+
+  // --- Геолокация -------------------------------------------------------
 
   Future<void> _initLocation() async {
     final addressProvider = context.read<DeliveryAddressProvider>();
 
     try {
-      if (mounted) {
-        setState(() => _gate = _LocationGate.checking);
-      }
+      if (mounted) setState(() => _gate = _LocationGate.checking);
 
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -418,7 +437,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         AppSnackBar.showError(
           context,
           message:
-              'Доступ к местоположению запрещен. Пожалуйста, разрешите его для работы карты.',
+              'Доступ к местоположению запрещён. '
+              'Разрешите его, чтобы карта работала корректно.',
           actionLabel: 'Настройки',
           onAction: () async {
             await Geolocator.openAppSettings();
@@ -460,9 +480,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       await addressProvider.fetchGpsHereAddress(lat: _myLat, lon: _myLon);
     } catch (e, st) {
       debugPrint('initLocation error: $e\n$st');
-      if (mounted) {
-        setState(() => _gate = _LocationGate.denied);
-      }
+      if (mounted) setState(() => _gate = _LocationGate.denied);
     }
   }
 
@@ -470,12 +488,21 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     if (!mounted) return;
     AppSnackBar.showError(
       context,
-      message: 'Геолокация отключена. Пожалуйста, включите GPS.',
+      message:
+          'Геолокация отключена. Включите GPS, чтобы видеть себя на карте.',
       actionLabel: 'Включить',
       onAction: () async {
         await Geolocator.openLocationSettings();
       },
     );
+  }
+
+  void _goToMyLocation() {
+    if (_gate != _LocationGate.ready) {
+      _initLocation();
+      return;
+    }
+    _mapController.move(LatLng(_myLat, _myLon), 16);
   }
 
   List<LatLng> _spreadSamePoints(List<LatLng> pts) {
@@ -500,6 +527,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     return out;
   }
 
+  // --- Состояние заказа -------------------------------------------------
+
   void _stopShipmentPolling() {
     _shipmentPollTimer?.cancel();
     _shipmentPollTimer = null;
@@ -511,6 +540,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _showFulfillmentSheet = false;
       _activeStops = const [];
       _currentStatus = ShipmentStatus.unknown;
+      _currentStatusCode = 'pending';
       _bootstrappedActive = false;
       _didFitOnFulfillment = false;
       _routePoints = const [];
@@ -530,8 +560,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       if (!mounted) return;
 
       final status = parseShipmentStatus(dto.status);
-
       _currentStatus = status;
+      _currentStatusCode = dto.status;
 
       if (status == ShipmentStatus.completed ||
           status == ShipmentStatus.canceled) {
@@ -541,6 +571,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           _deliveryPoint = null;
           _fromPoint = null;
           _intermediatePoints.clear();
+          _descriptionController.clear();
           _showOrderCompletedSheet();
         }
         return;
@@ -558,106 +589,212 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       });
 
       _syncRouteAndCamera();
-    } catch (_) {}
+    } catch (_) {
+      // Поллинг переживает единичные сетевые ошибки без вмешательства в UI.
+    }
   }
 
   void _showOrderCompletedSheet() {
     if (!mounted) return;
-    showModalBottomSheet(
+    showAppBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.transparent,
       builder: (_) => const OrderCompletedSheet(),
     );
   }
 
   void _startShipmentPolling(int shipmentId) {
     _shipmentPollTimer?.cancel();
-
     _shipmentPollTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _pollShipment(shipmentId),
     );
-
     _pollShipment(shipmentId);
   }
 
-  Future<void> _openIntermediatePointSheet() async {
-    final result = await showModalBottomSheet<DeliveryPoint>(
+  // --- Выбор точек ------------------------------------------------------
+
+  Future<DeliveryPoint?> _openPointPicker({
+    required PointPickerMode mode,
+    double? lat,
+    double? lon,
+    int? stopNumber,
+    String? headline,
+    String? headlineSubtitle,
+  }) {
+    return showAppBottomSheet<DeliveryPoint>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.transparent,
-      builder: (context) {
-        final bottom = MediaQuery.viewInsetsOf(context).bottom;
-        return Padding(
-          padding: EdgeInsets.only(bottom: bottom),
-          child: IntermediatePointSheet(
-            addressLine: 'Промежуточная точка',
-            placeLine: 'Заполните поля ниже',
-            lat: _centerLat,
-            lon: _centerLon,
-          ),
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      setState(() => _intermediatePoints.add(result));
-    }
-  }
-
-  Future<void> _openDeliveryPointSheet() async {
-    final addr = context.read<DeliveryAddressProvider>().fromAddress;
-
-    final result = await showModalBottomSheet<DeliveryPoint>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DeliveryPointSheet(
-        mainTitle: 'Точка доставки',
-        bazarTitle: addr,
-        lat: _centerLat,
-        lon: _centerLon,
+      builder: (_) => PointPickerSheet(
+        mode: mode,
+        lat: lat ?? _centerLat,
+        lon: lon ?? _centerLon,
+        stopNumber: stopNumber,
+        headline: headline,
+        headlineSubtitle: headlineSubtitle,
       ),
     );
-
-    if (result != null && mounted) {
-      setState(() => _deliveryPoint = result);
-    }
   }
 
-  Future<void> _openFromPointSheet({
+  Future<void> _editFromPoint({
     required String fromTitle,
     String? bazarTitle,
   }) async {
-    final result = await showModalBottomSheet<DeliveryPoint>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => FromPointSheet(
-        mainTitle: fromTitle,
-        bazarTitle: bazarTitle,
-        lat: _myLat,
-        lon: _myLon,
-        subtitle: bazarTitle ?? '',
-      ),
+    final result = await _openPointPicker(
+      mode: PointPickerMode.from,
+      lat: _myLat,
+      lon: _myLon,
+      headline: _fromPoint?.title ?? fromTitle,
+      headlineSubtitle: bazarTitle,
     );
 
     if (result != null && mounted) {
-      setState(() => _fromPoint = result);
+      setState(() {
+        _fromPoint = result;
+        _panelError = null;
+      });
     }
   }
+
+  Future<void> _editDestination() async {
+    final result = await _openPointPicker(
+      mode: PointPickerMode.destination,
+      headline: _deliveryPoint?.title,
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _deliveryPoint = result;
+        _panelError = null;
+      });
+    }
+  }
+
+  Future<void> _addIntermediatePoint() async {
+    final result = await _openPointPicker(
+      mode: PointPickerMode.intermediate,
+      stopNumber: _intermediatePoints.length + 1,
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _intermediatePoints.add(result);
+        _panelError = null;
+      });
+    }
+  }
+
+  Future<void> _editIntermediatePoint(int index) async {
+    if (index < 0 || index >= _intermediatePoints.length) return;
+
+    final result = await _openPointPicker(
+      mode: PointPickerMode.intermediate,
+      stopNumber: index + 1,
+      headline: _intermediatePoints[index].title,
+    );
+
+    if (result != null && mounted) {
+      setState(() => _intermediatePoints[index] = result);
+    }
+  }
+
+  Future<void> _removeIntermediatePoint(int index) async {
+    if (index < 0 || index >= _intermediatePoints.length) return;
+
+    final confirmed = await AppConfirmDialog.show(
+      context,
+      title: 'Удалить остановку ${index + 1}?',
+      message: _intermediatePoints[index].title,
+      confirmLabel: 'Удалить',
+      danger: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _intermediatePoints.removeAt(index));
+  }
+
+  void _reorderIntermediatePoints(int oldIndex, int newIndex) {
+    setState(() {
+      final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
+      final point = _intermediatePoints.removeAt(oldIndex);
+      _intermediatePoints.insert(adjusted, point);
+    });
+  }
+
+  Future<void> _onContainerTapped(ContainerRef container) async {
+    if (container.latValue == null || container.lonValue == null) return;
+
+    setState(() => _selectedContainer = container);
+    _mapController.move(
+      LatLng(container.latValue!, container.lonValue!),
+      _zoom < 17 ? 17 : _zoom,
+    );
+
+    final assignment = await showAppBottomSheet<ContainerAssignment>(
+      context: context,
+      builder: (_) =>
+          ContainerDetailsSheet(container: container, config: _config),
+    );
+
+    if (!mounted || assignment == null) return;
+
+    final point = _pointFromContainer(container);
+
+    setState(() {
+      _panelError = null;
+      switch (assignment) {
+        case ContainerAssignment.from:
+          _fromPoint = point;
+        case ContainerAssignment.destination:
+          _deliveryPoint = point;
+        case ContainerAssignment.intermediate:
+          _intermediatePoints.add(point);
+      }
+    });
+  }
+
+  DeliveryPoint _pointFromContainer(ContainerRef container) {
+    final bazar = container.bazarName.trim();
+    final number = container.number.trim();
+    final passage = container.passageNumber.trim();
+
+    final subtitleParts = <String>[
+      if (number.isNotEmpty) 'Контейнер: $number',
+      if (passage.isNotEmpty) 'Проход: $passage',
+    ];
+
+    return DeliveryPoint(
+      title: bazar.isNotEmpty ? bazar : 'Контейнер $number',
+      subtitle: subtitleParts.join(' • '),
+      lat: container.latValue,
+      lon: container.lonValue,
+      bazar: bazar,
+      container: number,
+      passage: passage,
+      q: '',
+    );
+  }
+
+  // --- Создание и отмена заказа ----------------------------------------
 
   Future<void> _cancelShipment({String targetStatus = 'canceled'}) async {
     final id = _activeShipmentId;
     if (id == null || _cancellingShipment) return;
 
+    if (targetStatus == 'canceled') {
+      final confirmed = await AppConfirmDialog.show(
+        context,
+        title: 'Отменить заказ?',
+        message: 'Поиск исполнителя будет остановлен.',
+        confirmLabel: 'Отменить заказ',
+        cancelLabel: 'Оставить',
+        danger: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
+
     setState(() => _cancellingShipment = true);
 
     try {
-      if (targetStatus == 'canceled') {
-        _stopShipmentPolling();
-      }
+      if (targetStatus == 'canceled') _stopShipmentPolling();
 
       await ApiService.instance.patchShipmentStatus(id, status: targetStatus);
 
@@ -668,64 +805,95 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _deliveryPoint = null;
         _fromPoint = null;
         _intermediatePoints.clear();
+        _descriptionController.clear();
       } else {
-        // if pending, we just stay in active mode, polling will continue or we can force one poll
         _pollShipment(id);
       }
     } catch (e) {
       if (!mounted) return;
-      AppSnackBar.showError(context, error: e);
+      AppSnackBar.showError(
+        context,
+        error: e,
+        message: friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось изменить статус заказа',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _cancellingShipment = false);
     }
   }
 
-  Future<void> _handleCreateShipment(List<DeliveryPoint> stops) async {
-    if (_creatingShipment || stops.isEmpty) return;
+  /// Создаёт заказ. Возвращает текст ошибки или `null` при успехе.
+  ///
+  /// Формат запроса не изменён: `title`, `service_type`, `description`,
+  /// `stops`, `return_to_start`.
+  Future<String?> _createShipment(List<DeliveryPoint> stops) async {
+    if (_creatingShipment) return null;
+    if (stops.isEmpty) return 'Маршрут не заполнен';
 
     // Сервер требует координаты у каждой точки — без них будет 400.
-    final missingCoords = stops.any((s) => s.lat == null || s.lon == null);
-    if (missingCoords) {
-      AppSnackBar.showError(
-        context,
-        message:
-            'Для каждой точки выберите контейнер из справочника или место на карте',
-      );
-      return;
+    if (stops.any((s) => s.lat == null || s.lon == null)) {
+      return 'Для каждой точки выберите контейнер из справочника '
+          'или место на карте';
     }
 
     setState(() => _creatingShipment = true);
 
     try {
       final repo = ShipmentsRepository();
-
-      final title = stops.length > 1 ? stops.last.title : 'Доставка';
+      final title = stops.length > 1 ? stops.last.title : _config.title;
 
       final shipmentId = await repo.createShipment(
         title: title,
-        description: '',
+        description: _config.supportsDescription
+            ? _descriptionController.text.trim()
+            : '',
         stops: stops.map((s) => s.toStopJson()).toList(),
         returnToStart: false,
-        serviceType: widget.serviceType,
+        serviceType: _config.type,
       );
 
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _activeShipmentId = shipmentId;
-        _isPaid =
-            true; // initially we assume we don't need payment sheet until assigned
+        // До назначения исполнителя щит оплаты не нужен.
+        _isPaid = true;
+        _currentStatusCode = 'pending';
       });
       _startShipmentPolling(shipmentId);
+      return null;
     } catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, error: e);
+      return friendlyErrorMessage(
+        e,
+        fallback: 'Не удалось создать заказ. Попробуйте ещё раз.',
+      );
     } finally {
       if (mounted) setState(() => _creatingShipment = false);
     }
   }
 
-  List<DeliveryPoint> _buildStopsForSearchSheet({
+  Future<void> _submitOrder(List<DeliveryPoint> stops) async {
+    FocusScope.of(context).unfocus();
+    setState(() => _panelError = null);
+
+    // Итоговая карточка перед отправкой: маршрут, сервис, стоимость.
+    // Кнопка внутри неё блокируется на время запроса, поэтому дубликаты
+    // заказа создать нельзя.
+    await showAppBottomSheet<bool>(
+      context: context,
+      isDismissible: !_creatingShipment,
+      builder: (_) => OrderSummarySheet(
+        config: _config,
+        stops: stops,
+        description: _descriptionController.text,
+        onConfirm: () => _createShipment(stops),
+      ),
+    );
+  }
+
+  List<DeliveryPoint> _buildStops({
     required String fromTitle,
     String? bazarTitle,
     String? detailText,
@@ -759,15 +927,22 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           );
 
     stops.add(startPoint);
-    stops.addAll(_intermediatePoints);
+    if (_config.allowsIntermediateStops) {
+      stops.addAll(_intermediatePoints);
+    }
     if (_deliveryPoint != null) stops.add(_deliveryPoint!);
 
     return stops;
   }
 
+  // --- build ------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.viewPaddingOf(context).top;
     final bottomInsets = MediaQuery.viewPaddingOf(context).bottom;
+    final horizontal = AppResponsive.horizontalPadding(context);
+
     final addressProvider = context.watch<DeliveryAddressProvider>();
     final gpsAddress = addressProvider.gpsHereAddress;
     final gpsLoading = addressProvider.gpsLoading;
@@ -778,7 +953,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     String? detailText;
 
     if (gpsLoading || _gate == _LocationGate.checking) {
-      fromTitle = 'Определяем адрес...';
+      fromTitle = 'Определяем адрес…';
     } else if (gpsError != null && gpsError.isNotEmpty) {
       fromTitle = 'Не удалось получить адрес';
     } else if (gpsAddress == null || gpsAddress.isEmpty) {
@@ -793,8 +968,73 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     }
 
     final fromTileTitle = _fromPoint?.title ?? fromTitle;
-    final myPoint = LatLng(_myLat, _myLon);
+    final showContainerLabels = _zoom >= _containerLabelMinZoom;
 
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          _buildMap(
+            gpsAddress: gpsAddress,
+            gpsLoading: gpsLoading,
+            gpsError: gpsError,
+            bazarTitle: bazarTitle,
+            detailText: detailText,
+            showContainerLabels: showContainerLabels,
+          ),
+
+          // Верхняя строка: назад, название сервиса, индикатор контейнеров.
+          Positioned(
+            top: topInset + AppSpacing.xs,
+            left: horizontal,
+            right: horizontal,
+            child: _MapTopBar(
+              config: _config,
+              containersLoading: _containersLoading,
+              containersCount: _visibleContainers.length,
+              onBack: () => context.go('/home'),
+              onContainers: _focusContainers,
+            ),
+          ),
+
+          // Кнопка «моя геолокация» — над нижней панелью, доступна одной рукой.
+          Positioned(
+            right: horizontal,
+            bottom: _searchMode ? 320 + bottomInsets : 360 + bottomInsets,
+            child: AppMapActionButton(
+              icon: Icons.my_location_rounded,
+              semanticLabel: 'Моё местоположение',
+              loading: _gate == _LocationGate.checking,
+              onTap: _goToMyLocation,
+            ),
+          ),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomPanel(
+              fromTitle: fromTitle,
+              fromTileTitle: fromTileTitle,
+              bazarTitle: bazarTitle,
+              detailText: detailText,
+              horizontal: horizontal,
+              bottomInsets: bottomInsets,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMap({
+    required String? gpsAddress,
+    required bool gpsLoading,
+    required String? gpsError,
+    required String? bazarTitle,
+    required String? detailText,
+    required bool showContainerLabels,
+  }) {
     final markers = <Marker>[];
     final containerPolygons = <Polygon>[];
 
@@ -803,25 +1043,31 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       final lon = container.lonValue;
       if (lat == null || lon == null) continue;
 
-      final polygonPoints = _containerPolygonPoints(container);
-      if (polygonPoints.isNotEmpty) {
-        containerPolygons.add(
-          Polygon(
-            points: polygonPoints,
-            color: const Color(0x334CAF50),
-            borderColor: const Color(0xFF1E8E3E),
-            borderStrokeWidth: 1.4,
-          ),
-        );
-      }
+      final selected = _selectedContainer?.id == container.id;
+
+      containerPolygons.add(
+        Polygon(
+          points: _containerPolygonPoints(lat, lon),
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : AppColors.containerFill,
+          borderColor: selected ? AppColors.primary : AppColors.container,
+          borderStrokeWidth: selected ? 2 : 1.4,
+        ),
+      );
 
       markers.add(
         Marker(
           point: LatLng(lat, lon),
-          width: 54,
-          height: 44,
+          width: ContainerMapMarker.hitSize,
+          height: ContainerMapMarker.hitSize,
           alignment: Alignment.center,
-          child: _ContainerMarker(container: container),
+          child: ContainerMapMarker(
+            container: container,
+            selected: selected,
+            showLabel: showContainerLabels,
+            onTap: () => _onContainerTapped(container),
+          ),
         ),
       );
     }
@@ -829,365 +1075,295 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     if (!_searchMode) {
       markers.add(
         Marker(
-          point: myPoint,
+          point: LatLng(_myLat, _myLon),
           width: 220,
-          height: 140,
-          alignment: Alignment.center,
-          child: Transform.translate(
-            offset: const Offset(0, -55),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                HereBubble(
-                  address: gpsAddress,
-                  loading: gpsLoading || _gate == _LocationGate.checking,
-                  error: gpsError,
-                  marketTitle: bazarTitle,
-                  detail: detailText,
-                ),
-                const SizedBox(height: 8),
-                const MeDot(),
-              ],
-            ),
+          height: 120,
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HereBubble(
+                address: gpsAddress,
+                loading: gpsLoading || _gate == _LocationGate.checking,
+                error: gpsError,
+                marketTitle: bazarTitle,
+                detail: detailText,
+              ),
+              AppSpacing.gapXs,
+              const MeDot(),
+            ],
           ),
         ),
       );
-    }
-
-    if (_searchMode) {
-      final rawPts = _extractStopPoints(_activeStops);
-      final pts = _spreadSamePoints(rawPts);
+    } else {
+      final pts = _spreadSamePoints(_extractStopPoints(_activeStops));
       for (int i = 0; i < pts.length; i++) {
         markers.add(
           Marker(
             point: pts[i],
-            width: 33,
-            height: 33,
+            width: 32,
+            height: 32,
             alignment: Alignment.center,
-            child: const _StopDotMarker(),
+            child: _StopDotMarker(
+              index: i + 1,
+              isFirst: i == 0,
+              isLast: i == pts.length - 1,
+            ),
           ),
         );
       }
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: LatLng(_centerLat, _centerLon),
-              initialZoom: 15,
-              onMapReady: _scheduleContainersRefresh,
-              onPositionChanged: (pos, hasGesture) {
-                final c = pos.center;
-                _centerLat = c.latitude;
-                _centerLon = c.longitude;
-                _scheduleContainersRefresh();
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                userAgentPackageName: 'kg.genesis.dogo',
-                subdomains: const ['a', 'b', 'c', 'd'],
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: LatLng(_centerLat, _centerLon),
+        initialZoom: 15,
+        onMapReady: () => _scheduleContainersRefresh(immediate: true),
+        onPositionChanged: (pos, hasGesture) {
+          final c = pos.center;
+          _centerLat = c.latitude;
+          _centerLon = c.longitude;
+
+          // Перерисовываем экран только при переходе через порог масштаба,
+          // из которого зависит видимость подписей контейнеров, — жест
+          // панорамирования сам по себе setState не вызывает.
+          final wasLabelled = _zoom >= _containerLabelMinZoom;
+          final isLabelled = pos.zoom >= _containerLabelMinZoom;
+          _zoom = pos.zoom;
+          if (wasLabelled != isLabelled && mounted) setState(() {});
+
+          _scheduleContainersRefresh();
+        },
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+          userAgentPackageName: 'kg.genesis.dogo',
+          subdomains: const ['a', 'b', 'c', 'd'],
+        ),
+        if (containerPolygons.isNotEmpty)
+          PolygonLayer(polygons: containerPolygons),
+        if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 6,
+                color: AppColors.routeLineHalo,
               ),
-
-              if (containerPolygons.isNotEmpty)
-                PolygonLayer(polygons: containerPolygons),
-
-              if ((_showFulfillmentSheet || _searchMode) &&
-                  _routePoints.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 5,
-                      color: Colors.black.withValues(alpha: 0.15),
-                    ),
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 3,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-
-              MarkerLayer(markers: markers),
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 3.5,
+                color: AppColors.primary,
+              ),
             ],
           ),
+        MarkerLayer(markers: markers),
+      ],
+    );
+  }
 
-          Positioned(
-            top: MediaQuery.viewPaddingOf(context).top + 12,
-            right: 16,
-            child: _ContainersButton(
-              loading: _containersLoading,
-              onTap: _focusContainers,
-            ),
+  List<LatLng> _containerPolygonPoints(double lat, double lon) {
+    const dLat = 0.000055;
+    const dLon = 0.000075;
+
+    return [
+      LatLng(lat - dLat, lon - dLon),
+      LatLng(lat - dLat, lon + dLon),
+      LatLng(lat + dLat, lon + dLon),
+      LatLng(lat + dLat, lon - dLon),
+    ];
+  }
+
+  Widget _buildBottomPanel({
+    required String fromTitle,
+    required String fromTileTitle,
+    required String? bazarTitle,
+    required String? detailText,
+    required double horizontal,
+    required double bottomInsets,
+  }) {
+    if (_activeShipmentId == null) {
+      return ServiceOrderPanel(
+        config: _config,
+        fromTitle: fromTileTitle,
+        fromSubtitle: _fromPoint?.subtitle ?? bazarTitle,
+        fromIsSelected: _fromPoint != null,
+        destination: _deliveryPoint,
+        intermediatePoints: _intermediatePoints,
+        descriptionController: _descriptionController,
+        creating: _creatingShipment,
+        errorMessage: _panelError,
+        onEditFrom: () =>
+            _editFromPoint(fromTitle: fromTitle, bazarTitle: bazarTitle),
+        onEditDestination: _editDestination,
+        onEditIntermediate: _editIntermediatePoint,
+        onAddIntermediate: _addIntermediatePoint,
+        onRemoveIntermediate: _removeIntermediatePoint,
+        onReorderIntermediate: _reorderIntermediatePoints,
+        onSubmit: () => _submitOrder(
+          _buildStops(
+            fromTitle: fromTitle,
+            bazarTitle: bazarTitle,
+            detailText: detailText,
           ),
+        ),
+      );
+    }
 
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16 + bottomInsets,
-            child: _activeShipmentId != null
-                ? (_showFulfillmentSheet
-                      ? OrderFulfillmentSheet(stops: _activeStops)
-                      : (_currentStatus == ShipmentStatus.assigned && !_isPaid)
-                      ? ShipmentPaymentSheet(
-                          shipmentId: _activeShipmentId!,
-                          amount: _fare,
-                          onCancel: () =>
-                              _cancelShipment(targetStatus: 'pending'),
-                        )
-                      : SearchingSheet(
-                          stops: _activeStops.isNotEmpty
-                              ? _activeStops
-                              : _buildStopsForSearchSheet(
-                                  fromTitle: fromTitle,
-                                  bazarTitle: bazarTitle,
-                                  detailText: detailText,
-                                ),
-                          cancelling: _cancellingShipment,
-                          onCancel: _cancelShipment,
-                        ))
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InputTile(
-                        iconAsset: 'assets/icons/ic_box.svg',
-                        title: fromTileTitle,
-                        enabled: true,
-                        onTap: () => _openFromPointSheet(
-                          fromTitle: fromTitle,
-                          bazarTitle: bazarTitle,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InputTile(
-                              iconAsset: 'assets/icons/ic_box.svg',
-                              title: _deliveryPoint?.title ?? 'Куда доставить',
-                              enabled: _deliveryPoint != null,
-                              onTap: _openDeliveryPointSheet,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          AddAddressButton(onTap: _openIntermediatePointSheet),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        height: 52,
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed:
-                              (_deliveryPoint == null || _creatingShipment)
-                              ? null
-                              : () async {
-                                  final stops = _buildStopsForSearchSheet(
-                                    fromTitle: fromTitle,
-                                    bazarTitle: bazarTitle,
-                                    detailText: detailText,
-                                  );
+    final Widget panel;
+    if (_showFulfillmentSheet) {
+      panel = OrderFulfillmentSheet(
+        stops: _activeStops,
+        statusCode: _currentStatusCode,
+      );
+    } else if (_currentStatus == ShipmentStatus.assigned && !_isPaid) {
+      panel = ShipmentPaymentSheet(
+        shipmentId: _activeShipmentId!,
+        amount: _fare,
+        onCancel: () => _cancelShipment(targetStatus: 'pending'),
+      );
+    } else {
+      panel = SearchingSheet(
+        stops: _activeStops.isNotEmpty
+            ? _activeStops
+            : _buildStops(
+                fromTitle: fromTitle,
+                bazarTitle: bazarTitle,
+                detailText: detailText,
+              ),
+        cancelling: _cancellingShipment,
+        onCancel: _cancelShipment,
+      );
+    }
 
-                                  await _handleCreateShipment(stops);
-                                },
-                          style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.resolveWith(
-                              (_) => AppColors.accent,
-                            ),
-                            foregroundColor: WidgetStateProperty.resolveWith(
-                              (_) => Colors.white,
-                            ),
-                            overlayColor: WidgetStateProperty.resolveWith(
-                              (_) => Colors.white.withValues(alpha: 0.10),
-                            ),
-                            shape: WidgetStateProperty.all(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            textStyle: WidgetStateProperty.all(
-                              const TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'SFProText',
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            _creatingShipment ? 'Создаём заказ…' : 'Далее',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        horizontal,
+        0,
+        horizontal,
+        AppSpacing.md + bottomInsets,
       ),
+      child: panel,
     );
   }
 }
 
-class _StopDotMarker extends StatelessWidget {
-  const _StopDotMarker();
+class _MapTopBar extends StatelessWidget {
+  const _MapTopBar({
+    required this.config,
+    required this.containersLoading,
+    required this.containersCount,
+    required this.onBack,
+    required this.onContainers,
+  });
 
-  static const Color color = Color(0xFFFFDFC7);
-  static const Color strokeColor = Color(0xFFFFDFC7);
+  final ServiceConfig config;
+  final bool containersLoading;
+  final int containersCount;
+  final VoidCallback onBack;
+  final VoidCallback onContainers;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 33,
-      height: 33,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 33,
-            height: 33,
+    return Row(
+      children: [
+        AppMapActionButton(
+          icon: Icons.arrow_back_ios_new_rounded,
+          semanticLabel: 'Назад',
+          onTap: onBack,
+        ),
+        AppSpacing.hGapXs,
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: strokeColor, width: 2),
+              color: AppColors.surface,
+              borderRadius: AppRadius.allSm,
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.raised,
+            ),
+            child: Row(
+              children: [
+                Icon(config.icon, size: 18, color: config.accent),
+                AppSpacing.hGapXs,
+                Expanded(
+                  child: Text(
+                    config.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.cardTitle,
+                  ),
+                ),
+              ],
             ),
           ),
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-          ),
-        ],
-      ),
+        ),
+        AppSpacing.hGapXs,
+        AppMapActionButton(
+          icon: Icons.grid_view_rounded,
+          semanticLabel: containersLoading
+              ? 'Загружаем контейнеры'
+              : 'Показать контейнеры: $containersCount',
+          loading: containersLoading,
+          badgeColor: containersCount > 0 ? AppColors.container : null,
+          onTap: onContainers,
+        ),
+      ],
     );
   }
 }
 
-class _ContainersButton extends StatelessWidget {
-  const _ContainersButton({required this.loading, required this.onTap});
+/// Маркер точки маршрута активного заказа.
+class _StopDotMarker extends StatelessWidget {
+  const _StopDotMarker({
+    required this.index,
+    required this.isFirst,
+    required this.isLast,
+  });
 
-  final bool loading;
-  final VoidCallback onTap;
+  final int index;
+  final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.14),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: loading ? null : onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5EAF0)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (loading)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E8E3E),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              const SizedBox(width: 8),
-              const Text(
-                'Контейнеры',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2933),
-                ),
-              ),
-            ],
+    final color = isFirst
+        ? AppColors.success
+        : isLast
+        ? AppColors.primary
+        : AppColors.info;
+
+    return Semantics(
+      label: isFirst
+          ? 'Начальная точка'
+          : isLast
+          ? 'Конечная точка'
+          : 'Остановка $index',
+      child: Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.white, width: 2.5),
+          boxShadow: AppShadows.raised,
+        ),
+        child: Text(
+          '$index',
+          style: const TextStyle(
+            fontFamily: AppTypography.fontFamily,
+            fontSize: 11,
+            height: 1,
+            fontWeight: FontWeight.w700,
+            color: AppColors.white,
           ),
         ),
       ),
     );
   }
-}
-
-class _ContainerMarker extends StatelessWidget {
-  const _ContainerMarker({required this.container});
-
-  final ContainerRef container;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: container.displayTitle,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 24,
-            constraints: const BoxConstraints(minWidth: 34, maxWidth: 52),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E8E3E),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.white, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Text(
-              container.number,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                height: 1,
-              ),
-            ),
-          ),
-          CustomPaint(
-            size: const Size(10, 7),
-            painter: _ContainerMarkerPointerPainter(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContainerMarkerPointerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = ui.Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..close();
-
-    canvas.drawPath(path, Paint()..color = const Color(0xFF1E8E3E));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

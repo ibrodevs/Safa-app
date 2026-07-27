@@ -8,7 +8,7 @@ class SupportProvider extends ChangeNotifier {
   final ProfileRepository _repo;
 
   SupportProvider({ProfileRepository? repo})
-      : _repo = repo ?? ProfileRepository(ApiService.instance);
+    : _repo = repo ?? ProfileRepository(ApiService.instance);
 
   SupportModel? _support;
   bool _loading = false;

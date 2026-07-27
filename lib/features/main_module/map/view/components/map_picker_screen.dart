@@ -5,12 +5,21 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../core/design/app_design.dart';
+import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/delivery_point_model.dart';
 import '../../data/model/delivery_refs_models.dart';
 import '../../data/repo/delivery_refs_repository.dart';
 import '../../provider/delivery_address_provider.dart';
 import '../../provider/delivery_autocomplete_provider.dart';
+import '../widgets/container_map_marker.dart';
 
+/// Экран выбора точки на карте.
+///
+/// Логика не изменена: reverse-геокодинг с дебаунсом 650 ms, загрузка
+/// контейнеров по видимой области с дебаунсом 350 ms, отбрасывание устаревших
+/// ответов по номеру запроса, сохранение последних маркеров при сетевой ошибке
+/// и сохранение выбранного контейнера в списке маркеров.
 class MapPickerScreen extends StatefulWidget {
   const MapPickerScreen({
     super.key,
@@ -26,15 +35,16 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
-  static const _accent = Color(0xFFFF8A00);
-  static const _containerColor = Color(0xFF1E8E3E);
+  /// Ниже этого масштаба подписи контейнеров скрываются.
+  static const double _containerLabelMinZoom = 16;
 
   final MapController _mapController = MapController();
-  final TextEditingController _q = TextEditingController();
+  final TextEditingController _query = TextEditingController();
   final FocusNode _focus = FocusNode();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
 
   LatLng _center = const LatLng(42.8746, 74.6122);
+  double _zoom = 15;
   Timer? _reverseDebounce;
   Timer? _containersDebounce;
 
@@ -72,7 +82,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   void dispose() {
     _reverseDebounce?.cancel();
     _containersDebounce?.cancel();
-    _q.dispose();
+    _query.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -112,8 +122,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         (bounds.north - bounds.south).abs().clamp(0.002, 0.03).toDouble() *
         0.25;
     final lonPadding =
-        (bounds.east - bounds.west).abs().clamp(0.002, 0.03).toDouble() *
-        0.25;
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03).toDouble() * 0.25;
 
     setState(() => _containersLoading = true);
 
@@ -129,18 +138,18 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
       final selected = _selectedContainer;
       final merged = List<ContainerRef>.from(containers);
-
       if (selected != null && !merged.any((item) => item.id == selected.id)) {
         merged.add(selected);
       }
 
-      setState(() => _visibleContainers = merged);
+      setState(() {
+        _visibleContainers = merged;
+        _containersLoading = false;
+      });
     } catch (_) {
       // Keep the last successfully loaded markers on transient network errors.
-    } finally {
-      if (mounted && serial == _containersRequestSerial) {
-        setState(() => _containersLoading = false);
-      }
+      if (!mounted || serial != _containersRequestSerial) return;
+      setState(() => _containersLoading = false);
     }
   }
 
@@ -196,9 +205,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     return parts.join(' • ');
   }
 
-  DeliveryPoint _buildPickedPoint({
-    required String hereAddress,
-  }) {
+  DeliveryPoint _buildPickedPoint({required String hereAddress}) {
     final container = _selectedContainer;
 
     if (container != null &&
@@ -244,19 +251,23 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final hereError = address.pickerError;
     final selectedContainer = _selectedContainer;
 
+    final topInset = MediaQuery.viewPaddingOf(context).top;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final showLabels = _zoom >= _containerLabelMinZoom;
+
     final markers = _visibleContainers
-        .where((container) {
-          return container.latValue != null && container.lonValue != null;
-        })
+        .where((c) => c.latValue != null && c.lonValue != null)
         .map(
           (container) => Marker(
             point: LatLng(container.latValue!, container.lonValue!),
-            width: 72,
-            height: 48,
+            width: ContainerMapMarker.hitSize,
+            height: ContainerMapMarker.hitSize,
             alignment: Alignment.center,
-            child: _ContainerMarker(
+            child: ContainerMapMarker(
               container: container,
               selected: selectedContainer?.id == container.id,
+              showLabel: showLabels,
               onTap: () => _selectContainer(container),
             ),
           ),
@@ -264,12 +275,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         .toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-      ),
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           FlutterMap(
@@ -277,9 +283,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 15,
-              onMapReady: () {
-                _scheduleContainersRefresh(immediate: true);
-              },
+              onMapReady: () => _scheduleContainersRefresh(immediate: true),
               onPositionChanged: (position, hasGesture) {
                 _center = position.center;
 
@@ -289,6 +293,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   }
                   _scheduleReverse(position.center);
                 }
+
+                final wasLabelled = _zoom >= _containerLabelMinZoom;
+                final isLabelled = position.zoom >= _containerLabelMinZoom;
+                _zoom = position.zoom;
+                if (wasLabelled != isLabelled && mounted) setState(() {});
 
                 _scheduleContainersRefresh();
               },
@@ -304,222 +313,79 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             ],
           ),
 
-          const IgnorePointer(
-            child: Center(
-              child: Icon(
-                Icons.place_rounded,
-                size: 44,
-                color: _accent,
-              ),
-            ),
-          ),
+          // Центральный маркер выбора — виден, пока контейнер не выбран.
+          if (selectedContainer == null)
+            const IgnorePointer(child: Center(child: _CenterPin())),
 
           Positioned(
-            left: 16,
-            right: 16,
-            top: 12,
-            child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              elevation: 10,
-              shadowColor: const Color(0x22000000),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+            top: topInset + AppSpacing.xs,
+            left: horizontal,
+            right: horizontal,
+            child: Column(
+              children: [
+                AppSearchField(
+                  controller: _query,
+                  hint: 'Поиск адреса',
+                  focusNode: _focus,
+                  leading: AppMapActionButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    semanticLabel: 'Назад',
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  onChanged: (value) => context
+                      .read<DeliveryAutocompleteProvider>()
+                      .onQueryChanged(value),
+                  onCleared: () => context
+                      .read<DeliveryAutocompleteProvider>()
+                      .clearSuggestions(),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search_rounded, color: _accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _q,
-                        focusNode: _focus,
-                        cursorColor: Colors.black,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'Поиск адреса',
-                        ),
-                        onChanged: (value) {
-                          context
-                              .read<DeliveryAutocompleteProvider>()
-                              .onQueryChanged(value);
-                          setState(() {});
-                        },
-                      ),
-                    ),
-                    if (_q.text.isNotEmpty)
-                      IconButton(
-                        onPressed: () {
-                          _q.clear();
-                          context
-                              .read<DeliveryAutocompleteProvider>()
-                              .clearSuggestions();
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          Positioned(
-            top: 76,
-            right: 16,
-            child: _ContainersStatus(
-              loading: _containersLoading,
-              count: _visibleContainers.length,
-            ),
-          ),
-
-          if (autocomplete.loading || autocomplete.items.isNotEmpty)
-            Positioned(
-              left: 16,
-              right: 16,
-              top: 72,
-              child: Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                elevation: 10,
-                shadowColor: const Color(0x22000000),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 260),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (autocomplete.loading)
-                        const LinearProgressIndicator(minHeight: 2),
-                      Flexible(
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: autocomplete.items.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final item = autocomplete.items[index];
-
-                            return ListTile(
-                              title: Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              subtitle: Text(
-                                item.address,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () {
-                                FocusScope.of(context).unfocus();
-                                context
-                                    .read<DeliveryAutocompleteProvider>()
-                                    .clearSuggestions();
-                                _moveTo(LatLng(item.lat, item.lon));
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                if (autocomplete.loading || autocomplete.items.isNotEmpty) ...[
+                  AppSpacing.gapXs,
+                  _SuggestionList(
+                    loading: autocomplete.loading,
+                    items: autocomplete.items,
+                    onSelected: (lat, lon) {
+                      FocusScope.of(context).unfocus();
+                      context
+                          .read<DeliveryAutocompleteProvider>()
+                          .clearSuggestions();
+                      _moveTo(LatLng(lat, lon));
+                    },
+                  ),
+                ],
+                AppSpacing.gapXs,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: AppMapStatusChip(
+                    label: _containersLoading
+                        ? 'Контейнеры…'
+                        : 'Контейнеры: ${_visibleContainers.length}',
+                    loading: _containersLoading,
                   ),
                 ),
-              ),
+              ],
             ),
+          ),
 
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16 + MediaQuery.viewPaddingOf(context).bottom,
-            child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              elevation: 12,
-              shadowColor: const Color(0x22000000),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      selectedContainer == null
-                          ? 'Точка на карте'
-                          : 'Выбран контейнер',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      selectedContainer != null
-                          ? _containerSubtitle(selectedContainer)
-                          : hereLoading
-                          ? 'Определяем адрес...'
-                          : (hereError != null && hereError.isNotEmpty)
-                          ? 'Адрес недоступен'
-                          : (hereAddress.isEmpty
-                                ? 'Адрес не найден'
-                                : hereAddress),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (selectedContainer != null &&
-                        _containerDetails(selectedContainer).isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _containerDetails(selectedContainer),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF7A828D),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 52,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(
-                            _buildPickedPoint(hereAddress: hereAddress),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        child: Text(
-                          selectedContainer == null
-                              ? 'Выбрать точку'
-                              : 'Выбрать контейнер',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            left: horizontal,
+            right: horizontal,
+            bottom: AppSpacing.md + bottomInset,
+            child: _PickerBottomCard(
+              title: widget.title,
+              selectedContainer: selectedContainer,
+              hereAddress: hereAddress,
+              hereLoading: hereLoading,
+              hereError: hereError,
+              containerSubtitle: selectedContainer == null
+                  ? null
+                  : _containerSubtitle(selectedContainer),
+              containerDetails: selectedContainer == null
+                  ? null
+                  : _containerDetails(selectedContainer),
+              onConfirm: () => Navigator.of(
+                context,
+              ).pop(_buildPickedPoint(hereAddress: hereAddress)),
             ),
           ),
         ],
@@ -528,124 +394,206 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 }
 
-class _ContainersStatus extends StatelessWidget {
-  const _ContainersStatus({
-    required this.loading,
-    required this.count,
-  });
-
-  final bool loading;
-  final int count;
+class _CenterPin extends StatelessWidget {
+  const _CenterPin();
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 6,
-      shadowColor: const Color(0x22000000),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5EAF0)),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.place_rounded, size: 40, color: AppColors.primary),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            shape: BoxShape.circle,
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (loading)
-              const SizedBox(
-                width: 13,
-                height: 13,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: _MapPickerScreenState._containerColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            const SizedBox(width: 7),
-            Text(
-              loading ? 'Контейнеры...' : 'Контейнеры: $count',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1F2933),
-              ),
+        // Компенсируем высоту иконки, чтобы её острие указывало в центр.
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+}
+
+class _SuggestionList extends StatelessWidget {
+  const _SuggestionList({
+    required this.loading,
+    required this.items,
+    required this.onSelected,
+  });
+
+  final bool loading;
+  final List<dynamic> items;
+  final void Function(double lat, double lon) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 240),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.allMd,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.raised,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (loading) const LinearProgressIndicator(minHeight: 2),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: items.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: AppColors.border),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return InkWell(
+                  onTap: () =>
+                      onSelected(item.lat as double, item.lon as double),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs + 2,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 18,
+                          color: AppColors.textTertiary,
+                        ),
+                        AppSpacing.hGapXs,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title as String,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.body.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                item.address as String,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.captionMuted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ContainerMarker extends StatelessWidget {
-  const _ContainerMarker({
-    required this.container,
-    required this.selected,
-    required this.onTap,
+class _PickerBottomCard extends StatelessWidget {
+  const _PickerBottomCard({
+    required this.title,
+    required this.selectedContainer,
+    required this.hereAddress,
+    required this.hereLoading,
+    required this.hereError,
+    required this.containerSubtitle,
+    required this.containerDetails,
+    required this.onConfirm,
   });
 
-  final ContainerRef container;
-  final bool selected;
-  final VoidCallback onTap;
+  final String title;
+  final ContainerRef? selectedContainer;
+  final String hereAddress;
+  final bool hereLoading;
+  final String? hereError;
+  final String? containerSubtitle;
+  final String? containerDetails;
+  final VoidCallback onConfirm;
+
+  /// Текст кнопки зависит от того, что именно выбрано.
+  String get _actionLabel {
+    if (selectedContainer != null) return 'Выбрать контейнер';
+    if (title.startsWith('Остановка')) return 'Подтвердить остановку';
+    return 'Выбрать точку';
+  }
+
+  String get _addressLine {
+    if (selectedContainer != null) return containerSubtitle ?? '';
+    if (hereLoading) return 'Определяем адрес…';
+    if (hereError != null && hereError!.isNotEmpty) return 'Адрес недоступен';
+    return hereAddress.isEmpty ? 'Адрес не найден' : hereAddress;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Контейнер ${container.number}',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            constraints: const BoxConstraints(
-              minWidth: 38,
-              maxWidth: 70,
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: selected ? 9 : 7,
-              vertical: selected ? 7 : 6,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? _MapPickerScreenState._accent
-                  : _MapPickerScreenState._containerColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.white,
-                width: selected ? 2.5 : 1.5,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
+    final container = selectedContainer;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.allLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sheet,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  container == null ? 'Точка на карте' : 'Выбран контейнер',
+                  style: AppTypography.label,
                 ),
-              ],
-            ),
-            child: Text(
-              container.number,
+              ),
+              if (container != null)
+                AppStatusBadge(
+                  label: 'Контейнер ${container.number}',
+                  tone: AppBadgeTone.success,
+                  icon: Icons.inventory_2_outlined,
+                  dense: true,
+                ),
+            ],
+          ),
+          AppSpacing.gapXxs,
+          Text(
+            _addressLine,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.cardTitle,
+          ),
+          if (container != null && (containerDetails ?? '').isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              containerDetails!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                height: 1,
-                fontWeight: FontWeight.w900,
-              ),
+              style: AppTypography.captionMuted,
             ),
+          ],
+          AppSpacing.gapSm,
+          AppPrimaryButton(
+            label: _actionLabel,
+            size: AppButtonSize.medium,
+            onPressed: onConfirm,
           ),
-        ),
+        ],
       ),
     );
   }

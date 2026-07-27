@@ -1,14 +1,11 @@
-import 'package:dogo/core/utils/app_colors.dart';
-import 'package:dogo/core/widgets/primary_button.dart';
-import 'package:dogo/core/widgets/shadow_field.dart';
+import 'package:dogo/core/design/app_design.dart';
+import 'package:dogo/core/widgets/app_widgets.dart';
+import 'package:dogo/features/auth_module/login/widgets/auth_brand_header.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
-import 'package:dogo/features/auth_module/register/view/widgets/client_title_block_widget_second.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/utils/snackbar_utils.dart';
-import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/widgets/eye_password.dart';
+
 import 'components/register_dots_indicator.dart';
 
 class ClientRegisterScreen extends StatefulWidget {
@@ -24,8 +21,15 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
   final _pass = TextEditingController();
   final _pass2 = TextEditingController();
 
-  bool _passObscured = true;
-  bool _pass2Obscured = true;
+  final _phoneFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final _pass2Focus = FocusNode();
+
+  String? _nameError;
+  String? _phoneError;
+  String? _passError;
+  String? _pass2Error;
+  String? _formError;
 
   @override
   void dispose() {
@@ -33,155 +37,173 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
     _phone.dispose();
     _pass.dispose();
     _pass2.dispose();
+    _phoneFocus.dispose();
+    _passFocus.dispose();
+    _pass2Focus.dispose();
     super.dispose();
   }
 
-  String _digitsPhone() {
-    return _phone.text.replaceAll(RegExp(r'\D'), '');
-  }
+  /// 12 цифр вида 996XXXXXXXXX — формат, который ждёт backend.
+  String _digitsPhone() => KgPhoneInputFormatter.digitsOf(_phone.text);
 
-  Future<void> _onNext() async {
+  bool _validate() {
     final firstName = _name.text.trim();
     final phone = _digitsPhone();
     final pass = _pass.text;
     final pass2 = _pass2.text;
 
-    if (firstName.isEmpty || phone.isEmpty || pass.isEmpty || pass2.isEmpty) {
-      AppSnackBar.showError(context, message: 'Заполните все поля');
-      return;
-    }
+    final nameError = firstName.isEmpty ? 'Укажите имя' : null;
+    final phoneError = (phone.length != 12 || !phone.startsWith('996'))
+        ? 'Введите номер в формате +996 XXX XX-XX-XX'
+        : null;
+    final passError = pass.length < 6
+        ? 'Пароль должен быть не короче 6 символов'
+        : null;
+    final pass2Error = pass2 != pass ? 'Пароли не совпадают' : null;
 
-    if (pass != pass2) {
-      AppSnackBar.showError(context, message: 'Пароли не совпадают');
-      return;
-    }
+    setState(() {
+      _nameError = nameError;
+      _phoneError = phoneError;
+      _passError = passError;
+      _pass2Error = pass2Error;
+      _formError = null;
+    });
+
+    return nameError == null &&
+        phoneError == null &&
+        passError == null &&
+        pass2Error == null;
+  }
+
+  Future<void> _onNext() async {
+    FocusScope.of(context).unfocus();
+    if (!_validate()) return;
 
     final provider = context.read<AuthProvider>();
 
     final ok = await provider.register(
-      phoneNumber: phone,
-      firstName: firstName,
+      phoneNumber: _digitsPhone(),
+      firstName: _name.text.trim(),
       lastName: '-',
-      password: pass,
-      passwordConfirm: pass2,
+      password: _pass.text,
+      passwordConfirm: _pass2.text,
     );
 
     if (!mounted) return;
 
     if (ok) {
       context.push('/register/confirm/whatsapp');
-    } else {
-      final message = provider.error ?? 'Не удалось завершить регистрацию';
-      AppSnackBar.showError(context, message: message);
+      return;
     }
+
+    setState(
+      () => _formError = provider.error ?? 'Не удалось завершить регистрацию',
+    );
+  }
+
+  void _clearFormError() {
+    if (_formError != null) setState(() => _formError = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     final loading = context.watch<AuthProvider>().loading;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: AppColors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + keyboard),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const ClientTitleBlockSecond(),
-                  const SizedBox(height: 18),
-                  ShadowField(
-                    child: AppTextField(
-                      controller: _name,
-                      hint: 'Имя',
-                      prefixText: '  ',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ShadowField(
-                    child: AppTextField(
-                      controller: _phone,
-                      hint: 'Телефон с WhatsApp',
-                      keyboardType: TextInputType.phone,
-                      prefixText: '+',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ShadowField(
-                    child: AppTextField(
-                      controller: _pass,
-                      hint: 'Пароль',
-                      prefixText: '  ',
-                      obscure: _passObscured,
-                      suffix: PasswordEye(
-                        obscured: _passObscured,
-                        onTap: () {
-                          setState(() {
-                            _passObscured = !_passObscured;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ShadowField(
-                    child: AppTextField(
-                      controller: _pass2,
-                      hint: 'Повторите пароль',
-                      prefixText: '  ',
-                      obscure: _pass2Obscured,
-                      suffix: PasswordEye(
-                        obscured: _pass2Obscured,
-                        onTap: () {
-                          setState(() {
-                            _pass2Obscured = !_pass2Obscured;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  PrimaryButton(
-                    text: loading ? 'Отправка...' : 'Далее',
-                    onPressed: loading ? null : _onNext,
-                  ),
-                  const SizedBox(height: 18),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => context.pop(),
-                      child: const Text(
-                        'Отменить регистрацию',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          height: 1.25,
-                          color: Color(0xFFB9C0C8),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height:240),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomPadding,
-              child: const Center(
-                child: Hero(
-                  tag: 'register_dots',
-                  child: RegisterDotsIndicator(activeIndex: 1),
-                ),
-              ),
-            ),
-          ],
-        ),
+
+    return AppScreenScaffold(
+      backgroundColor: AppColors.surface,
+      showBackButton: true,
+      footer: Column(
+        children: [
+          AppFormError(message: _formError),
+          if (_formError != null) AppSpacing.gapSm,
+          AppPrimaryButton(
+            label: 'Далее',
+            loadingLabel: 'Отправляем…',
+            loading: loading,
+            onPressed: _onNext,
+          ),
+          AppSpacing.gapSm,
+          const Hero(
+            tag: 'register_dots',
+            child: RegisterDotsIndicator(activeIndex: 1),
+          ),
+          AppTextButton(
+            label: 'Отменить регистрацию',
+            muted: true,
+            enabled: !loading,
+            onPressed: () => context.pop(),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AuthBrandHeader(
+            title: 'Регистрация',
+            subtitle: 'Создайте аккаунт клиента, чтобы оформлять заказы',
+          ),
+          AppSpacing.gapXl,
+          AppTextField(
+            controller: _name,
+            hint: 'Например, Иброхим',
+            label: 'Имя',
+            errorText: _nameError,
+            enabled: !loading,
+            prefixIcon: Icons.person_outline_rounded,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.givenName],
+            onChanged: (_) {
+              _clearFormError();
+              if (_nameError != null) setState(() => _nameError = null);
+            },
+            onSubmitted: (_) => _phoneFocus.requestFocus(),
+          ),
+          AppSpacing.gapMd,
+          AppPhoneField(
+            controller: _phone,
+            focusNode: _phoneFocus,
+            label: 'Телефон с WhatsApp',
+            helperText: 'На этот номер придёт код подтверждения',
+            errorText: _phoneError,
+            enabled: !loading,
+            onChanged: (_) {
+              _clearFormError();
+              if (_phoneError != null) setState(() => _phoneError = null);
+            },
+            onSubmitted: (_) => _passFocus.requestFocus(),
+          ),
+          AppSpacing.gapMd,
+          AppPasswordField(
+            controller: _pass,
+            focusNode: _passFocus,
+            label: 'Пароль',
+            errorText: _passError,
+            enabled: !loading,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.newPassword],
+            onChanged: (_) {
+              _clearFormError();
+              if (_passError != null) setState(() => _passError = null);
+            },
+            onSubmitted: (_) => _pass2Focus.requestFocus(),
+          ),
+          AppSpacing.gapMd,
+          AppPasswordField(
+            controller: _pass2,
+            focusNode: _pass2Focus,
+            hint: 'Повторите пароль',
+            label: 'Подтверждение пароля',
+            errorText: _pass2Error,
+            enabled: !loading,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) {
+              _clearFormError();
+              if (_pass2Error != null) setState(() => _pass2Error = null);
+            },
+            onSubmitted: (_) => _onNext(),
+          ),
+        ],
       ),
     );
   }

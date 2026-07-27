@@ -9,7 +9,7 @@ import '../../provider/profile_provider.dart';
 class ProfileAccountScreen extends StatefulWidget {
   const ProfileAccountScreen({super.key});
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
   static const _greyText = Color(0xFF9FA4AD);
   static const _tileBorder = Color(0xFFE9EDF2);
 
@@ -228,6 +228,7 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
       ),
     );
   }
+
   Future<void> _showLogoutSheet(BuildContext context) async {
     final res = await showModalBottomSheet<bool>(
       context: context,
@@ -268,11 +269,13 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
       if (!context.mounted) return;
       context.go('/');
     } else {
-      final err = context.read<ProfileProvider>().error ?? 'Не удалось удалить аккаунт';
+      final err =
+          context.read<ProfileProvider>().error ?? 'Не удалось удалить аккаунт';
       if (!context.mounted) return;
       AppSnackBar.showError(context, message: err);
     }
   }
+
   Future<void> _openEditDialog(
     BuildContext context, {
     required String title,
@@ -360,8 +363,9 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
                           textInputAction: TextInputAction.done,
                           autofocus: true,
                           onChanged: (_) {
-                            if (errorText != null)
+                            if (errorText != null) {
                               setState(() => errorText = null);
+                            }
                           },
                           onSubmitted: (_) async {
                             if (saving) return;
@@ -488,7 +492,7 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
         );
       },
     );
-    if (ok == true && mounted) {
+    if (ok == true && context.mounted) {
       AppSnackBar.showSuccess(context, message: 'Сохранено');
     }
   }
@@ -629,6 +633,7 @@ class _ErrorCard extends StatelessWidget {
     );
   }
 }
+
 class _LogoutSheet extends StatelessWidget {
   const _LogoutSheet();
 
@@ -758,6 +763,7 @@ class _LogoutSheet extends StatelessWidget {
     );
   }
 }
+
 class _AccountTile extends StatelessWidget {
   const _AccountTile({
     required this.label,

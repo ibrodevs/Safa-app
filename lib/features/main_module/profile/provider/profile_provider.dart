@@ -9,7 +9,7 @@ class ProfileProvider extends ChangeNotifier {
   final ProfileRepository _repo;
 
   ProfileProvider({ProfileRepository? repo})
-      : _repo = repo ?? ProfileRepository(ApiService.instance);
+    : _repo = repo ?? ProfileRepository(ApiService.instance);
 
   ProfileModel? _profile;
   bool _loading = false;
@@ -84,6 +84,7 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<bool> deleteAccount() async {
     _saving = true;
     _error = null;

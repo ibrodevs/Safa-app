@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../core/utils/app_colors.dart';
+import '../../../../../core/design/app_design.dart';
+import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/delivery_point_model.dart';
+import 'map_panel_shell.dart';
 
+/// Панель «ищем исполнителя» над картой.
+///
+/// Маршрут показывается тем же компонентом [AppRoutePointTile], что и
+/// в конструкторе маршрута и в итоговой карточке — раньше здесь был
+/// собственный визуальный язык со стрелками вниз.
 class SearchingSheet extends StatelessWidget {
   const SearchingSheet({
     super.key,
@@ -17,83 +24,56 @@ class SearchingSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(28),
-      elevation: 10,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Поиск тачкистов',
-              style: TextStyle(
-                fontSize: 24,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-                color: AppColors.green,
+    return MapPanelShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
               ),
-            ),
-            const SizedBox(height: 24),
-            for (int i = 0; i < stops.length; i++) ...[
-              Text(
-                stops[i].title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  height: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.black,
+              AppSpacing.hGapSm,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Ищем исполнителя', style: AppTypography.cardTitle),
+                    Text(
+                      'Обычно это занимает несколько минут',
+                      style: AppTypography.captionMuted,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                stops[i].subtitle,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.grey,
-                ),
-              ),
-              if (i != stops.length - 1) ...[
-                const SizedBox(height: 16),
-                const Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 26,
-                  color: AppColors.black,
-                ),
-                const SizedBox(height: 16),
-              ] else ...[
-                const SizedBox(height: 24),
-              ],
             ],
-            const Divider(height: 1, color: AppColors.chev2),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: cancelling ? null : onCancel,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.accent, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(
-                  cancelling ? 'Отменяем…' : 'Отменить поиск',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.black,
-                  ),
-                ),
-              ),
+          ),
+          AppSpacing.gapMd,
+          for (var i = 0; i < stops.length; i++)
+            AppRoutePointTile(
+              role: i == 0
+                  ? RoutePointRole.start
+                  : i == stops.length - 1
+                  ? RoutePointRole.end
+                  : RoutePointRole.stop,
+              index: (i > 0 && i < stops.length - 1) ? i : null,
+              title: stops[i].title,
+              subtitle: stops[i].subtitle,
+              isLast: i == stops.length - 1,
+              dense: true,
             ),
-          ],
-        ),
+          AppSpacing.gapMd,
+          AppSecondaryButton(
+            label: 'Отменить поиск',
+            loading: cancelling,
+            danger: true,
+            size: AppButtonSize.medium,
+            onPressed: onCancel,
+          ),
+        ],
       ),
     );
   }

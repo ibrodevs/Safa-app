@@ -15,7 +15,7 @@ class DeliveryAutocompleteResult {
     final latRaw = json['lat'];
     final lonRaw = json['lon'];
 
-    double _toDouble(dynamic v) {
+    double toDouble_(dynamic v) {
       if (v == null) return 0;
       if (v is num) return v.toDouble();
       if (v is String) return double.tryParse(v) ?? 0;
@@ -25,8 +25,8 @@ class DeliveryAutocompleteResult {
     return DeliveryAutocompleteResult(
       title: json['title']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
-      lat: _toDouble(latRaw),
-      lon: _toDouble(lonRaw),
+      lat: toDouble_(latRaw),
+      lon: toDouble_(lonRaw),
     );
   }
 }

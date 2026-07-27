@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
-import 'app_logger.dart';
 
+import '../design/app_design.dart';
+import 'app_logger.dart';
+import 'friendly_error.dart';
+
+/// Всплывающие уведомления приложения.
+///
+/// Snackbar используется только для сообщений, не относящихся к конкретному
+/// полю формы: ошибки полей выводятся под самими полями
+/// (`AppTextField.errorText`), общие ошибки формы — через `AppFormError`.
+///
+/// Технический текст ошибки пользователю не показывается: он попадает
+/// только в лог, а на экран уходит результат [friendlyErrorMessage].
 class AppSnackBar {
+  const AppSnackBar._();
+
   static void showError(
     BuildContext context, {
     dynamic error,
@@ -11,88 +23,22 @@ class AppSnackBar {
     String? actionLabel,
     VoidCallback? onAction,
   }) {
-    final displayMessage = message ?? 'Произошла ошибка, попробуйте позже';
+    final displayMessage = message ?? friendlyErrorMessage(error);
 
-    // Logging the detailed error
     if (error != null) {
       AppLogger.e('UI Error: $displayMessage', error, stackTrace);
     } else {
       AppLogger.e('UI Error: $displayMessage');
     }
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.transparent,
-        content: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.accent.withOpacity(0.3), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.error_outline_rounded,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayMessage,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (actionLabel != null && onAction != null) ...[
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          onAction();
-                        },
-                        child: Text(
-                          actionLabel,
-                          style: const TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    _show(
+      context,
+      message: displayMessage,
+      icon: Icons.error_outline_rounded,
+      accent: AppColors.error,
+      background: AppColors.errorSoft,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 
@@ -102,72 +48,116 @@ class AppSnackBar {
     String? actionLabel,
     VoidCallback? onAction,
   }) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    _show(
+      context,
+      message: message,
+      icon: Icons.check_circle_outline_rounded,
+      accent: AppColors.success,
+      background: AppColors.successSoft,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+
+  static void showInfo(
+    BuildContext context, {
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    _show(
+      context,
+      message: message,
+      icon: Icons.info_outline_rounded,
+      accent: AppColors.info,
+      background: AppColors.infoSoft,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+
+  /// Раздел ещё не реализован на backend.
+  static void showSoon(BuildContext context) {
+    showInfo(
+      context,
+      message: 'Раздел появится в одном из ближайших обновлений',
+    );
+  }
+
+  static void _show(
+    BuildContext context, {
+    required String message,
+    required IconData icon,
+    required Color accent,
+    required Color background,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         elevation: 0,
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.transparent,
+        padding: EdgeInsets.zero,
         content: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.green.withOpacity(0.2), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            color: AppColors.surface,
+            borderRadius: AppRadius.allMd,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.raised,
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.green.withOpacity(0.1),
+                  color: background,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check_circle_outline_rounded,
-                  color: AppColors.green,
-                  size: 20,
-                ),
+                child: Icon(icon, color: accent, size: 18),
               ),
-              const SizedBox(width: 12),
+              AppSpacing.hGapXs,
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      message,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xxs + 2),
+                      child: Text(message, style: AppTypography.caption),
                     ),
-                    if (actionLabel != null && onAction != null) ...[
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          onAction();
-                        },
-                        child: Text(
-                          actionLabel,
-                          style: const TextStyle(
-                            color: AppColors.green,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
+                    if (actionLabel != null && onAction != null)
+                      Semantics(
+                        button: true,
+                        label: actionLabel,
+                        child: InkWell(
+                          onTap: () {
+                            messenger.hideCurrentSnackBar();
+                            onAction();
+                          },
+                          borderRadius: AppRadius.allSm,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs,
+                            ),
+                            child: Text(
+                              actionLabel,
+                              style: AppTypography.caption.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),

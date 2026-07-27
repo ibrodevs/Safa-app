@@ -16,13 +16,13 @@ class CarrierDayStats {
   });
 
   factory CarrierDayStats.fromJson(Map<String, dynamic> json) {
-    int _asInt(dynamic v) {
+    int asInt(dynamic v) {
       if (v is int) return v;
       if (v is num) return v.toInt();
       return int.tryParse(v?.toString() ?? '0') ?? 0;
     }
 
-    DateTime _asDate(dynamic v) {
+    DateTime asDate(dynamic v) {
       if (v == null) return DateTime.now();
       final s = v.toString();
       return DateTime.tryParse(s) ?? DateTime.now();
@@ -31,12 +31,12 @@ class CarrierDayStats {
     final cp = json['change_percent_vs_prev'];
 
     return CarrierDayStats(
-      date: _asDate(json['date']),
-      grossTotal: _asInt(json['gross_total']),
-      earned: _asInt(json['earned']),
-      commission: _asInt(json['commission']),
-      clients: _asInt(json['clients']),
-      changePercentVsPrev: cp == null ? null : _asInt(cp),
+      date: asDate(json['date']),
+      grossTotal: asInt(json['gross_total']),
+      earned: asInt(json['earned']),
+      commission: asInt(json['commission']),
+      clients: asInt(json['clients']),
+      changePercentVsPrev: cp == null ? null : asInt(cp),
     );
   }
 }

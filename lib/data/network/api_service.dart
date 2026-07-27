@@ -529,13 +529,13 @@ final class ApiService {
     }
 
     return results
-        .where((e) => e is Map)
-        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+        .whereType<Map>()
+        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
   Future<CarrierDayStats> getCarrierStatsForDate(DateTime date) async {
-    String _fmtDate(DateTime d) {
+    String fmtDate(DateTime d) {
       final y = d.year.toString().padLeft(4, '0');
       final m = d.month.toString().padLeft(2, '0');
       final day = d.day.toString().padLeft(2, '0');
@@ -545,7 +545,7 @@ final class ApiService {
     try {
       final resp = await _dio.get(
         'delivery/stats/',
-        queryParameters: {'date': _fmtDate(date)},
+        queryParameters: {'date': fmtDate(date)},
       );
       final map = _asMap(resp.data);
       return CarrierDayStats.fromJson(map);
@@ -730,8 +730,9 @@ final class ApiService {
       'delivery/shipments/',
       queryParameters: {'page': page, 'page_size': pageSize},
     );
-    if (resp.data is Map<String, dynamic>)
+    if (resp.data is Map<String, dynamic>) {
       return resp.data as Map<String, dynamic>;
+    }
     if (resp.data is Map) return Map<String, dynamic>.from(resp.data as Map);
     throw ApiException('Некорректный ответ delivery/shipments/');
   }

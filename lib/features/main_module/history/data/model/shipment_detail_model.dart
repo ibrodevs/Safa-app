@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-
 int _asInt(dynamic v) {
   if (v is int) return v;
   if (v is num) return v.toInt();
@@ -104,12 +103,10 @@ class ShipmentDetail {
 
     final stopsJson = json['stops'] as List? ?? const [];
     final stops = stopsJson
-        .where((e) => e is Map)
+        .whereType<Map>()
         .map<ShipmentStop>(
-          (e) => ShipmentStop.fromJson(
-        Map<String, dynamic>.from(e as Map),
-      ),
-    )
+          (e) => ShipmentStop.fromJson(Map<String, dynamic>.from(e)),
+        )
         .toList();
 
     return ShipmentDetail(

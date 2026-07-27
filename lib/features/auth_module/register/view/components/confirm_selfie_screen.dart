@@ -1,5 +1,7 @@
 import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
 class ConfirmSelfieScreen extends StatelessWidget {
@@ -94,8 +96,16 @@ class _CaptureBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: const Color(0xFFE6E9EF), width: 1),
         boxShadow: const [
-          BoxShadow(color: Color(0x12000000), blurRadius: 28, offset: Offset(0, 12)),
-          BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 28,
+            offset: Offset(0, 12),
+          ),
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       child: Stack(
@@ -108,7 +118,6 @@ class _CaptureBox extends StatelessWidget {
               height: 140,
               fit: BoxFit.contain,
             ),
-
           ),
         ],
       ),
@@ -129,7 +138,7 @@ class _PrimaryButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ButtonStyle(
-          backgroundColor: const WidgetStatePropertyAll(Color(0xFFE67E22)),
+          backgroundColor: const WidgetStatePropertyAll(AppColors.primary),
           foregroundColor: const WidgetStatePropertyAll(Colors.white),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),

@@ -6,16 +6,16 @@ import '../../data/model/app_notification_model.dart';
 import '../../data/repo/notifications_repo.dart';
 import '../../provider/notifications_provider.dart';
 
-
 class ProfileNotificationsScreen extends StatefulWidget {
   const ProfileNotificationsScreen({super.key});
 
   @override
-  State<ProfileNotificationsScreen> createState() => _ProfileNotificationsScreenState();
+  State<ProfileNotificationsScreen> createState() =>
+      _ProfileNotificationsScreenState();
 }
 
-class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen> {
-
+class _ProfileNotificationsScreenState
+    extends State<ProfileNotificationsScreen> {
   bool _newShipments = true;
   bool _statusUpdates = true;
   bool _promo = false;
@@ -98,14 +98,20 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                       ],
                     ),
                   ),
-                  const Divider(height: 1, thickness: 1, color: AppColors.tileBorder),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: AppColors.tileBorder,
+                  ),
                   Expanded(
                     child: RefreshIndicator(
                       color: AppColors.accent,
                       onRefresh: p.refresh,
                       child: SingleChildScrollView(
                         controller: _scroll,
-                        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                         child: Column(
                           children: [
@@ -113,7 +119,10 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                               decoration: BoxDecoration(
                                 color: AppColors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppColors.tileBorder, width: 1),
+                                border: Border.all(
+                                  color: AppColors.tileBorder,
+                                  width: 1,
+                                ),
                                 boxShadow: const [
                                   BoxShadow(
                                     color: AppColors.boxShadow,
@@ -131,34 +140,47 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                                 children: [
                                   _SwitchTile(
                                     title: 'Новые заказы рядом',
-                                    subtitle: 'Когда появляется новый груз поблизости.',
+                                    subtitle:
+                                        'Когда появляется новый груз поблизости.',
                                     value: _newShipments,
-                                    onChanged: (v) => setState(() => _newShipments = v),
+                                    onChanged: (v) =>
+                                        setState(() => _newShipments = v),
                                   ),
                                   const _SettingsDivider(),
                                   _SwitchTile(
                                     title: 'Изменение статуса',
-                                    subtitle: 'Принятие, выполнение и отмена заказов.',
+                                    subtitle:
+                                        'Принятие, выполнение и отмена заказов.',
                                     value: _statusUpdates,
-                                    onChanged: (v) => setState(() => _statusUpdates = v),
+                                    onChanged: (v) =>
+                                        setState(() => _statusUpdates = v),
                                   ),
                                   const _SettingsDivider(),
                                   _SwitchTile(
                                     title: 'Акции и промокоды',
-                                    subtitle: 'Редкие, но приятные уведомления о бонусах.',
+                                    subtitle:
+                                        'Редкие, но приятные уведомления о бонусах.',
                                     value: _promo,
-                                    onChanged: (v) => setState(() => _promo = v),
+                                    onChanged: (v) =>
+                                        setState(() => _promo = v),
                                   ),
                                   const _SettingsDivider(),
                                   _SwitchTile(
                                     title: 'Системные уведомления',
-                                    subtitle: 'Важно для стабильной работы приложения.',
+                                    subtitle:
+                                        'Важно для стабильной работы приложения.',
                                     value: _system,
-                                    onChanged: (v) => setState(() => _system = v),
+                                    onChanged: (v) =>
+                                        setState(() => _system = v),
                                   ),
                                   const _SettingsDivider(),
                                   Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      14,
+                                      16,
+                                      14,
+                                    ),
                                     child: Row(
                                       children: [
                                         const Text(
@@ -179,7 +201,12 @@ class _ProfileNotificationsScreenState extends State<ProfileNotificationsScreen>
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
                                     child: _NotificationsBody(provider: p),
                                   ),
                                 ],
@@ -226,18 +253,18 @@ class _NotificationsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     if (provider.loading) {
       return Column(
-        children: List.generate(6, (i) => const Padding(
-          padding: EdgeInsets.only(bottom: 10),
-          child: _NotificationSkeleton(),
-        )),
+        children: List.generate(
+          6,
+          (i) => const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: _NotificationSkeleton(),
+          ),
+        ),
       );
     }
 
     if (provider.error != null && provider.items.isEmpty) {
-      return _InlineError(
-        text: provider.error!,
-        onRetry: provider.loadInitial,
-      );
+      return _InlineError(text: provider.error!, onRetry: provider.loadInitial);
     }
 
     if (provider.items.isEmpty) {
@@ -263,10 +290,7 @@ class _NotificationsBody extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.n,
-    this.onTap,
-  });
+  const _NotificationCard({required this.n, this.onTap});
 
   final AppNotificationModel n;
   final VoidCallback? onTap;
@@ -378,7 +402,9 @@ class _NotificationCard extends StatelessWidget {
                               fontSize: 12,
                               height: 1.0,
                               fontWeight: FontWeight.w800,
-                              color: n.isRead ? AppColors.grey : AppColors.accent,
+                              color: n.isRead
+                                  ? AppColors.grey
+                                  : AppColors.accent,
                             ),
                           ),
                         ],
@@ -393,6 +419,7 @@ class _NotificationCard extends StatelessWidget {
       ),
     );
   }
+
   IconData _iconFor(String channel) {
     switch (channel) {
       case 'orders':
@@ -459,7 +486,7 @@ class _UnreadPill extends StatelessWidget {
 
   final int count;
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -504,10 +531,7 @@ class _UnreadPill extends StatelessWidget {
 }
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.value,
-    required this.onChanged,
-  });
+  const _FilterPill({required this.value, required this.onChanged});
 
   final NotificationsReadFilter value;
   final ValueChanged<NotificationsReadFilter> onChanged;
@@ -556,7 +580,7 @@ class _FilterChip extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -661,7 +685,11 @@ class _InlineError extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, size: 20, color: Color(0xFFB00020)),
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 20,
+            color: Color(0xFFB00020),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -793,9 +821,23 @@ class _NotificationSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFFEFF2F6), borderRadius: BorderRadius.circular(999))),
+                Container(
+                  height: 12,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF2F6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
                 const SizedBox(height: 10),
-                Container(height: 10, width: 240, decoration: BoxDecoration(color: const Color(0xFFEFF2F6), borderRadius: BorderRadius.circular(999))),
+                Container(
+                  height: 10,
+                  width: 240,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF2F6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
               ],
             ),
           ),
@@ -819,7 +861,7 @@ class _SwitchTile extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   static const _greyText = Color(0xFF9FA4AD);
-  static const _accent = Color(0xFFFF8A00);
+  static const _accent = AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -872,10 +914,6 @@ class _SettingsDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      height: 1,
-      thickness: 1,
-      color: Color(0xFFE9EDF2),
-    );
+    return const Divider(height: 1, thickness: 1, color: Color(0xFFE9EDF2));
   }
 }

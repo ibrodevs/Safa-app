@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import 'package:dogo/core/design/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,7 +16,7 @@ class SecondSplashScreen extends StatefulWidget {
 class _SecondSplashScreenState extends State<SecondSplashScreen>
     with TickerProviderStateMixin {
   static const _titleGrey = Color(0xFFB5BCC5);
-  static const _orange = Color(0xFFFF8A00);
+  static const _orange = AppColors.primary;
   static const _orangeSoft = Color(0xFFFFE6D2);
   static const _purple = Color(0xFF5A46FF);
   static const _purpleSoft = Color(0xFFE4DDFF);
@@ -75,9 +77,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     _heroOffset = Tween<Offset>(
       begin: const Offset(0, 0.25),
       end: Offset.zero,
-    ).chain(
-      CurveTween(curve: Curves.easeOutCubic),
-    ).animate(_heroCtrl);
+    ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(_heroCtrl);
 
     Future.delayed(const Duration(milliseconds: 550), () {
       if (!mounted) return;
@@ -128,10 +128,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
               opacity: _heroOpacity,
               child: SlideTransition(
                 position: _heroOffset,
-                child: Image.asset(
-                  'assets/images/img_route.png',
-                  height: 520,
-                ),
+                child: Image.asset('assets/images/img_route.png', height: 520),
               ),
             ),
           ),
@@ -260,10 +257,7 @@ class _CategoryChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: borderColor,
-          width: 2,
-        ),
+        border: Border.all(color: borderColor, width: 2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -273,16 +267,14 @@ class _CategoryChip extends StatelessWidget {
             'assets/icons/ic_box.svg',
             width: 20,
             height: 20,
-            colorFilter: ColorFilter.mode(
-              iconColor,
-              BlendMode.srcIn,
-            ),
+            colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
           ),
           const SizedBox(width: 6),
           Text(
             title,
-            style: _SecondSplashScreenState._chipTextStyle
-                .copyWith(color: textColor),
+            style: _SecondSplashScreenState._chipTextStyle.copyWith(
+              color: textColor,
+            ),
           ),
         ],
       ),

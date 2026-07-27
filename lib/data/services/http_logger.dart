@@ -51,7 +51,9 @@ class HttpLoggerInterceptor extends Interceptor {
     final b = StringBuffer()
       ..writeln('→ ${o.method} ${o.uri}')
       ..writeln('headers: ${_short(_pretty(o.headers))}');
-    if (o.queryParameters.isNotEmpty) b.writeln('query: ${_short(_pretty(o.queryParameters))}');
+    if (o.queryParameters.isNotEmpty) {
+      b.writeln('query: ${_short(_pretty(o.queryParameters))}');
+    }
     if (o.data != null) b.writeln('body: ${_short(_pretty(o.data))}');
     return b.toString().trimRight();
   }

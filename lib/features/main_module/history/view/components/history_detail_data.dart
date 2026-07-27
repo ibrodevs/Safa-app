@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../core/design/app_design.dart';
+import '../../../../../core/utils/date_format_ru.dart';
+import '../../../../../core/utils/order_status_view.dart';
+import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/shipment_detail_model.dart';
 import '../../data/repo/shipment_detail_repo.dart';
 import '../../provider/shipment_detail_provider.dart';
@@ -16,379 +18,236 @@ class HistoryDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) =>
-      ShipmentDetailProvider(ShipmentDetailRepository())..load(shipmentId),
-      child: const _HistoryDetailsBody(),
+          ShipmentDetailProvider(ShipmentDetailRepository())..load(shipmentId),
+      child: _HistoryDetailsBody(shipmentId: shipmentId),
     );
   }
 }
 
 class _HistoryDetailsBody extends StatelessWidget {
-  const _HistoryDetailsBody();
+  const _HistoryDetailsBody({required this.shipmentId});
 
-  static const _accent = Color(0xFFFF8A00);
-  static const _statusGreen = Color(0xFF2E7D32);
-
-  String _fmtDate(DateTime d) {
-    // Используем "d MMM, HH:mm" для формата "16 апр, 23:57"
-    // Но так как нам нужно с секундами (как в логах), сделаем так:
-    try {
-      return DateFormat('dd.MM.yyyy - HH:mm:ss').format(d);
-    } catch (_) {
-      final dd = d.day.toString().padLeft(2, '0');
-      final mm = d.month.toString().padLeft(2, '0');
-      final yyyy = d.year.toString().padLeft(4, '0');
-      final hh = d.hour.toString().padLeft(2, '0');
-      final min = d.minute.toString().padLeft(2, '0');
-      final ss = d.second.toString().padLeft(2, '0');
-      return '$dd.$mm.$yyyy -$hh:$min:$ss';
-    }
-  }
-
-  String _mapStatus(String code) {
-    switch (code) {
-      case 'pending':
-        return 'В обработке';
-      case 'accepted':
-        return 'Принято';
-      case 'in_progress':
-        return 'В пути';
-      case 'completed':
-      case 'delivered':
-        return 'Завершено';
-      case 'canceled':
-        return 'Отменено';
-      default:
-        return code;
-    }
-  }
+  final int shipmentId;
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.viewPaddingOf(context).top;
-
     return Consumer<ShipmentDetailProvider>(
       builder: (context, state, _) {
         if (state.loading && state.detail == null) {
-          return Scaffold(
-            backgroundColor: Colors.white,
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.only(top: top + 32),
-                child: const CircularProgressIndicator(),
-              ),
-            ),
+          return const AppScreenScaffold(
+            showBackButton: true,
+            title: 'Заказ',
+            scrollable: false,
+            child: AppLoadingState(message: 'Загружаем заказ…'),
           );
         }
 
         if (state.error != null && state.detail == null) {
-          return Scaffold(
-            backgroundColor: Colors.white,
-            body: Padding(
-              padding: EdgeInsets.only(
-                top: top + 32,
-                left: 24,
-                right: 24,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 22,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-              ),
+          return AppScreenScaffold(
+            showBackButton: true,
+            title: 'Заказ',
+            scrollable: false,
+            child: AppErrorState(
+              error: state.error,
+              title: 'Не удалось загрузить заказ',
+              onRetry: () => state.load(shipmentId),
             ),
           );
         }
 
-        final ShipmentDetail d = state.detail!;
-        final flightNumberText =
-        d.publicCode.isNotEmpty ? d.publicCode : d.id.toString();
-
-        final orderCostText = (d.finalFare > 0)
-            ? '${d.finalFare} сом'
-            : (d.estimatedFare != null && d.estimatedFare! > 0)
-            ? '${d.estimatedFare} сом'
-            : '—';
-
-        final commissionValue = int.tryParse(d.commission) ?? 0;
-        final commissionText =
-        (d.commission.isNotEmpty && commissionValue > 0) ? '${d.commission} сом' : '—';
-
-
-        final titleNumber = d.publicCode.isNotEmpty
-            ? 'Посылка №${d.publicCode}'
-            : 'Посылка #${d.id}';
-        final statusText = _mapStatus(d.status);
-
-        final chips = <_DetailChip>[
-          _DetailChip(
-            'assets/icons/ic_box.svg',
-            'Размер: ${d.size}, кол-во: ${d.quantity}',
-          ),
-          if (d.stopsCount.isNotEmpty)
-            _DetailChip(
-              'assets/icons/ic_weight.svg',
-              'Остановок: ${d.stopsCount}',
-            ),
-          if (d.fragile)
-            const _DetailChip(
-              'assets/icons/ic_warning.svg',
-              'Хрупкая посылка',
-            ),
-          if (d.segment != null && (d.segment!['name']?.toString() ?? '').isNotEmpty)
-            _DetailChip(
-              'assets/icons/ic_box.svg',
-              'Тип: ${d.segment!['name']}',
-            ),
-        ];
-
-        final routeText = d.stops.isEmpty
-            ? 'Маршрут не указан'
-            : d.stops
-            .map(
-              (s) => '${s.position}. ${s.title}',
-        )
-            .join('\n');
-
-        final compositionBuffer = StringBuffer();
-        if (d.description.isNotEmpty) {
-          compositionBuffer.writeln(d.description);
-        }
-        compositionBuffer.writeln('Размер: ${d.size}');
-        compositionBuffer.writeln('Количество: ${d.quantity}');
-        if (d.fragile) {
-          compositionBuffer.writeln('Хрупкая посылка');
-        }
-        final compositionText = compositionBuffer.toString().trim();
-
-        final priceBuffer = StringBuffer();
-        priceBuffer.writeln('Предварительная стоимость: ${d.estimatedFare}');
-        priceBuffer.writeln('Итоговая стоимость: ${d.finalFare}');
-        if (d.courierIncome.isNotEmpty) {
-          priceBuffer.writeln('Доход курьера: ${d.courierIncome}');
-        }
-        if (d.commission.isNotEmpty) {
-          priceBuffer.writeln('Комиссия: ${d.commission}');
-        }
-        // ignore: unused_local_variable\r\n        final priceText = priceBuffer.toString().trim();
-
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: SizedBox(height: top + 8)),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.of(context).maybePop(),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 22,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          titleNumber,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            height: 1.1,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        statusText,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.2,
-                          fontWeight: FontWeight.w600,
-                          color: _statusGreen,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
-                  child: Text(
-                    d.title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      height: 1.15,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      for (final chip in chips) ...[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SvgPicture.asset(
-                              chip.asset,
-                              width: 22,
-                              height: 22,
-                              colorFilter: const ColorFilter.mode(
-                                _accent,
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                chip.text,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Было зарегистрировано:',
-                  value: _fmtDate(d.createdAt),
-                ),
-              ),
-              if (d.paidAt != null) ...[
-                const SliverToBoxAdapter(child: _Divider()),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Оплачено:',
-                    value: _fmtDate(d.paidAt!),
-                  ),
-                ),
-              ],
-              if (d.finishedAt != null) ...[
-                const SliverToBoxAdapter(child: _Divider()),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Завершено:',
-                    value: _fmtDate(d.finishedAt!),
-                  ),
-                ),
-              ],
-              const SliverToBoxAdapter(child: _Divider()),
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Маршрут:',
-                  value: routeText,
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Составляющие:',
-                  value: compositionText,
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Номер рейса',
-                  value: flightNumberText,
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Стоимость заказа',
-                  value: orderCostText,
-                ),
-              ),
-              const SliverToBoxAdapter(child: _Divider()),
-
-              SliverToBoxAdapter(
-                child: _Section(
-                  title: 'Стоимость комиссий',
-                  value: commissionText,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height:
-                  32 + MediaQuery.viewPaddingOf(context).bottom,
-                ),
-              ),
-            ],
-          ),
-        );
+        return _DetailContent(detail: state.detail!);
       },
     );
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.value});
-  final String title;
-  final String value;
+class _DetailContent extends StatelessWidget {
+  const _DetailContent({required this.detail});
 
-  static const _greyText = Color(0xFF9FA4AD);
+  final ShipmentDetail detail;
+
+  String get _numberLabel => detail.publicCode.isNotEmpty
+      ? 'Заказ №${detail.publicCode}'
+      : 'Заказ #${detail.id}';
+
+  String get _priceLabel {
+    if (detail.finalFare > 0) return '${detail.finalFare} сом';
+    final estimated = detail.estimatedFare;
+    if (estimated != null && estimated > 0) return '$estimated сом';
+    return '—';
+  }
+
+  String get _commissionLabel {
+    final value = int.tryParse(detail.commission) ?? 0;
+    return value > 0 ? '${detail.commission} сом' : '—';
+  }
+
+  String? get _segmentName {
+    final name = detail.segment?['name']?.toString().trim();
+    return (name == null || name.isEmpty) ? null : name;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+    final status = OrderStatusView.of(detail.status);
+    final stops = detail.stops.toList()
+      ..sort((a, b) => a.position.compareTo(b.position));
+
+    return AppScreenScaffold(
+      showBackButton: true,
+      title: _numberLabel,
+      // Действия показываются только те, что имеют смысл для текущего статуса.
+      footer: _Actions(status: status),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.25,
-              fontWeight: FontWeight.w800,
-              color: _greyText,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  detail.title.isEmpty ? 'Без названия' : detail.title,
+                  style: AppTypography.sectionTitle,
+                ),
+              ),
+              AppSpacing.hGapXs,
+              status.toBadge(),
+            ],
+          ),
+          AppSpacing.gapLg,
+
+          const AppSectionHeader(title: 'Маршрут'),
+          AppSpacing.gapXs,
+          AppCard(
+            child: stops.isEmpty
+                ? Text('Маршрут не указан', style: AppTypography.captionMuted)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < stops.length; i++)
+                        AppRoutePointTile(
+                          role: i == 0
+                              ? RoutePointRole.start
+                              : i == stops.length - 1
+                              ? RoutePointRole.end
+                              : RoutePointRole.stop,
+                          index: (i > 0 && i < stops.length - 1) ? i : null,
+                          title: stops[i].title.isEmpty
+                              ? 'Точка ${stops[i].position}'
+                              : stops[i].title,
+                          isLast: i == stops.length - 1,
+                          dense: true,
+                        ),
+                    ],
+                  ),
+          ),
+          AppSpacing.gapLg,
+
+          const AppSectionHeader(title: 'О посылке'),
+          AppSpacing.gapXs,
+          AppCard(
+            child: Column(
+              children: [
+                if (detail.size.isNotEmpty)
+                  _InfoRow(
+                    icon: Icons.straighten_rounded,
+                    label: 'Размер',
+                    value: detail.size,
+                  ),
+                _InfoRow(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Количество',
+                  value: '${detail.quantity}',
+                ),
+                if (detail.stopsCount.isNotEmpty)
+                  _InfoRow(
+                    icon: Icons.alt_route_rounded,
+                    label: 'Остановок',
+                    value: detail.stopsCount,
+                  ),
+                if (_segmentName != null)
+                  _InfoRow(
+                    icon: Icons.category_outlined,
+                    label: 'Тип',
+                    value: _segmentName!,
+                  ),
+                if (detail.description.trim().isNotEmpty)
+                  _InfoRow(
+                    icon: Icons.description_outlined,
+                    label: 'Описание',
+                    value: detail.description.trim(),
+                  ),
+                if (detail.fragile)
+                  const _InfoRow(
+                    icon: Icons.warning_amber_rounded,
+                    label: 'Особенность',
+                    value: 'Хрупкая посылка',
+                    highlight: true,
+                    isLast: true,
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.3,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
+          AppSpacing.gapLg,
+
+          const AppSectionHeader(title: 'Оплата'),
+          AppSpacing.gapXs,
+          AppCard(
+            child: Column(
+              children: [
+                _InfoRow(
+                  icon: Icons.payments_outlined,
+                  label: 'Стоимость заказа',
+                  value: _priceLabel,
+                  emphasize: true,
+                ),
+                _InfoRow(
+                  icon: Icons.percent_rounded,
+                  label: 'Комиссия',
+                  value: _commissionLabel,
+                ),
+                _InfoRow(
+                  icon: Icons.credit_card_outlined,
+                  label: 'Способ оплаты',
+                  value: detail.paidAt != null ? 'Оплачено' : 'Не оплачено',
+                  isLast: true,
+                ),
+              ],
+            ),
+          ),
+          AppSpacing.gapLg,
+
+          const AppSectionHeader(title: 'История статусов'),
+          AppSpacing.gapXs,
+          AppCard(
+            child: Column(
+              children: [
+                _InfoRow(
+                  icon: Icons.add_circle_outline_rounded,
+                  label: 'Создан',
+                  value: formatOrderDateTime(detail.createdAt),
+                ),
+                if (detail.paidAt != null)
+                  _InfoRow(
+                    icon: Icons.check_circle_outline_rounded,
+                    label: 'Оплачен',
+                    value: formatOrderDateTime(detail.paidAt!),
+                  ),
+                if (detail.finishedAt != null)
+                  _InfoRow(
+                    icon: Icons.flag_outlined,
+                    label: 'Завершён',
+                    value: formatOrderDateTime(detail.finishedAt!),
+                  ),
+                _InfoRow(
+                  icon: Icons.confirmation_number_outlined,
+                  label: 'Номер рейса',
+                  value: detail.publicCode.isNotEmpty
+                      ? detail.publicCode
+                      : '${detail.id}',
+                  isLast: true,
+                ),
+              ],
             ),
           ),
         ],
@@ -397,24 +256,75 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
-  const _Divider();
+class _Actions extends StatelessWidget {
+  const _Actions({required this.status});
+
+  final OrderStatusView status;
+
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Divider(
-        height: 0.5,
-        thickness: 1,
-        color: Color(0xFFE9EDF2),
-      ),
+    // Для активного заказа есть смысл вернуться к карте и следить за статусом;
+    // для завершённого и отменённого доступных действий нет.
+    if (!status.isActive) return const SizedBox.shrink();
+
+    return AppSecondaryButton(
+      label: 'Следить на карте',
+      icon: Icons.map_outlined,
+      accent: true,
+      onPressed: () => Navigator.of(context).maybePop(),
     );
   }
 }
 
-class _DetailChip {
-  final String asset;
-  final String text;
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+    this.highlight = false,
+    this.isLast = false,
+  });
 
-  const _DetailChip(this.asset, this.text);
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool emphasize;
+  final bool highlight;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: highlight ? AppColors.warning : AppColors.textTertiary,
+          ),
+          AppSpacing.hGapXs,
+          Expanded(flex: 4, child: Text(label, style: AppTypography.caption)),
+          AppSpacing.hGapXs,
+          Expanded(
+            flex: 5,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: AppTypography.caption.copyWith(
+                color: emphasize
+                    ? AppColors.primary
+                    : highlight
+                    ? AppColors.warning
+                    : AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

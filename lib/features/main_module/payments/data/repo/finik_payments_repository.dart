@@ -4,7 +4,8 @@ import '../../../../../data/network/api_service.dart';
 import '../../../../../data/network/model/api_exeptions_model.dart';
 
 final class FinikPaymentsRepository {
-  FinikPaymentsRepository({ApiService? api}) : _api = api ?? ApiService.instance;
+  FinikPaymentsRepository({ApiService? api})
+    : _api = api ?? ApiService.instance;
 
   final ApiService _api;
 
@@ -16,7 +17,9 @@ final class FinikPaymentsRepository {
 
   Future<FinikPayInitResponse> startFinikPayment(int shipmentId) async {
     try {
-      final resp = await _api.dio.post('delivery/shipments/$shipmentId/pay/finik/');
+      final resp = await _api.dio.post(
+        'delivery/shipments/$shipmentId/pay/finik/',
+      );
       final map = _asMap(resp.data);
       final parsed = FinikPayInitResponse.fromJson(map);
 
@@ -24,12 +27,16 @@ final class FinikPaymentsRepository {
         throw ApiException('Некорректный ответ /pay/finik/');
       }
       if (parsed.callbackUrl.isEmpty) {
-        throw ApiException('callbackUrl пустой. Проверь публичный HTTPS URL на backend.');
+        throw ApiException(
+          'callbackUrl пустой. Проверь публичный HTTPS URL на backend.',
+        );
       }
 
       return parsed;
     } on DioException catch (e) {
-      throw ApiException(e.response?.data?.toString() ?? 'Не удалось стартовать оплату Finik');
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось стартовать оплату Finik',
+      );
     }
   }
 }

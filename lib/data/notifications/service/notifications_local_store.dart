@@ -12,10 +12,7 @@ final class NotificationsLocalStore {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return <int>{};
-      return decoded
-          .whereType<num>()
-          .map((e) => e.toInt())
-          .toSet();
+      return decoded.whereType<num>().map((e) => e.toInt()).toSet();
     } catch (_) {
       return <int>{};
     }

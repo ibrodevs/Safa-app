@@ -67,10 +67,7 @@ class RegisterRequest {
       form.files.add(
         MapEntry(
           'avatar',
-          await MultipartFile.fromFile(
-            avatarPath!,
-            filename: 'avatar.jpg',
-          ),
+          await MultipartFile.fromFile(avatarPath!, filename: 'avatar.jpg'),
         ),
       );
     }
@@ -79,10 +76,7 @@ class RegisterRequest {
       form.files.add(
         MapEntry(
           'id_front',
-          await MultipartFile.fromFile(
-            idFrontPath!,
-            filename: 'id_front.jpg',
-          ),
+          await MultipartFile.fromFile(idFrontPath!, filename: 'id_front.jpg'),
         ),
       );
     }
@@ -91,10 +85,7 @@ class RegisterRequest {
       form.files.add(
         MapEntry(
           'id_back',
-          await MultipartFile.fromFile(
-            idBackPath!,
-            filename: 'id_back.jpg',
-          ),
+          await MultipartFile.fromFile(idBackPath!, filename: 'id_back.jpg'),
         ),
       );
     }
@@ -102,5 +93,3 @@ class RegisterRequest {
     return form;
   }
 }
-
-

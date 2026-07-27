@@ -88,3 +88,71 @@ flutter test
 ```
 
 Manual map verification still requires real device permissions, network, backend URL, Firebase configuration and map provider keys.
+
+## UI redesign and responsive testing
+
+The UI is built on a single design system. Do not hardcode colors, spacing,
+radii or text styles in screens — import the tokens instead:
+
+```dart
+import 'package:dogo/core/design/app_design.dart';   // AppColors, AppSpacing, AppRadius, AppTypography, …
+import 'package:dogo/core/widgets/app_widgets.dart'; // AppPrimaryButton, AppTextField, AppOrderCard, …
+```
+
+| Layer | Location |
+|---|---|
+| Design tokens and theme | `lib/core/design/` |
+| Reusable components | `lib/core/widgets/` |
+| Service definitions (`delivery` / `cars` / `amanat`) | `lib/features/main_module/services/service_config.dart` |
+
+Rules that the redesign relies on:
+
+- spacing grid is 4 / 8 / 12 / 16 / 20 / 24 / 32 px (`AppSpacing`) — no arbitrary values;
+- radii come from `AppRadius`, shadows from `AppShadows` (soft only);
+- only `SFProText` is used — it is the single font family declared in `pubspec.yaml`
+  with a full weight range, so max weight is `w700`;
+- orange (`AppColors.primary`) is reserved for primary buttons, active elements,
+  selected tabs and important markers;
+- every screen wraps its body in `AppScreenScaffold`, every modal in `AppBottomSheet` —
+  both handle the keyboard, safe areas and max content width;
+- interactive targets are at least 44 px; status is never conveyed by color alone.
+
+The three service sections share one order flow. To change the behaviour of a
+section, edit `ServiceConfig` — do not fork the screen. `service_type` is read
+from there and sent to the backend unchanged.
+
+### Responsive testing
+
+Widget tests run every main surface across the supported width range and text scales.
+The helpers live in `test/support/test_harness.dart`:
+
+```dart
+testAcrossScreenSizes('does not overflow', (tester, size) async { … });
+```
+
+| Constant | Values |
+|---|---|
+| `kScreenSizes` | 320×568, 360×640, 390×844, 430×932, 600×960 |
+| `kTextScales` | 1.0, 1.2, 1.4 |
+
+```bash
+flutter test test/widgets   # components
+flutter test test/screens   # screens and the responsive matrix
+```
+
+`testAcrossScreenSizes` fails on any exception, which includes
+`RenderFlex overflowed by N pixels`. When adding a screen, add it to
+`test/screens/responsive_matrix_test.dart`.
+
+Full check before a PR:
+
+```bash
+flutter pub get
+flutter analyze   # must report: No issues found!
+flutter test
+dart format .
+```
+
+Design decisions, known limitations and the list of scenarios that still need a
+real device are documented in [`docs/UI_REDESIGN_AUDIT.md`](docs/UI_REDESIGN_AUDIT.md)
+and [`docs/UI_REDESIGN_REPORT.md`](docs/UI_REDESIGN_REPORT.md).

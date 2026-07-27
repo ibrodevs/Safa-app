@@ -37,10 +37,7 @@ class AppNotificationModel {
       readAt: read,
     );
   }
-  AppNotificationModel copyWith({
-    bool? isRead,
-    DateTime? readAt,
-  }) {
+  AppNotificationModel copyWith({bool? isRead, DateTime? readAt}) {
     return AppNotificationModel(
       id: id,
       type: type,
@@ -53,5 +50,4 @@ class AppNotificationModel {
       readAt: readAt ?? this.readAt,
     );
   }
-
 }

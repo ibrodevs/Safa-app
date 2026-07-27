@@ -33,11 +33,7 @@ class DeliveryAddressProvider extends ChangeNotifier {
   double? get fromLat => _fromLat;
   double? get fromLon => _fromLon;
 
-  void setFromAddress({
-    required String address,
-    double? lat,
-    double? lon,
-  }) {
+  void setFromAddress({required String address, double? lat, double? lon}) {
     final a = address.trim();
     if (a.isEmpty) {
       clearFromAddress();
@@ -56,7 +52,10 @@ class DeliveryAddressProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchGpsHereAddress({required double lat, required double lon}) async {
+  Future<void> fetchGpsHereAddress({
+    required double lat,
+    required double lon,
+  }) async {
     _gpsLoading = true;
     _gpsError = null;
     notifyListeners();
@@ -75,7 +74,10 @@ class DeliveryAddressProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchPickerHereAddress({required double lat, required double lon}) async {
+  Future<void> fetchPickerHereAddress({
+    required double lat,
+    required double lon,
+  }) async {
     _pickerLoading = true;
     _pickerError = null;
     notifyListeners();
