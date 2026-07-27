@@ -66,5 +66,23 @@ void main() {
       expect(payload['lat'], 42.936);
       expect(payload['lon'], 74.623);
     });
+
+    test('восстанавливают контейнер после выбора на карте', () {
+      const pointRebuiltBySheet = DeliveryPoint(
+        title: 'Дордой',
+        subtitle: 'Контейнер 125 • Проход 4',
+        lat: 42.936,
+        lon: 74.623,
+        bazar: '',
+        passage: '',
+        container: '',
+      );
+
+      final payload = pointRebuiltBySheet.toStopJson();
+
+      expect(payload['bazar'], 'Дордой');
+      expect(payload['passage'], '4');
+      expect(payload['container'], '125');
+    });
   });
 }
