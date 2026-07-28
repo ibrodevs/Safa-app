@@ -49,12 +49,6 @@ jobs:
       - name: Format changed Dart files
         run: dart format lib/features/main_module/map test/market_map_layers_test.dart
 
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Run map tests
-        run: flutter test test/market_map_layers_test.dart test/route_payload_test.dart
-
       - name: Commit integrated map layers
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
@@ -71,3 +65,23 @@ jobs:
                   test/market_map_layers_test.dart
           git commit -m "integrate published market map layers"
           git push origin HEAD:agent/market-map-layers
+
+      - name: Analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee flutter-analyze.log
+
+      - name: Run map tests
+        run: |
+          set -o pipefail
+          flutter test test/market_map_layers_test.dart test/route_payload_test.dart 2>&1 | tee flutter-tests.log
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-map-flutter-validation
+          path: |
+            flutter-analyze.log
+            flutter-tests.log
+          if-no-files-found: ignore
