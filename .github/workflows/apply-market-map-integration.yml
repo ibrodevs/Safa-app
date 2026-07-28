@@ -7,6 +7,14 @@ on:
     paths:
       - tool/apply_market_map_patch.py
       - .github/workflows/apply-market-map-integration.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tool/apply_market_map_patch.py
+      - .github/workflows/apply-market-map-integration.yml
+      - lib/features/main_module/map/**
+      - test/market_map_layers_test.dart
 
 permissions:
   contents: write
@@ -48,6 +56,7 @@ jobs:
         run: flutter test test/market_map_layers_test.dart test/route_payload_test.dart
 
       - name: Commit integrated map layers
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           if git diff --quiet; then
             echo "No changes to commit"
