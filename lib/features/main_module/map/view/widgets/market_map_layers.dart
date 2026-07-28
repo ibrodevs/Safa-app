@@ -36,6 +36,7 @@ final class MarketMapRenderData {
               color: border,
             ),
           );
+          break;
         case 'Polygon':
           final points = _polygonOuter(feature.coordinates);
           if (points.length < 3) continue;
@@ -47,6 +48,7 @@ final class MarketMapRenderData {
               borderStrokeWidth: feature.strokeWidth,
             ),
           );
+          break;
         case 'MultiPolygon':
           final raw = feature.coordinates;
           if (raw is! List) continue;
@@ -62,6 +64,9 @@ final class MarketMapRenderData {
               ),
             );
           }
+          break;
+        default:
+          break;
       }
     }
 
