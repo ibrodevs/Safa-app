@@ -740,9 +740,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
   void _reorderIntermediatePoints(int oldIndex, int newIndex) {
     setState(() {
-      final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
       final point = _intermediatePoints.removeAt(oldIndex);
-      _intermediatePoints.insert(adjusted, point);
+      _intermediatePoints.insert(newIndex, point);
     });
   }
 
