@@ -43,14 +43,20 @@ final class MarketMapFeature {
       name: (properties['name'] ?? properties['number'] ?? '').toString(),
       geometryType: (geometry['type'] ?? '').toString(),
       coordinates: geometry['coordinates'],
-      minZoom: _asInt(properties['min_zoom'], fallback: 0).clamp(0, 22),
+      minZoom: _clampInt(
+        _asInt(properties['min_zoom'], fallback: 0),
+        0,
+        22,
+      ),
       strokeColor: (properties['stroke_color'] ?? '#E47F26').toString(),
       fillColor: (properties['fill_color'] ?? '#FF8656').toString(),
-      strokeWidth: _asDouble(properties['stroke_width'], fallback: 2).clamp(
+      strokeWidth: _clampDouble(
+        _asDouble(properties['stroke_width'], fallback: 2),
         1,
         12,
       ),
-      fillOpacity: _asDouble(properties['fill_opacity'], fallback: 0.2).clamp(
+      fillOpacity: _clampDouble(
+        _asDouble(properties['fill_opacity'], fallback: 0.2),
         0,
         1,
       ),
@@ -67,6 +73,22 @@ final class MarketMapFeature {
   static double _asDouble(dynamic value, {required double fallback}) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  static int _clampInt(int value, int minimum, int maximum) {
+    if (value < minimum) return minimum;
+    if (value > maximum) return maximum;
+    return value;
+  }
+
+  static double _clampDouble(
+    double value,
+    double minimum,
+    double maximum,
+  ) {
+    if (value < minimum) return minimum;
+    if (value > maximum) return maximum;
+    return value;
   }
 }
 
