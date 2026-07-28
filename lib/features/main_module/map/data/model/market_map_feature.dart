@@ -43,11 +43,7 @@ final class MarketMapFeature {
       name: (properties['name'] ?? properties['number'] ?? '').toString(),
       geometryType: (geometry['type'] ?? '').toString(),
       coordinates: geometry['coordinates'],
-      minZoom: _clampInt(
-        _asInt(properties['min_zoom'], fallback: 0),
-        0,
-        22,
-      ),
+      minZoom: _clampInt(_asInt(properties['min_zoom'], fallback: 0), 0, 22),
       strokeColor: (properties['stroke_color'] ?? '#E47F26').toString(),
       fillColor: (properties['fill_color'] ?? '#FF8656').toString(),
       strokeWidth: _clampDouble(
@@ -81,11 +77,7 @@ final class MarketMapFeature {
     return value;
   }
 
-  static double _clampDouble(
-    double value,
-    double minimum,
-    double maximum,
-  ) {
+  static double _clampDouble(double value, double minimum, double maximum) {
     if (value < minimum) return minimum;
     if (value > maximum) return maximum;
     return value;
@@ -93,10 +85,7 @@ final class MarketMapFeature {
 }
 
 final class MarketMapCollection {
-  const MarketMapCollection({
-    required this.features,
-    required this.versions,
-  });
+  const MarketMapCollection({required this.features, required this.versions});
 
   final List<MarketMapFeature> features;
   final Map<String, int> versions;

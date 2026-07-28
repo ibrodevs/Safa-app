@@ -5,10 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../data/model/market_map_feature.dart';
 
 final class MarketMapRenderData {
-  const MarketMapRenderData({
-    required this.polygons,
-    required this.polylines,
-  });
+  const MarketMapRenderData({required this.polygons, required this.polylines});
 
   final List<Polygon> polygons;
   final List<Polyline> polylines;

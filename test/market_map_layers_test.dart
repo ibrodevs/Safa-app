@@ -42,11 +42,7 @@ void main() {
     final feature = MarketMapFeature.fromJson({
       'type': 'Feature',
       'id': 'container-1',
-      'properties': {
-        'kind': 'container',
-        'name': '101',
-        'min_zoom': 17,
-      },
+      'properties': {'kind': 'container', 'name': '101', 'min_zoom': 17},
       'geometry': {
         'type': 'Point',
         'coordinates': [74.62, 42.94],

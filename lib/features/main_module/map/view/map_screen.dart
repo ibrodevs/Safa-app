@@ -18,8 +18,10 @@ import '../../payments/data/repo/shipments_repository.dart';
 import '../../services/service_config.dart';
 import '../data/model/delivery_point_model.dart';
 import '../data/model/delivery_refs_models.dart';
+import '../data/model/market_map_feature.dart';
 import '../data/model/shipment_status.dart';
 import '../data/repo/delivery_refs_repository.dart';
+import '../data/repo/market_map_repository.dart';
 import '../provider/active_shipment_provider.dart';
 import 'components/container_details_sheet.dart';
 import 'components/order_completed_sheet.dart';
@@ -31,6 +33,7 @@ import 'components/service_order_panel.dart';
 import 'components/shipment_payment_sheet.dart';
 import 'widgets/container_map_marker.dart';
 import 'widgets/here_bubble.dart';
+import 'widgets/market_map_layers.dart';
 import 'widgets/me_dot.dart';
 import 'widgets/parsed_adress.dart';
 
@@ -62,6 +65,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
   final MapController _mapController = MapController();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
+  final MarketMapRepository _marketMapRepository = MarketMapRepository();
   final TextEditingController _descriptionController = TextEditingController();
 
   DeliveryPoint? _deliveryPoint;
@@ -97,6 +101,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   ContainerRef? _selectedContainer;
   bool _containersLoading = false;
   int _containersRequestSerial = 0;
+
+  List<MarketMapFeature> _marketMapFeatures = const [];
+  bool _marketMapLoading = false;
+  int _marketMapRequestSerial = 0;
 
   // --- Маршрут OSRM -----------------------------------------------------
 
@@ -287,6 +295,24 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     }
   }
 
+  Future<void> _loadMarketMap() async {
+    if (_marketMapLoading) return;
+    final serial = ++_marketMapRequestSerial;
+    _marketMapLoading = true;
+
+    try {
+      final collection = await _marketMapRepository.loadPublished();
+      if (!mounted || serial != _marketMapRequestSerial) return;
+      setState(() {
+        _marketMapFeatures = collection.features;
+        _marketMapLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || serial != _marketMapRequestSerial) return;
+      setState(() => _marketMapLoading = false);
+    }
+  }
+
   void _fitToPoints(List<LatLng> pts) {
     if (pts.isEmpty) return;
 
@@ -365,6 +391,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
+      unawaited(_loadMarketMap());
       final p = context.read<ActiveShipmentProvider>();
       await p.load();
       if (!mounted) return;
@@ -1037,6 +1064,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }) {
     final markers = <Marker>[];
     final containerPolygons = <Polygon>[];
+    final marketMap = MarketMapRenderData.fromFeatures(
+      _marketMapFeatures,
+      zoom: _zoom,
+    );
 
     for (final container in _visibleContainers) {
       final lat = container.latValue;
@@ -1129,9 +1160,14 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           // из которого зависит видимость подписей контейнеров, — жест
           // панорамирования сам по себе setState не вызывает.
           final wasLabelled = _zoom >= _containerLabelMinZoom;
+          final oldZoomBucket = _zoom.floor();
           final isLabelled = pos.zoom >= _containerLabelMinZoom;
+          final newZoomBucket = pos.zoom.floor();
           _zoom = pos.zoom;
-          if (wasLabelled != isLabelled && mounted) setState(() {});
+          if ((wasLabelled != isLabelled || oldZoomBucket != newZoomBucket) &&
+              mounted) {
+            setState(() {});
+          }
 
           _scheduleContainersRefresh();
         },
@@ -1143,6 +1179,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           userAgentPackageName: 'kg.genesis.dogo',
           subdomains: const ['a', 'b', 'c', 'd'],
         ),
+        if (marketMap.polygons.isNotEmpty)
+          PolygonLayer(polygons: marketMap.polygons),
+        if (marketMap.polylines.isNotEmpty)
+          PolylineLayer(polylines: marketMap.polylines),
         if (containerPolygons.isNotEmpty)
           PolygonLayer(polygons: containerPolygons),
         if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
