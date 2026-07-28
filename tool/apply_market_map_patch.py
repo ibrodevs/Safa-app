@@ -88,6 +88,22 @@ replace_once(
 )
 
 replace_once(
+    "  void _reorderIntermediatePoints(int oldIndex, int newIndex) {\n"
+    "    setState(() {\n"
+    "      final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;\n"
+    "      final point = _intermediatePoints.removeAt(oldIndex);\n"
+    "      _intermediatePoints.insert(adjusted, point);\n"
+    "    });\n"
+    "  }",
+    "  void _reorderIntermediatePoints(int oldIndex, int newIndex) {\n"
+    "    setState(() {\n"
+    "      final point = _intermediatePoints.removeAt(oldIndex);\n"
+    "      _intermediatePoints.insert(newIndex, point);\n"
+    "    });\n"
+    "  }",
+)
+
+replace_once(
     "    final markers = <Marker>[];\n"
     "    final containerPolygons = <Polygon>[];",
     "    final markers = <Marker>[];\n"
