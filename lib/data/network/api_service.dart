@@ -24,7 +24,7 @@ final class ApiService {
 
   static String get _baseUrl => const String.fromEnvironment(
     'DOGO_API_BASE_URL',
-    defaultValue: 'http://46.101.255.131:8001/api/',
+    defaultValue: 'https://safabackend21.pythonanywhere.com/api/',
   );
 
   final SecureStorageService _storage = SecureStorageService();
@@ -300,9 +300,9 @@ final class ApiService {
       if (rate != null) data['rate'] = rate;
       if (clientRateCount != null) data['client_rate_count'] = clientRateCount;
 
-      final path = (id != null) ? 'users/profile/$id/' : 'users/profile/';
-
-      final resp = await _dio.patch(path, data: data);
+      // Профиль редактируется только через self-endpoint. URL с ID на backend
+      // предназначен исключительно для чтения и отклоняет PATCH.
+      final resp = await _dio.patch('users/profile/', data: data);
       final map = _asMap(resp.data);
       return ProfileModel.fromJson(map);
     } on DioException catch (e) {

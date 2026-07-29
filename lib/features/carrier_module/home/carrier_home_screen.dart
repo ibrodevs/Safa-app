@@ -101,7 +101,50 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     Future.microtask(() {
       PushService.instance.registerOnServerOnce(kind: 'carrier');
     });
-    _initLocation();
+    Future.microtask(_bootstrapCarrier);
+  }
+
+  Future<void> _bootstrapCarrier() async {
+    await _restoreActiveShipment();
+    await _initLocation();
+  }
+
+  Future<void> _restoreActiveShipment() async {
+    try {
+      final page = await ApiService.instance.getShipments(page: 1, pageSize: 100);
+      final rawResults = page['results'];
+      if (rawResults is! List) return;
+
+      for (final raw in rawResults) {
+        if (raw is! Map) continue;
+        final json = Map<String, dynamic>.from(raw);
+        final status = parseShipmentStatus((json['status'] ?? '').toString());
+        if (status != ShipmentStatus.assigned &&
+            status != ShipmentStatus.inTransit) {
+          continue;
+        }
+
+        final parsed = _parseActive(json);
+        if (!mounted || parsed.id <= 0) return;
+        setState(() {
+          _activeId = parsed.id;
+          _activePublicCode = parsed.publicCode;
+          _activeStatus = parsed.status;
+          _activeCurrentStopIndex = parsed.currentStopIndex;
+          _activeStops = parsed.stops;
+          _activeFare = parsed.fare;
+          _showWelcome = false;
+          _showEmptyOrders = false;
+          _nearby = const [];
+          _nearbyIndex = 0;
+        });
+        _startPolling(parsed.id);
+        await _syncRouteAndCameraForActive();
+        return;
+      }
+    } catch (_) {
+      // Нет активного заказа или сеть временно недоступна — остаёмся на welcome.
+    }
   }
 
   @override
@@ -424,6 +467,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       await _syncRouteAndCameraForActive();
     } catch (e) {
       if (!mounted) return;
+      AppSnackBar.showError(context, error: e);
     }
   }
 
@@ -770,7 +814,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   Future<Set<int>> _getRejectedIds() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_rejectedOrdersKey) ?? [];
-    return list.map((e) => int.parse(e)).toSet();
+    return list.map(int.tryParse).whereType<int>().toSet();
   }
 
   Future<void> _saveRejectedId(int id) async {
@@ -1322,7 +1366,7 @@ class _ActiveProgressSheet extends StatelessWidget {
             SizedBox(height: 8),
             const Center(
               child: Text(
-                'Сатурн — шестая планета по удалённости от Солнца и вторая по размерам планета',
+                'Направляйтесь к первой точке и нажмите «Начать» после получения груза.',
                 style: TextStyle(
                   fontSize: 15,
                   letterSpacing: -0.4,

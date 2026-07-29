@@ -15,21 +15,17 @@ class PushService {
 
   final FirebaseMessaging _fm = FirebaseMessaging.instance;
   bool _inited = false;
-
   String? _lastToken;
 
   Future<void> init() async {
     if (_inited) return;
 
-    final settings = await _fm.requestPermission(
+    await _fm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
     );
-    if (kDebugMode) {
-      print('🔔 Permission: ${settings.authorizationStatus}');
-    }
 
     await _fm.setForegroundNotificationPresentationOptions(
       alert: true,
@@ -38,14 +34,8 @@ class PushService {
     );
 
     _lastToken = await _fm.getToken();
-    if (kDebugMode) {
-      print('🔑 FCM token: $_lastToken');
-    }
 
     FirebaseMessaging.onMessage.listen((msg) async {
-      if (kDebugMode) {
-        print('📬 FG message: ${msg.data}');
-      }
       await NotificationService.instance.showFromMessage(msg);
     });
 
@@ -56,31 +46,40 @@ class PushService {
     if (initial != null) {
       _routeFromData(initial.data);
     }
-    _fm.onTokenRefresh.listen((t) {
-      _lastToken = t;
-      if (kDebugMode) {
-        print('🔁 Token refreshed: $t');
-      }
+
+    _fm.onTokenRefresh.listen((token) async {
+      _lastToken = token;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('fcm_registered_token_client');
+      await prefs.remove('fcm_registered_token_carrier');
     });
     _inited = true;
   }
 
   void _routeFromData(Map<String, dynamic> data) {
+    final app = data['app']?.toString().toLowerCase();
+    final shipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
+
+    if (app == 'client' && shipmentId != null) {
+      AppRouter.router.go('/history/detail', extra: shipmentId);
+      return;
+    }
+    if (app == 'carrier') {
+      AppRouter.router.go('/home-carrier');
+      return;
+    }
+
     final route = _extractRoute(data);
-    if (route != null && route.isNotEmpty) {
+    if (route != null && route.startsWith('/')) {
       AppRouter.router.go(route);
     }
   }
 
   String? _extractRoute(Map<String, dynamic> data) {
-    final r = data['route']?.toString();
-    if (r != null && r.isNotEmpty) {
-      return r;
-    }
-    final dl = data['deep_link']?.toString();
-    if (dl != null && dl.isNotEmpty) {
-      return dl;
-    }
+    final route = data['route']?.toString();
+    if (route != null && route.isNotEmpty) return route;
+    final deepLink = data['deep_link']?.toString();
+    if (deepLink != null && deepLink.startsWith('/')) return deepLink;
     return null;
   }
 
@@ -89,22 +88,16 @@ class PushService {
   Future<void> unsubscribeFrom(String topic) => _fm.unsubscribeFromTopic(topic);
 
   Future<void> registerOnServerOnce({required String kind}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'fcm_registered_$kind';
-    if (prefs.getBool(key) == true) {
-      return;
-    }
-
     final token = _lastToken ?? await _fm.getToken();
-    if (token == null || token.isEmpty) {
-      return;
-    }
+    if (token == null || token.isEmpty) return;
 
     final api = ApiService();
     final bearer = api.currentAccessToken;
-    if (bearer == null || bearer.isEmpty) {
-      return;
-    }
+    if (bearer == null || bearer.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'fcm_registered_token_$kind';
+    if (prefs.getString(key) == token) return;
 
     final platform = defaultTargetPlatform == TargetPlatform.iOS
         ? 'ios'
@@ -112,14 +105,9 @@ class PushService {
 
     try {
       await api.postFcmRegister(token: token, platform: platform);
-      await prefs.setBool(key, true);
-      if (kDebugMode) {
-        print('FCM registered on server [$platform/$kind]');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('FCM register failed: $e');
-      }
+      await prefs.setString(key, token);
+    } catch (_) {
+      // Следующий вход на домашний экран повторит регистрацию.
     }
   }
 }
