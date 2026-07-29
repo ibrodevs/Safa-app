@@ -17,10 +17,16 @@ final class MarketMapRenderData {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
 
-    for (final feature in features) {
+    final sortedFeatures = features.toList()
+      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+
+    for (final feature in sortedFeatures) {
       if (feature.isContainer || feature.minZoom > zoom) continue;
       final border = _parseColor(feature.strokeColor, const Color(0xFFE47F26));
       final fill = _parseColor(feature.fillColor, const Color(0xFFFF8656));
+      final pattern = feature.linePattern == 'dashed'
+          ? StrokePattern.dashed(segments: const [10, 8])
+          : const StrokePattern.solid();
 
       switch (feature.geometryType) {
         case 'LineString':
@@ -31,6 +37,7 @@ final class MarketMapRenderData {
               points: points,
               strokeWidth: feature.strokeWidth,
               color: border,
+              pattern: pattern,
             ),
           );
           break;
@@ -43,6 +50,7 @@ final class MarketMapRenderData {
               color: fill.withValues(alpha: feature.fillOpacity),
               borderColor: border,
               borderStrokeWidth: feature.strokeWidth,
+              pattern: pattern,
             ),
           );
           break;
@@ -58,6 +66,7 @@ final class MarketMapRenderData {
                 color: fill.withValues(alpha: feature.fillOpacity),
                 borderColor: border,
                 borderStrokeWidth: feature.strokeWidth,
+                pattern: pattern,
               ),
             );
           }

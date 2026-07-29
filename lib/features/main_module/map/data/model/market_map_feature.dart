@@ -26,6 +26,11 @@ final class MarketMapFeature {
   final Map<String, dynamic> properties;
 
   bool get isContainer => kind == 'container';
+  int get zIndex => _asInt(properties['z_index'], fallback: 1);
+  String get linePattern => (properties['line_pattern'] ?? 'solid')
+      .toString()
+      .trim()
+      .toLowerCase();
 
   factory MarketMapFeature.fromJson(Map<String, dynamic> json) {
     final rawProperties = json['properties'];
