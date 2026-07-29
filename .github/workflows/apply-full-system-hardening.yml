@@ -1,0 +1,44 @@
+name: Apply Flutter hardening
+
+on:
+  push:
+    branches:
+      - agent/full-system-hardening
+    paths:
+      - tool/apply_full_system_hardening.py
+      - .github/workflows/apply-full-system-hardening.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/full-system-hardening
+          fetch-depth: 0
+
+      - name: Apply verified patch
+        run: python tool/apply_full_system_hardening.py
+
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            lib/data/network/api_service.dart \
+            lib/features/auth_module/register/provider/auth_provider.dart \
+            lib/features/main_module/history/data/repo/shipments_history_repo.dart \
+            lib/data/notifications/service/push_service.dart \
+            lib/features/carrier_module/home/carrier_home_screen.dart \
+            lib/features/main_module/payments/provider/finik_payment_flow_provider.dart \
+            lib/features/main_module/payments/view/finik_payment_screen.dart \
+            test/full_system_contract_test.dart
+          git commit -m "apply Flutter full-system hardening"
+          git push origin HEAD:agent/full-system-hardening
