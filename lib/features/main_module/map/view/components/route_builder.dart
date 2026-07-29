@@ -138,7 +138,7 @@ class _IntermediateList extends StatelessWidget {
         physics: const ClampingScrollPhysics(),
         buildDefaultDragHandles: false,
         itemCount: points.length,
-        onReorderItem: onReorder,
+        onReorder: onReorder,
         proxyDecorator: (child, index, animation) => Material(
           color: AppColors.surface,
           borderRadius: AppRadius.allSm,
