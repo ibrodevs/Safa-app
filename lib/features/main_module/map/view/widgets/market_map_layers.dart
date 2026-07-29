@@ -21,7 +21,7 @@ final class MarketMapRenderData {
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
     for (final feature in sortedFeatures) {
-      if (feature.isContainer || feature.minZoom > zoom) continue;
+      if (feature.minZoom > zoom) continue;
       final border = _parseColor(feature.strokeColor, const Color(0xFFE47F26));
       final fill = _parseColor(feature.fillColor, const Color(0xFFFF8656));
       final pattern = feature.linePattern == 'dashed'
@@ -29,6 +29,18 @@ final class MarketMapRenderData {
           : const StrokePattern.solid();
 
       switch (feature.geometryType) {
+        case 'Point':
+          final point = _point(feature.coordinates);
+          if (point == null) continue;
+          polygons.add(
+            Polygon(
+              points: _pointRectangle(point),
+              color: fill.withValues(alpha: feature.fillOpacity),
+              borderColor: border,
+              borderStrokeWidth: feature.strokeWidth,
+            ),
+          );
+          break;
         case 'LineString':
           final points = _line(feature.coordinates);
           if (points.length < 2) continue;
@@ -96,6 +108,17 @@ final class MarketMapRenderData {
     if (lat == null || lon == null) return null;
     if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
     return LatLng(lat, lon);
+  }
+
+  static List<LatLng> _pointRectangle(LatLng center) {
+    const latHalf = 0.000012;
+    const lonHalf = 0.000018;
+    return [
+      LatLng(center.latitude + latHalf, center.longitude - lonHalf),
+      LatLng(center.latitude + latHalf, center.longitude + lonHalf),
+      LatLng(center.latitude - latHalf, center.longitude + lonHalf),
+      LatLng(center.latitude - latHalf, center.longitude - lonHalf),
+    ];
   }
 
   static double? _double(dynamic value) {
