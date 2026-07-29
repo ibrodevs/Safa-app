@@ -138,7 +138,15 @@ class _IntermediateList extends StatelessWidget {
         physics: const ClampingScrollPhysics(),
         buildDefaultDragHandles: false,
         itemCount: points.length,
-        onReorderItem: onReorder,
+        // Этот callback поддерживается и старыми, и новыми Flutter SDK.
+        // На новых SDK он deprecated, но пока остаётся совместимым.
+        // ignore: deprecated_member_use
+        onReorder: (oldIndex, newIndex) {
+          final adjustedNewIndex = newIndex > oldIndex
+              ? newIndex - 1
+              : newIndex;
+          onReorder(oldIndex, adjustedNewIndex);
+        },
         proxyDecorator: (child, index, animation) => Material(
           color: AppColors.surface,
           borderRadius: AppRadius.allSm,
