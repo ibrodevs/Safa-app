@@ -248,14 +248,6 @@ class _FinikStatusOverlay extends StatelessWidget {
   }
 
   Widget _buildSuccessCard(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (context.mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop(true);
-        }
-      });
-    });
-
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -286,6 +278,14 @@ class _FinikStatusOverlay extends StatelessWidget {
           const Text(
             'Заказ успешно оплачен',
             style: TextStyle(fontSize: 16, color: AppColors.grey2),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Готово'),
+            ),
           ),
         ],
       ),

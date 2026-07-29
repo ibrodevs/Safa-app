@@ -1,0 +1,46 @@
+name: Flutter full-system checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - agent/full-system-hardening
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Run full test suite
+        run: flutter test --coverage
+
+      - name: Build Android debug APK
+        run: >-
+          flutter build apk --debug
+          --dart-define=DOGO_API_BASE_URL=https://safabackend21.pythonanywhere.com/api/
+          --dart-define=GOOGLE_MAPS_API_KEY=test-key
+
+      - name: Upload test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: coverage/lcov.info
+          if-no-files-found: warn

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../../../core/utils/friendly_error.dart';
 import '../data/model/finik_pay_init_response.dart';
 import '../data/repo/finik_payments_repository.dart';
 import '../data/repo/shipments_repository.dart';
@@ -31,11 +32,13 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
 
   Timer? _pollTimer;
   int _pollTicks = 0;
+  bool _pollInFlight = false;
 
   void reset() {
     _pollTimer?.cancel();
     _pollTimer = null;
     _pollTicks = 0;
+    _pollInFlight = false;
     status = FinikFlowStatus.initial;
     errorText = null;
     shipmentId = null;
@@ -60,7 +63,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       status = FinikFlowStatus.failed;
-      errorText = e.toString();
+      errorText = friendlyErrorMessage(e, fallback: 'Не удалось начать оплату');
       notifyListeners();
       rethrow;
     }
@@ -94,7 +97,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       status = FinikFlowStatus.failed;
-      errorText = e.toString();
+      errorText = friendlyErrorMessage(e, fallback: 'Не удалось начать оплату');
       notifyListeners();
     }
   }
@@ -115,6 +118,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     final maxTicks = (maxSeconds * 1000) ~/ interval.inMilliseconds;
 
     _pollTimer = Timer.periodic(interval, (t) async {
+      if (_pollInFlight) return;
+      _pollInFlight = true;
       _pollTicks++;
 
       try {
@@ -137,9 +142,14 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
         if (_pollTicks >= maxTicks) {
           t.cancel();
           status = FinikFlowStatus.failed;
-          errorText = e.toString();
+          errorText = friendlyErrorMessage(
+            e,
+            fallback: 'Не удалось проверить статус оплаты',
+          );
           notifyListeners();
         }
+      } finally {
+        _pollInFlight = false;
       }
     });
   }

@@ -9,7 +9,8 @@ class ShipmentsHistoryRepository {
   Future<ShipmentHistoryPage> fetchPage({
     required int page,
     required int pageSize,
-  }) {
-    return _api.getShipmentHistory(page: page, pageSize: pageSize);
+  }) async {
+    final json = await _api.getShipments(page: page, pageSize: pageSize);
+    return ShipmentHistoryPage.fromJson(json);
   }
 }

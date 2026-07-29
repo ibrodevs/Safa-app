@@ -113,26 +113,13 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       final alreadyExists =
           e.statusCode == 400 &&
-          e.message.toLowerCase().contains('уже существует');
+          (e.message.toLowerCase().contains('уже существует') ||
+              e.message.toLowerCase().contains('уже зарегистрирован'));
       if (alreadyExists) {
-        try {
-          await _repo.login(phoneNumber: phoneNumber, password: password);
-          _pendingPhone = phoneNumber;
-          _loggedIn = true;
-          _error = null;
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('pending_phone', phoneNumber);
-
-          _loading = false;
-          notifyListeners();
-          return true;
-        } on ApiException catch (e2) {
-          _loading = false;
-          _error = e2.message;
-          notifyListeners();
-          return false;
-        }
+        _loading = false;
+        _error = 'Аккаунт с этим номером уже существует. Войдите через экран авторизации.';
+        notifyListeners();
+        return false;
       }
       _loading = false;
       _error = e.message;
