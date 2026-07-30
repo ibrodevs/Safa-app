@@ -94,7 +94,7 @@ class ServiceConfig {
     accentSoft: AppColors.infoSoft,
     imageAsset: AppImages.serviceCars,
     allowsIntermediateStops: true,
-    maxIntermediateStops: 8,
+    maxIntermediateStops: 28,
     destinationLabel: 'Куда',
     destinationHint: 'Конечная точка',
     primaryActionLabel: 'Оформить маршрут',
