@@ -54,7 +54,8 @@ class ServiceOrderPanel extends StatelessWidget {
 
   final String? errorMessage;
 
-  bool get _canSubmit => destination != null && !creating;
+  bool _hasRequiredDescription(String description) =>
+      !config.requiresDescription || description.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -124,35 +125,52 @@ class ServiceOrderPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.md + safeBottom,
-                ),
-                child: Column(
-                  children: [
-                    AppFormError(message: errorMessage),
-                    if (errorMessage != null) AppSpacing.gapSm,
-                    AppPrimaryButton(
-                      label: config.primaryActionLabel,
-                      loadingLabel: 'Создаём заказ…',
-                      loading: creating,
-                      enabled: _canSubmit,
-                      onPressed: onSubmit,
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: descriptionController,
+                builder: (context, value, _) {
+                  final hasDescription = _hasRequiredDescription(value.text);
+                  final canSubmit =
+                      destination != null && hasDescription && !creating;
+
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.md + safeBottom,
                     ),
-                    if (destination == null) ...[
-                      AppSpacing.gapXs,
-                      Text(
-                        'Укажите ${config.destinationLabel.toLowerCase()}, '
-                        'чтобы продолжить',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.captionMuted,
-                      ),
-                    ],
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        AppFormError(message: errorMessage),
+                        if (errorMessage != null) AppSpacing.gapSm,
+                        AppPrimaryButton(
+                          label: config.primaryActionLabel,
+                          loadingLabel: 'Создаём заказ…',
+                          loading: creating,
+                          enabled: canSubmit,
+                          onPressed: onSubmit,
+                        ),
+                        if (destination == null) ...[
+                          AppSpacing.gapXs,
+                          Text(
+                            'Укажите ${config.destinationLabel.toLowerCase()}, '
+                            'чтобы продолжить',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.captionMuted,
+                          ),
+                        ] else if (!hasDescription) ...[
+                          AppSpacing.gapXs,
+                          Text(
+                            'Заполните ${config.descriptionLabel?.toLowerCase() ?? 'описание'}, '
+                            'чтобы продолжить',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.captionMuted,
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ),

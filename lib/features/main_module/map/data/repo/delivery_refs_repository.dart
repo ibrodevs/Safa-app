@@ -94,6 +94,14 @@ class DeliveryRefsRepository {
     ).map(ContainerRef.fromJson).where((c) => c.isActive).toList();
   }
 
+  Future<ContainerRef> getContainer(int id) async {
+    final json = await _api.getJson(
+      'delivery/containers/$id/',
+      fallbackError: 'Не удалось загрузить контейнер',
+    );
+    return ContainerRef.fromJson(json);
+  }
+
   Future<List<ContainerRef>> loadContainersInBounds({
     required double minLat,
     required double maxLat,

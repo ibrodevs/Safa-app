@@ -54,7 +54,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   /// не превращалась в визуальный хаос.
   static const double _containerLabelMinZoom = 16;
 
-  late final ServiceConfig _config = ServiceConfig.fromType(widget.serviceType);
+  ServiceConfig get _config => ServiceConfig.fromType(widget.serviceType);
 
   double _myLat = 42.8746;
   double _myLon = 74.6122;
@@ -422,6 +422,25 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   @override
+  void didUpdateWidget(covariant OrderMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.serviceType == widget.serviceType ||
+        _activeShipmentId != null) {
+      return;
+    }
+    setState(() {
+      _deliveryPoint = null;
+      _fromPoint = null;
+      _intermediatePoints.clear();
+      _descriptionController.clear();
+      _panelError = null;
+      _selectedContainer = null;
+      _routePoints = const [];
+      _routeSignature = null;
+    });
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _initLocation();
@@ -777,6 +796,95 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     });
   }
 
+  Future<void> _onMarketMapContainerTapped(MarketMapFeature feature) async {
+    final containerId = _marketMapContainerId(feature);
+    final center = _featureCenter(feature.coordinates);
+    if (center == null) return;
+
+    ContainerRef container;
+    if (containerId != null) {
+      try {
+        container = await _refsRepository.getContainer(containerId);
+      } catch (_) {
+        container = _containerRefFromFeature(feature, center);
+      }
+    } else {
+      container = _containerRefFromFeature(feature, center);
+    }
+
+    if (!mounted) return;
+    await _onContainerTapped(container);
+  }
+
+  int? _marketMapContainerId(MarketMapFeature feature) {
+    final raw = feature.properties['container_id'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
+  ContainerRef _containerRefFromFeature(
+    MarketMapFeature feature,
+    LatLng center,
+  ) {
+    final props = feature.properties;
+    String stringProp(String key) => (props[key] ?? '').toString();
+    int intProp(String key) {
+      final raw = props[key];
+      if (raw is num) return raw.toInt();
+      return int.tryParse(raw?.toString() ?? '') ?? 0;
+    }
+
+    final number = stringProp('number').trim().isNotEmpty
+        ? stringProp('number').trim()
+        : feature.name;
+
+    return ContainerRef(
+      id: _marketMapContainerId(feature) ?? -feature.id.hashCode.abs(),
+      bazarId: intProp('bazar_id'),
+      bazarName: stringProp('bazar_name'),
+      passageId: intProp('passage_id'),
+      passageNumber: stringProp('passage_number'),
+      number: number,
+      title: stringProp('title'),
+      isActive: true,
+      lat: center.latitude.toString(),
+      lon: center.longitude.toString(),
+      uiLabel: number,
+      displayTitle: number,
+    );
+  }
+
+  LatLng? _featureCenter(dynamic coordinates) {
+    final points = <LatLng>[];
+    void visit(dynamic raw) {
+      if (raw is List && raw.length >= 2 && raw[0] is num && raw[1] is num) {
+        points.add(
+          LatLng((raw[1] as num).toDouble(), (raw[0] as num).toDouble()),
+        );
+        return;
+      }
+      if (raw is List) {
+        for (final item in raw) {
+          visit(item);
+        }
+      }
+    }
+
+    visit(coordinates);
+    if (points.isEmpty) return null;
+    var minLat = points.first.latitude;
+    var maxLat = points.first.latitude;
+    var minLon = points.first.longitude;
+    var maxLon = points.first.longitude;
+    for (final point in points.skip(1)) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLon) minLon = point.longitude;
+      if (point.longitude > maxLon) maxLon = point.longitude;
+    }
+    return LatLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+  }
+
   DeliveryPoint _pointFromContainer(ContainerRef container) {
     final bazar = container.bazarName.trim();
     final number = container.number.trim();
@@ -857,6 +965,16 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   Future<String?> _createShipment(List<DeliveryPoint> stops) async {
     if (_creatingShipment) return null;
     if (stops.isEmpty) return 'Маршрут не заполнен';
+    if (stops.length < 2) return 'Укажите начальную и конечную точки';
+
+    if (!_config.allowsIntermediateStops && stops.length != 2) {
+      return '${_config.title}: нужен маршрут ровно из двух точек';
+    }
+
+    if (_config.requiresDescription &&
+        _descriptionController.text.trim().isEmpty) {
+      return 'Опишите пожертвование, чтобы оформить аманат';
+    }
 
     // Сервер требует координаты у каждой точки — без них будет 400.
     if (stops.any((s) => s.lat == null || s.lon == null)) {
@@ -1062,29 +1180,42 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     required bool showContainerLabels,
   }) {
     final markers = <Marker>[];
-    final containerPolygons = <Polygon>[];
     final marketMap = MarketMapRenderData.fromFeatures(
       _marketMapFeatures,
       zoom: _zoom,
     );
+    final publishedContainerIds = _marketMapFeatures
+        .where((feature) => feature.isContainer)
+        .map(_marketMapContainerId)
+        .whereType<int>()
+        .toSet();
+
+    for (final feature in _marketMapFeatures) {
+      if (!feature.isContainer || feature.minZoom > _zoom) continue;
+      final center = _featureCenter(feature.coordinates);
+      if (center == null) continue;
+      markers.add(
+        Marker(
+          point: center,
+          width: 48,
+          height: 48,
+          alignment: Alignment.center,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _onMarketMapContainerTapped(feature),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      );
+    }
 
     for (final container in _visibleContainers) {
+      if (publishedContainerIds.contains(container.id)) continue;
       final lat = container.latValue;
       final lon = container.lonValue;
       if (lat == null || lon == null) continue;
 
       final selected = _selectedContainer?.id == container.id;
-
-      containerPolygons.add(
-        Polygon(
-          points: _containerPolygonPoints(lat, lon),
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.18)
-              : AppColors.containerFill,
-          borderColor: selected ? AppColors.primary : AppColors.container,
-          borderStrokeWidth: selected ? 2 : 1.4,
-        ),
-      );
 
       markers.add(
         Marker(
@@ -1182,8 +1313,6 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           PolygonLayer(polygons: marketMap.polygons),
         if (marketMap.polylines.isNotEmpty)
           PolylineLayer(polylines: marketMap.polylines),
-        if (containerPolygons.isNotEmpty)
-          PolygonLayer(polygons: containerPolygons),
         if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
           PolylineLayer(
             polylines: [
@@ -1199,21 +1328,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
               ),
             ],
           ),
-        MarkerLayer(markers: markers),
+        MarkerLayer(markers: [...marketMap.markers, ...markers]),
       ],
     );
-  }
-
-  List<LatLng> _containerPolygonPoints(double lat, double lon) {
-    const dLat = 0.000055;
-    const dLon = 0.000075;
-
-    return [
-      LatLng(lat - dLat, lon - dLon),
-      LatLng(lat - dLat, lon + dLon),
-      LatLng(lat + dLat, lon + dLon),
-      LatLng(lat + dLat, lon - dLon),
-    ];
   }
 
   Widget _buildBottomPanel({

@@ -5,10 +5,15 @@ import 'package:latlong2/latlong.dart';
 import '../../data/model/market_map_feature.dart';
 
 final class MarketMapRenderData {
-  const MarketMapRenderData({required this.polygons, required this.polylines});
+  const MarketMapRenderData({
+    required this.polygons,
+    required this.polylines,
+    required this.markers,
+  });
 
   final List<Polygon> polygons;
   final List<Polyline> polylines;
+  final List<Marker> markers;
 
   factory MarketMapRenderData.fromFeatures(
     Iterable<MarketMapFeature> features, {
@@ -16,6 +21,7 @@ final class MarketMapRenderData {
   }) {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
+    final markers = <Marker>[];
 
     final sortedFeatures = features.toList()
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
@@ -32,14 +38,24 @@ final class MarketMapRenderData {
         case 'Point':
           final point = _point(feature.coordinates);
           if (point == null) continue;
+          final points = _pointRectangle(point);
           polygons.add(
             Polygon(
-              points: _pointRectangle(point),
+              points: points,
               color: fill.withValues(alpha: feature.fillOpacity),
               borderColor: border,
               borderStrokeWidth: feature.strokeWidth,
             ),
           );
+          if (feature.kind == 'container') {
+            markers.add(
+              _labelMarker(
+                _boundsCenter(points),
+                feature.name,
+                const Color(0xFF111827),
+              ),
+            );
+          }
           break;
         case 'LineString':
           final points = _line(feature.coordinates);
@@ -52,6 +68,10 @@ final class MarketMapRenderData {
               pattern: pattern,
             ),
           );
+          if (feature.kind == 'passage') {
+            final center = _boundsCenter(points);
+            markers.add(_labelMarker(center, feature.name, border));
+          }
           break;
         case 'Polygon':
           final points = _polygonOuter(feature.coordinates);
@@ -65,6 +85,15 @@ final class MarketMapRenderData {
               pattern: pattern,
             ),
           );
+          if (feature.kind == 'container') {
+            markers.add(
+              _labelMarker(
+                _boundsCenter(points),
+                feature.name,
+                const Color(0xFF111827),
+              ),
+            );
+          }
           break;
         case 'MultiPolygon':
           final raw = feature.coordinates;
@@ -81,6 +110,15 @@ final class MarketMapRenderData {
                 pattern: pattern,
               ),
             );
+            if (feature.kind == 'container') {
+              markers.add(
+                _labelMarker(
+                  _boundsCenter(points),
+                  feature.name,
+                  const Color(0xFF111827),
+                ),
+              );
+            }
           }
           break;
         default:
@@ -88,7 +126,52 @@ final class MarketMapRenderData {
       }
     }
 
-    return MarketMapRenderData(polygons: polygons, polylines: polylines);
+    return MarketMapRenderData(
+      polygons: polygons,
+      polylines: polylines,
+      markers: markers,
+    );
+  }
+
+  static Marker _labelMarker(LatLng point, String text, Color color) {
+    return Marker(
+      point: point,
+      width: 72,
+      height: 28,
+      alignment: Alignment.center,
+      child: IgnorePointer(
+        child: Text(
+          text.trim().isEmpty ? '•' : text.trim(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 3),
+              Shadow(color: Colors.white, blurRadius: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static LatLng _boundsCenter(List<LatLng> points) {
+    var minLat = points.first.latitude;
+    var maxLat = points.first.latitude;
+    var minLon = points.first.longitude;
+    var maxLon = points.first.longitude;
+    for (final point in points.skip(1)) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLon) minLon = point.longitude;
+      if (point.longitude > maxLon) maxLon = point.longitude;
+    }
+    return LatLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
   }
 
   static List<LatLng> _line(dynamic raw) {

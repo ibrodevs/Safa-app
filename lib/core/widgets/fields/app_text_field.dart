@@ -122,87 +122,97 @@ class _AppTextFieldState extends State<AppTextField> {
           Text(widget.label!, style: AppTypography.label),
           AppSpacing.gapXs,
         ],
-        AnimatedContainer(
-          duration: AppDurations.fast,
-          decoration: BoxDecoration(
-            color: widget.enabled ? AppColors.surface : AppColors.surfaceMuted,
-            borderRadius: AppRadius.allMd,
-            border: Border.all(
-              color: borderColor,
-              width: (_focused || hasError) ? 1.6 : 1,
-            ),
-            boxShadow: _focused ? AppShadows.card : AppShadows.none,
-          ),
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focus,
-            enabled: widget.enabled,
-            autofocus: widget.autofocus,
-            keyboardType: widget.keyboardType,
-            textInputAction: widget.textInputAction,
-            obscureText: widget.obscure,
-            maxLength: effectiveMaxLength,
-            maxLines: widget.obscure ? 1 : widget.maxLines,
-            minLines: widget.minLines,
-            onChanged: widget.onChanged,
-            onSubmitted: widget.onSubmitted,
-            inputFormatters: widget.inputFormatters,
-            textCapitalization: widget.textCapitalization,
-            autofillHints: widget.autofillHints,
+        TextSelectionTheme(
+          data: TextSelectionThemeData(
             cursorColor: AppColors.primary,
-            style: AppTypography.field.copyWith(
+            selectionColor: AppColors.primary.withValues(alpha: 0.22),
+            selectionHandleColor: AppColors.primary,
+          ),
+          child: AnimatedContainer(
+            duration: AppDurations.fast,
+            decoration: BoxDecoration(
               color: widget.enabled
-                  ? AppColors.textPrimary
-                  : AppColors.textTertiary,
+                  ? AppColors.surface
+                  : AppColors.surfaceMuted,
+              borderRadius: AppRadius.allMd,
+              border: Border.all(
+                color: borderColor,
+                width: (_focused || hasError) ? 1.6 : 1,
+              ),
+              boxShadow: _focused ? AppShadows.card : AppShadows.none,
             ),
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              hintStyle: AppTypography.fieldHint,
-              isDense: true,
-              filled: false,
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.md,
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              enabled: widget.enabled,
+              autofocus: widget.autofocus,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              obscureText: widget.obscure,
+              maxLength: effectiveMaxLength,
+              maxLines: widget.obscure ? 1 : widget.maxLines,
+              minLines: widget.minLines,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              inputFormatters: widget.inputFormatters,
+              textCapitalization: widget.textCapitalization,
+              autofillHints: widget.autofillHints,
+              cursorColor: AppColors.primary,
+              keyboardAppearance: Brightness.light,
+              style: AppTypography.field.copyWith(
+                color: widget.enabled
+                    ? AppColors.textPrimary
+                    : AppColors.textTertiary,
               ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              focusedErrorBorder: InputBorder.none,
-              prefixIcon: widget.prefixIcon == null
-                  ? null
-                  : Padding(
-                      padding: const EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.xs,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                hintStyle: AppTypography.fieldHint,
+                isDense: true,
+                filled: false,
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                prefixIcon: widget.prefixIcon == null
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.md,
+                          right: AppSpacing.xs,
+                        ),
+                        child: Icon(
+                          widget.prefixIcon,
+                          size: 20,
+                          color: hasError
+                              ? AppColors.error
+                              : _focused
+                              ? AppColors.primary
+                              : AppColors.textTertiary,
+                        ),
                       ),
-                      child: Icon(
-                        widget.prefixIcon,
-                        size: 20,
-                        color: hasError
-                            ? AppColors.error
-                            : _focused
-                            ? AppColors.primary
-                            : AppColors.textTertiary,
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+                prefixText: widget.prefixText,
+                prefixStyle: AppTypography.field,
+                suffixIcon: widget.suffix == null
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.xs),
+                        child: widget.suffix,
                       ),
-                    ),
-              prefixIconConstraints: const BoxConstraints(
-                minWidth: 0,
-                minHeight: 0,
-              ),
-              prefixText: widget.prefixText,
-              prefixStyle: AppTypography.field,
-              suffixIcon: widget.suffix == null
-                  ? null
-                  : Padding(
-                      padding: const EdgeInsets.only(right: AppSpacing.xs),
-                      child: widget.suffix,
-                    ),
-              suffixIconConstraints: const BoxConstraints(
-                minWidth: 44,
-                minHeight: 44,
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
               ),
             ),
           ),

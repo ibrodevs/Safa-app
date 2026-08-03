@@ -194,13 +194,17 @@ final class AppRouter {
             routes: [
               GoRoute(
                 path: '/map',
-                pageBuilder: (context, state) => _build(
-                  state,
-                  OrderMapScreen(
-                    serviceType:
-                        state.uri.queryParameters['service'] ?? 'delivery',
-                  ),
-                ),
+                pageBuilder: (context, state) {
+                  final service =
+                      state.uri.queryParameters['service'] ?? 'delivery';
+                  return _build(
+                    state,
+                    OrderMapScreen(
+                      key: ValueKey('order-map-$service'),
+                      serviceType: service,
+                    ),
+                  );
+                },
               ),
             ],
           ),

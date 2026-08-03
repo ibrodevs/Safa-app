@@ -35,8 +35,6 @@ class ContainerMapMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.container;
-
     return Semantics(
       button: onTap != null,
       selected: selected,
@@ -51,12 +49,8 @@ class ContainerMapMarker extends StatelessWidget {
           height: hitSize,
           child: Center(
             child: showLabel || selected
-                ? _LabelBubble(
-                    number: container.number,
-                    color: color,
-                    selected: selected,
-                  )
-                : _Dot(color: color),
+                ? _LabelText(number: container.number, selected: selected)
+                : const _Dot(),
           ),
         ),
       ),
@@ -64,64 +58,51 @@ class ContainerMapMarker extends StatelessWidget {
   }
 }
 
-class _LabelBubble extends StatelessWidget {
-  const _LabelBubble({
-    required this.number,
-    required this.color,
-    required this.selected,
-  });
+class _LabelText extends StatelessWidget {
+  const _LabelText({required this.number, required this.selected});
 
   final String number;
-  final Color color;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: AppDurations.fast,
-      constraints: const BoxConstraints(minWidth: 26, maxWidth: 64),
-      padding: EdgeInsets.symmetric(
-        horizontal: selected ? 8 : 6,
-        vertical: selected ? 5 : 4,
-      ),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: AppRadius.allXs,
-        border: Border.all(color: AppColors.white, width: selected ? 2.5 : 1.5),
-        boxShadow: AppShadows.raised,
-      ),
-      child: Text(
-        number.isEmpty ? '•' : number,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontFamily: AppTypography.fontFamily,
-          color: AppColors.white,
-          fontSize: 11,
-          height: 1.1,
-          fontWeight: FontWeight.w700,
-        ),
+    return Text(
+      number.isEmpty ? '•' : number,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontFamily: AppTypography.fontFamily,
+        color: selected ? AppColors.primary : AppColors.textPrimary,
+        fontSize: selected ? 13 : 12,
+        height: 1,
+        fontWeight: FontWeight.w800,
+        shadows: const [
+          Shadow(color: AppColors.white, blurRadius: 3),
+          Shadow(color: AppColors.white, blurRadius: 6),
+        ],
       ),
     );
   }
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
-
-  final Color color;
+  const _Dot();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 1.5),
+    return const Text(
+      '•',
+      style: TextStyle(
+        fontFamily: AppTypography.fontFamily,
+        color: AppColors.textPrimary,
+        fontSize: 16,
+        height: 1,
+        fontWeight: FontWeight.w800,
+        shadows: [
+          Shadow(color: AppColors.white, blurRadius: 3),
+          Shadow(color: AppColors.white, blurRadius: 6),
+        ],
       ),
     );
   }

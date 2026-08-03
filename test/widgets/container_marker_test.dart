@@ -65,31 +65,31 @@ void main() {
       expect(taps, 1);
     });
 
-    testWidgets('выбранный контейнер выделяется акцентным цветом', (
+    testWidgets('выбранный контейнер показывает номер акцентным текстом', (
       tester,
     ) async {
       await tester.pumpWidget(buildMarker(selected: true));
       await tester.pumpAndSettle();
 
-      final decorated = tester
-          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
-          .first;
-      final decoration = decorated.decoration! as BoxDecoration;
+      final label = tester.widget<Text>(find.text('125'));
+      final style = label.style!;
 
-      expect(decoration.color, AppColors.primary);
-      expect(decoration.border!.top.width, greaterThan(2));
+      expect(style.color, AppColors.primary);
+      expect(style.fontWeight, FontWeight.w800);
+      expect(find.byType(AnimatedContainer), findsNothing);
     });
 
-    testWidgets('невыбранный контейнер остаётся зелёным', (tester) async {
+    testWidgets('невыбранный контейнер показывает только номер без фона', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildMarker());
       await tester.pumpAndSettle();
 
-      final decorated = tester
-          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
-          .first;
-      final decoration = decorated.decoration! as BoxDecoration;
+      final label = tester.widget<Text>(find.text('125'));
+      final style = label.style!;
 
-      expect(decoration.color, AppColors.container);
+      expect(style.color, AppColors.textPrimary);
+      expect(find.byType(AnimatedContainer), findsNothing);
     });
 
     testWidgets('на малом масштабе подпись скрывается', (tester) async {

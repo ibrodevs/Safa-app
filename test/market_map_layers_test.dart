@@ -38,7 +38,7 @@ void main() {
     );
   });
 
-  test('container features are skipped to avoid duplicate markers', () {
+  test('container features render as admin-style rectangles with labels', () {
     final feature = MarketMapFeature.fromJson({
       'type': 'Feature',
       'id': 'container-1',
@@ -50,7 +50,8 @@ void main() {
     });
 
     final data = MarketMapRenderData.fromFeatures([feature], zoom: 18);
-    expect(data.polygons, isEmpty);
+    expect(data.polygons, hasLength(1));
     expect(data.polylines, isEmpty);
+    expect(data.markers, hasLength(1));
   });
 }

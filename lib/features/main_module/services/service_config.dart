@@ -28,6 +28,7 @@ class ServiceConfig {
     required this.primaryActionLabel,
     this.maxIntermediateStops = 0,
     this.supportsDescription = false,
+    this.requiresDescription = false,
     this.descriptionLabel,
     this.descriptionHint,
   });
@@ -62,6 +63,7 @@ class ServiceConfig {
   /// поле `description` запроса `POST delivery/shipments/` — новых
   /// полей API не появляется.
   final bool supportsDescription;
+  final bool requiresDescription;
   final String? descriptionLabel;
   final String? descriptionHint;
 
@@ -104,19 +106,20 @@ class ServiceConfig {
   static const ServiceConfig amanat = ServiceConfig(
     type: 'amanat',
     title: 'Аманат',
-    shortDescription: 'Безопасная передача посылок и вещей',
-    orderSubtitle: 'Укажите маршрут и опишите, что нужно передать',
+    shortDescription: 'Пожертвование или помощь с передачей',
+    orderSubtitle: 'Укажите точку помощи и опишите пожертвование',
     icon: Icons.card_giftcard_outlined,
     accent: AppColors.success,
     accentSoft: AppColors.successSoft,
     imageAsset: AppImages.serviceAmanat,
     allowsIntermediateStops: false,
-    destinationLabel: 'Кому',
-    destinationHint: 'Куда передать',
-    primaryActionLabel: 'Отправить аманат',
+    destinationLabel: 'Куда',
+    destinationHint: 'Куда направить помощь',
+    primaryActionLabel: 'Оформить пожертвование',
     supportsDescription: true,
-    descriptionLabel: 'Что передаём',
-    descriptionHint: 'Например: документы в конверте, получатель Азамат',
+    requiresDescription: true,
+    descriptionLabel: 'Пожертвование',
+    descriptionHint: 'Например: продукты, одежда, сумма или комментарий',
   );
 
   static const List<ServiceConfig> all = [delivery, cars, amanat];
