@@ -27,7 +27,7 @@ final class MarketMapRenderData {
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
     for (final feature in sortedFeatures) {
-      if (feature.minZoom > zoom) continue;
+      if (_effectiveMinZoom(feature) > zoom) continue;
       final border = _parseColor(feature.strokeColor, const Color(0xFFE47F26));
       final fill = _parseColor(feature.fillColor, const Color(0xFFFF8656));
       final pattern = feature.linePattern == 'dashed'
@@ -54,6 +54,10 @@ final class MarketMapRenderData {
                 feature.name,
                 const Color(0xFF111827),
               ),
+            );
+          } else if (feature.kind == 'bazar' || feature.kind == 'district') {
+            markers.add(
+              _labelMarker(_boundsCenter(points), feature.name, border),
             );
           }
           break;
@@ -93,6 +97,12 @@ final class MarketMapRenderData {
                 const Color(0xFF111827),
               ),
             );
+          } else if (feature.kind == 'passage' ||
+              feature.kind == 'bazar' ||
+              feature.kind == 'district') {
+            markers.add(
+              _labelMarker(_boundsCenter(points), feature.name, border),
+            );
           }
           break;
         case 'MultiPolygon':
@@ -118,6 +128,10 @@ final class MarketMapRenderData {
                   const Color(0xFF111827),
                 ),
               );
+            } else if (feature.kind == 'bazar' || feature.kind == 'district') {
+              markers.add(
+                _labelMarker(_boundsCenter(points), feature.name, border),
+              );
             }
           }
           break;
@@ -133,7 +147,23 @@ final class MarketMapRenderData {
     );
   }
 
+  static int _effectiveMinZoom(MarketMapFeature feature) {
+    switch (feature.kind) {
+      case 'bazar':
+        return feature.minZoom > 10 ? 10 : feature.minZoom;
+      case 'district':
+        return feature.minZoom > 12 ? 12 : feature.minZoom;
+      case 'passage':
+        return feature.minZoom > 14 ? 14 : feature.minZoom;
+      case 'container':
+        return feature.minZoom > 15 ? 15 : feature.minZoom;
+      default:
+        return feature.minZoom;
+    }
+  }
+
   static Marker _labelMarker(LatLng point, String text, Color color) {
+    final label = text.trim();
     return Marker(
       point: point,
       width: 72,
@@ -141,7 +171,7 @@ final class MarketMapRenderData {
       alignment: Alignment.center,
       child: IgnorePointer(
         child: Text(
-          text.trim().isEmpty ? '•' : text.trim(),
+          label.isEmpty ? '•' : label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,

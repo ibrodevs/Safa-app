@@ -63,6 +63,10 @@ class _HomeBodyState extends State<_HomeBody> {
   }
 
   void _openService(ServiceConfig config) {
+    if (config.type == ServiceConfig.amanat.type) {
+      context.push('/amanat');
+      return;
+    }
     context.go('/map?service=${config.type}');
   }
 

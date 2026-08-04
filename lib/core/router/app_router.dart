@@ -4,6 +4,7 @@ import 'package:dogo/features/auth_module/register/view/client_register_screens.
 import 'package:dogo/features/auth_module/register/view/components/selfie_capture_screen.dart';
 import 'package:dogo/features/auth_module/register/view/components/selfie_waiting_screen.dart';
 import 'package:dogo/features/auth_module/select_role/select_role_screen.dart';
+import 'package:dogo/features/main_module/amanat/amanat_screen.dart';
 import 'package:dogo/features/main_module/history/view/components/history_detail_data.dart';
 import 'package:dogo/features/main_module/history/view/history_screen.dart';
 import 'package:dogo/features/main_module/map/view/map_screen.dart';
@@ -170,6 +171,22 @@ final class AppRouter {
         name: 'finik_pay',
         pageBuilder: (context, state) =>
             _build(state, const FinikPaymentScreen()),
+      ),
+      GoRoute(
+        path: AmanatScreen.route,
+        pageBuilder: (context, state) => _build(state, const AmanatScreen()),
+      ),
+      GoRoute(
+        path: AmanatDetailScreen.route,
+        pageBuilder: (context, state) {
+          final campaignId = int.tryParse(
+            state.uri.queryParameters['id'] ?? '',
+          );
+          if (campaignId == null) {
+            return _build(state, const AmanatScreen());
+          }
+          return _build(state, AmanatDetailScreen(campaignId: campaignId));
+        },
       ),
       GoRoute(
         path: '/privacy-policy',

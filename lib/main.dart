@@ -18,6 +18,7 @@ import 'features/main_module/map/data/repo/delivery_geo_repository.dart';
 import 'features/main_module/map/provider/active_shipment_provider.dart';
 import 'features/main_module/map/provider/delivery_address_provider.dart';
 import 'features/main_module/map/provider/delivery_autocomplete_provider.dart';
+import 'features/main_module/amanat/amanat_provider.dart';
 import 'features/main_module/payments/data/repo/shipments_repository.dart';
 import 'features/main_module/profile/data/repo/profile_repo.dart';
 import 'features/main_module/profile/provider/profile_provider.dart';
@@ -72,6 +73,7 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => ActiveShipmentProvider(repo: shipRepo),
         ),
+        ChangeNotifierProvider(create: (_) => AmanatProvider()),
         ChangeNotifierProvider(
           create: (_) => FinikPaymentFlowProvider(
             shipmentsRepo: shipRepo,

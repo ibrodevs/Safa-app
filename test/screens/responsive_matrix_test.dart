@@ -170,10 +170,10 @@ void main() {
       }
 
       await pumpPanel(ServiceConfig.amanat);
-      expect(find.text('Что передаём'), findsOneWidget);
+      expect(find.text(ServiceConfig.amanat.descriptionLabel!), findsOneWidget);
 
       await pumpPanel(ServiceConfig.delivery);
-      expect(find.text('Что передаём'), findsNothing);
+      expect(find.text(ServiceConfig.amanat.descriptionLabel!), findsNothing);
     });
 
     testWidgets('кнопка заблокирована, пока не выбрана конечная точка', (

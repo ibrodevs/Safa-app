@@ -37,6 +37,8 @@ class MapPickerScreen extends StatefulWidget {
 class _MapPickerScreenState extends State<MapPickerScreen> {
   /// Ниже этого масштаба подписи контейнеров скрываются.
   static const double _containerLabelMinZoom = 16;
+  static const double _containerShapeMinZoom = 15;
+  static const int _maxRenderedContainerShapes = 180;
 
   final MapController _mapController = MapController();
   final TextEditingController _query = TextEditingController();
@@ -124,7 +126,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final lonPadding =
         (bounds.east - bounds.west).abs().clamp(0.002, 0.03).toDouble() * 0.25;
 
-    setState(() => _containersLoading = true);
+    if (_visibleContainers.isEmpty) {
+      setState(() => _containersLoading = true);
+    } else {
+      _containersLoading = true;
+    }
 
     try {
       final containers = await _refsRepository.loadContainersInBounds(
@@ -149,7 +155,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     } catch (_) {
       // Keep the last successfully loaded markers on transient network errors.
       if (!mounted || serial != _containersRequestSerial) return;
-      setState(() => _containersLoading = false);
+      if (_visibleContainers.isEmpty) {
+        setState(() => _containersLoading = false);
+      } else {
+        _containersLoading = false;
+      }
     }
   }
 
@@ -255,6 +265,29 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final horizontal = AppResponsive.horizontalPadding(context);
     final showLabels = _zoom >= _containerLabelMinZoom;
+    final showShapes =
+        _zoom >= _containerShapeMinZoom &&
+        (_visibleContainers.length <= _maxRenderedContainerShapes ||
+            _zoom >= _containerLabelMinZoom);
+
+    final containerPolygons = _visibleContainers
+        .where((c) => c.latValue != null && c.lonValue != null)
+        .where((c) => showShapes || selectedContainer?.id == c.id)
+        .map((container) {
+          final selected = selectedContainer?.id == container.id;
+          return Polygon(
+            points: _containerPolygonPoints(
+              container.latValue!,
+              container.lonValue!,
+            ),
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.16)
+                : AppColors.white.withValues(alpha: 0.2),
+            borderColor: selected ? AppColors.primary : AppColors.textPrimary,
+            borderStrokeWidth: selected ? 2.2 : 1.2,
+          );
+        })
+        .toList();
 
     final markers = _visibleContainers
         .where((c) => c.latValue != null && c.lonValue != null)
@@ -309,6 +342,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
+              if (containerPolygons.isNotEmpty)
+                PolygonLayer(polygons: containerPolygons),
               if (markers.isNotEmpty) MarkerLayer(markers: markers),
             ],
           ),
@@ -391,6 +426,18 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         ],
       ),
     );
+  }
+
+  List<LatLng> _containerPolygonPoints(double lat, double lon) {
+    const dLat = 0.000055;
+    const dLon = 0.000075;
+
+    return [
+      LatLng(lat - dLat, lon - dLon),
+      LatLng(lat - dLat, lon + dLon),
+      LatLng(lat + dLat, lon + dLon),
+      LatLng(lat + dLat, lon - dLon),
+    ];
   }
 }
 

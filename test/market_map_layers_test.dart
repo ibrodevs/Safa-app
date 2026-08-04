@@ -3,7 +3,7 @@ import 'package:dogo/features/main_module/map/data/model/market_map_feature.dart
 import 'package:dogo/features/main_module/map/view/widgets/market_map_layers.dart';
 
 void main() {
-  test('parses and renders polygon only at configured zoom', () {
+  test('district polygons render from mobile-friendly zoom', () {
     final feature = MarketMapFeature.fromJson({
       'type': 'Feature',
       'id': 'district-1',
@@ -29,11 +29,11 @@ void main() {
     });
 
     expect(
-      MarketMapRenderData.fromFeatures([feature], zoom: 13).polygons,
+      MarketMapRenderData.fromFeatures([feature], zoom: 11).polygons,
       isEmpty,
     );
     expect(
-      MarketMapRenderData.fromFeatures([feature], zoom: 14).polygons,
+      MarketMapRenderData.fromFeatures([feature], zoom: 12).polygons,
       hasLength(1),
     );
   });
@@ -49,7 +49,7 @@ void main() {
       },
     });
 
-    final data = MarketMapRenderData.fromFeatures([feature], zoom: 18);
+    final data = MarketMapRenderData.fromFeatures([feature], zoom: 15);
     expect(data.polygons, hasLength(1));
     expect(data.polylines, isEmpty);
     expect(data.markers, hasLength(1));

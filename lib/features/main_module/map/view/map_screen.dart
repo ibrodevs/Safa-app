@@ -53,6 +53,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   /// Ниже этого масштаба подписи контейнеров скрываются, чтобы карта
   /// не превращалась в визуальный хаос.
   static const double _containerLabelMinZoom = 16;
+  static const double _containerShapeMinZoom = 15;
+  static const int _maxRenderedLooseContainers = 180;
 
   ServiceConfig get _config => ServiceConfig.fromType(widget.serviceType);
 
@@ -101,8 +103,16 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   ContainerRef? _selectedContainer;
   bool _containersLoading = false;
   int _containersRequestSerial = 0;
+  LatLngBounds? _lastContainersBounds;
+  int? _lastContainersZoomBucket;
 
   List<MarketMapFeature> _marketMapFeatures = const [];
+  MarketMapRenderData? _marketMapRenderCache;
+  int? _marketMapRenderZoomBucket;
+  int? _marketMapRenderFeatureCount;
+  int? _marketMapRenderFeatureHash;
+  Set<int> _publishedContainerIdsCache = const {};
+  int? _publishedContainerHash;
   bool _marketMapLoading = false;
   int _marketMapRequestSerial = 0;
 
@@ -222,13 +232,25 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       return;
     }
 
+    final zoomBucket = _zoom.floor();
+    final previousBounds = _lastContainersBounds;
+    if (previousBounds != null &&
+        _lastContainersZoomBucket == zoomBucket &&
+        !_shouldReloadContainers(previousBounds, bounds)) {
+      return;
+    }
+
     final serial = ++_containersRequestSerial;
     final latPadding =
         (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.25;
     final lonPadding =
         (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.25;
 
-    setState(() => _containersLoading = true);
+    if (_visibleContainers.isEmpty) {
+      setState(() => _containersLoading = true);
+    } else {
+      _containersLoading = true;
+    }
 
     try {
       final containers = await _refsRepository.loadContainersInBounds(
@@ -252,12 +274,18 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       setState(() {
         _visibleContainers = merged;
         _containersLoading = false;
+        _lastContainersBounds = bounds;
+        _lastContainersZoomBucket = zoomBucket;
       });
     } catch (_) {
       // При кратковременной сетевой ошибке сохраняем последние успешно
       // загруженные маркеры — раньше они пропадали с карты.
       if (!mounted || serial != _containersRequestSerial) return;
-      setState(() => _containersLoading = false);
+      if (_visibleContainers.isEmpty) {
+        setState(() => _containersLoading = false);
+      } else {
+        _containersLoading = false;
+      }
     }
   }
 
@@ -276,6 +304,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       setState(() {
         _visibleContainers = containers;
         _containersLoading = false;
+        _lastContainersBounds = null;
+        _lastContainersZoomBucket = null;
       });
 
       if (points.isNotEmpty) {
@@ -571,6 +601,62 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       }
     }
     return out;
+  }
+
+  int _marketFeatureHash() {
+    var hash = 17;
+    for (final feature in _marketMapFeatures) {
+      hash = 37 * hash + feature.id.hashCode;
+      hash = 37 * hash + feature.kind.hashCode;
+      hash = 37 * hash + feature.minZoom;
+    }
+    return hash;
+  }
+
+  MarketMapRenderData _marketMapRenderData() {
+    final zoomBucket = _zoom.floor();
+    final hash = _marketFeatureHash();
+    final cached = _marketMapRenderCache;
+    if (cached != null &&
+        _marketMapRenderZoomBucket == zoomBucket &&
+        _marketMapRenderFeatureCount == _marketMapFeatures.length &&
+        _marketMapRenderFeatureHash == hash) {
+      return cached;
+    }
+
+    final next = MarketMapRenderData.fromFeatures(
+      _marketMapFeatures,
+      zoom: _zoom,
+    );
+    _marketMapRenderCache = next;
+    _marketMapRenderZoomBucket = zoomBucket;
+    _marketMapRenderFeatureCount = _marketMapFeatures.length;
+    _marketMapRenderFeatureHash = hash;
+    return next;
+  }
+
+  Set<int> _publishedContainerIds() {
+    final hash = _marketFeatureHash();
+    if (_publishedContainerHash == hash) return _publishedContainerIdsCache;
+    final ids = _marketMapFeatures
+        .where((feature) => feature.isContainer)
+        .map(_marketMapContainerId)
+        .whereType<int>()
+        .toSet();
+    _publishedContainerHash = hash;
+    _publishedContainerIdsCache = ids;
+    return ids;
+  }
+
+  bool _shouldReloadContainers(LatLngBounds previous, LatLngBounds next) {
+    final previousLatSpan = (previous.north - previous.south).abs();
+    final previousLonSpan = (previous.east - previous.west).abs();
+    final previousCenter = previous.center;
+    final nextCenter = next.center;
+    final latShift = (previousCenter.latitude - nextCenter.latitude).abs();
+    final lonShift = (previousCenter.longitude - nextCenter.longitude).abs();
+    return latShift > previousLatSpan * 0.25 ||
+        lonShift > previousLonSpan * 0.25;
   }
 
   // --- Состояние заказа -------------------------------------------------
@@ -1180,18 +1266,20 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     required bool showContainerLabels,
   }) {
     final markers = <Marker>[];
-    final marketMap = MarketMapRenderData.fromFeatures(
-      _marketMapFeatures,
-      zoom: _zoom,
-    );
-    final publishedContainerIds = _marketMapFeatures
-        .where((feature) => feature.isContainer)
-        .map(_marketMapContainerId)
-        .whereType<int>()
-        .toSet();
+    final containerPolygons = <Polygon>[];
+    final marketMap = _marketMapRenderData();
+    final publishedContainerIds = _publishedContainerIds();
+    final shouldDrawLooseContainerShapes =
+        _zoom >= _containerShapeMinZoom &&
+        (_visibleContainers.length <= _maxRenderedLooseContainers ||
+            _zoom >= _containerLabelMinZoom);
 
     for (final feature in _marketMapFeatures) {
-      if (!feature.isContainer || feature.minZoom > _zoom) continue;
+      if (!feature.isContainer ||
+          feature.minZoom > _zoom ||
+          _zoom < _containerShapeMinZoom) {
+        continue;
+      }
       final center = _featureCenter(feature.coordinates);
       if (center == null) continue;
       markers.add(
@@ -1216,6 +1304,19 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       if (lat == null || lon == null) continue;
 
       final selected = _selectedContainer?.id == container.id;
+
+      if (selected || shouldDrawLooseContainerShapes) {
+        containerPolygons.add(
+          Polygon(
+            points: _containerPolygonPoints(lat, lon),
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.16)
+                : AppColors.white.withValues(alpha: 0.2),
+            borderColor: selected ? AppColors.primary : AppColors.textPrimary,
+            borderStrokeWidth: selected ? 2.2 : 1.2,
+          ),
+        );
+      }
 
       markers.add(
         Marker(
@@ -1313,6 +1414,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           PolygonLayer(polygons: marketMap.polygons),
         if (marketMap.polylines.isNotEmpty)
           PolylineLayer(polylines: marketMap.polylines),
+        if (containerPolygons.isNotEmpty)
+          PolygonLayer(polygons: containerPolygons),
         if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
           PolylineLayer(
             polylines: [
@@ -1331,6 +1434,18 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         MarkerLayer(markers: [...marketMap.markers, ...markers]),
       ],
     );
+  }
+
+  List<LatLng> _containerPolygonPoints(double lat, double lon) {
+    const dLat = 0.000055;
+    const dLon = 0.000075;
+
+    return [
+      LatLng(lat - dLat, lon - dLon),
+      LatLng(lat - dLat, lon + dLon),
+      LatLng(lat + dLat, lon + dLon),
+      LatLng(lat + dLat, lon - dLon),
+    ];
   }
 
   Widget _buildBottomPanel({
