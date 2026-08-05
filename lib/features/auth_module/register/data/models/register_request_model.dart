@@ -2,6 +2,14 @@ import 'package:dio/dio.dart';
 
 enum UserRole { client, carrier }
 
+enum SpecialistType { cart, delivery }
+
+extension SpecialistTypeX on SpecialistType {
+  String get apiValue => this == SpecialistType.cart ? 'cart' : 'delivery';
+
+  String get title => this == SpecialistType.cart ? 'Тачкист' : 'Доставщик';
+}
+
 extension UserRoleX on UserRole {
   String get apiValue => this == UserRole.client ? 'client' : 'carrier';
 }
@@ -22,6 +30,7 @@ class RegisterRequest {
   final String lastName;
   final String? avatarPath;
   final UserRole role;
+  final SpecialistType? specialistType;
   final String password;
   final String passwordConfirm;
   final String? idFrontPath;
@@ -33,6 +42,7 @@ class RegisterRequest {
     required this.lastName,
     this.avatarPath,
     required this.role,
+    this.specialistType,
     required this.password,
     required this.passwordConfirm,
     this.idFrontPath,
@@ -46,6 +56,8 @@ class RegisterRequest {
       'last_name': lastName,
       'avatar': avatarPath,
       'role': role.apiValue,
+      if (role == UserRole.carrier && specialistType != null)
+        'specialist_type': specialistType!.apiValue,
       'password': password,
       'password_confirm': passwordConfirm,
       'id_front': idFrontPath,
@@ -59,6 +71,8 @@ class RegisterRequest {
       'first_name': firstName,
       'last_name': lastName,
       'role': role.apiValue,
+      if (role == UserRole.carrier && specialistType != null)
+        'specialist_type': specialistType!.apiValue,
       'password': password,
       'password_confirm': passwordConfirm,
     });

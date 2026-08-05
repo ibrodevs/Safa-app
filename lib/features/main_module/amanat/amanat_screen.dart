@@ -61,6 +61,7 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
     final state = context.watch<AmanatProvider>();
     final campaigns = state.campaigns;
     final featured = state.featuredCampaign;
+    final bottomSafe = math.max(MediaQuery.viewPaddingOf(context).bottom, 16.0);
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: () => context.read<AmanatProvider>().load(),
@@ -68,7 +69,7 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
-        padding: const EdgeInsets.fromLTRB(15, 9, 15, 28),
+        padding: EdgeInsets.fromLTRB(15, 9, 15, 28 + bottomSafe),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -83,59 +84,6 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
               )
             else if (featured != null)
               _HeroCampaignCard(campaign: featured),
-            const SizedBox(height: 20),
-            const Text(
-              'Сборы',
-              style: TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 28,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _CategoryTabs(
-              categories: state.categories,
-              selectedSlug: state.selectedCategorySlug,
-              onSelected: state.loading
-                  ? (_) {}
-                  : (slug) =>
-                        context.read<AmanatProvider>().selectCategory(slug),
-            ),
-            const SizedBox(height: 12),
-            if (state.loading && campaigns.isNotEmpty)
-              const LinearProgressIndicator(
-                minHeight: 2,
-                color: AppColors.primary,
-                backgroundColor: Color(0xFFEAEAEA),
-              )
-            else if (campaigns.isEmpty && state.error == null)
-              const _AmanatEmptyState(
-                message: 'В этой категории пока нет сборов',
-              )
-            else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: campaigns.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisExtent: 264,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 18,
-                ),
-                itemBuilder: (context, index) {
-                  final campaign = campaigns[index];
-                  return _CampaignTile(
-                    campaign: campaign,
-                    onOpen: () => context.push(
-                      '${AmanatDetailScreen.route}?id=${campaign.id}',
-                    ),
-                    onDonate: () => _showDonateSheet(context, campaign),
-                  );
-                },
-              ),
           ],
         ),
       ),
@@ -195,11 +143,12 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
       return const Center(child: CircularProgressIndicator());
     }
     final selectedCampaign = campaign;
+    final bottomSafe = math.max(MediaQuery.viewPaddingOf(context).bottom, 16.0);
     return Stack(
       children: [
         SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(15, 9, 15, 104),
+          padding: EdgeInsets.fromLTRB(15, 9, 15, 104 + bottomSafe),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -241,7 +190,7 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
         Positioned(
           left: 15,
           right: 15,
-          bottom: 16 + MediaQuery.of(context).padding.bottom,
+          bottom: 16 + bottomSafe,
           child: SizedBox(
             height: 52,
             child: FilledButton(
@@ -446,168 +395,6 @@ class _HeroCampaignCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CategoryTabs extends StatelessWidget {
-  const _CategoryTabs({
-    required this.categories,
-    required this.selectedSlug,
-    required this.onSelected,
-  });
-
-  final List<AmanatCategory> categories;
-  final String? selectedSlug;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 28,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: categories.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 21),
-        itemBuilder: (context, index) {
-          final category = index == 0 ? null : categories[index - 1];
-          final title = category?.name ?? 'Все';
-          final slug = category?.slug;
-          final isSelected = slug == selectedSlug;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => onSelected(slug),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: isSelected ? 17 : 0),
-              alignment: Alignment.center,
-              decoration: isSelected
-                  ? BoxDecoration(
-                      color: const Color(0xFFFF8425),
-                      borderRadius: BorderRadius.circular(15),
-                    )
-                  : null,
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontFamily: AppTypography.fontFamily,
-                  fontSize: 11,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _CampaignTile extends StatelessWidget {
-  const _CampaignTile({
-    required this.campaign,
-    required this.onOpen,
-    required this.onDonate,
-  });
-
-  final AmanatCampaign campaign;
-  final VoidCallback onOpen;
-  final VoidCallback onDonate;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onOpen,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.all(Radius.circular(7)),
-            child: SizedBox(
-              height: 120,
-              width: double.infinity,
-              child: _CampaignImage(campaign: campaign),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            campaign.shortTitle.isEmpty ? campaign.title : campaign.shortTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: AppTypography.fontFamily,
-              fontSize: 14,
-              height: 1.08,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            '${campaign.endsAt.isEmpty ? 'Нужно собрать:' : 'До ${campaign.endsAt} нужно собрать:'}\n${_money(campaign.neededAmount)} сом',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: AppTypography.fontFamily,
-              fontSize: 12,
-              height: 1.28,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: SizedBox(
-              height: 7,
-              child: LinearProgressIndicator(
-                value: campaign.progress.clamp(0, 1),
-                backgroundColor: const Color(0xFFEAEAEA),
-                valueColor: const AlwaysStoppedAnimation(Color(0xFF3EBD44)),
-                minHeight: 7,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Собрано: ${_money(campaign.collectedAmount)} сом',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: AppTypography.fontFamily,
-              fontSize: 12,
-              height: 1.15,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 9),
-          SizedBox(
-            height: 28,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF8425),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.only(left: 13, right: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                textStyle: const TextStyle(
-                  fontFamily: AppTypography.fontFamily,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              onPressed: onDonate,
-              icon: const Icon(Icons.add_circle_outline, size: 13),
-              label: const Text('Помочь'),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -884,12 +671,16 @@ Future<void> _showDonateSheet(
       return StatefulBuilder(
         builder: (context, setSheetState) {
           final provider = context.watch<AmanatProvider>();
+          final bottomSafe = math.max(
+            MediaQuery.viewPaddingOf(context).bottom,
+            16.0,
+          );
           return Padding(
             padding: EdgeInsets.fromLTRB(
               20,
               20,
               20,
-              20 + MediaQuery.of(context).viewInsets.bottom,
+              20 + bottomSafe + MediaQuery.viewInsetsOf(context).bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

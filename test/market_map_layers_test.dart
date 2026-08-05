@@ -84,4 +84,43 @@ void main() {
     expect(data.polygons, hasLength(5));
     expect(data.markers, hasLength(5));
   });
+
+  test('container feature rendering can be disabled while map moves', () {
+    final bazar = MarketMapFeature.fromJson({
+      'type': 'Feature',
+      'id': 'bazar-1',
+      'properties': {'kind': 'bazar', 'name': 'Базар', 'min_zoom': 10},
+      'geometry': {
+        'type': 'Polygon',
+        'coordinates': [
+          [
+            [74.60, 42.90],
+            [74.65, 42.90],
+            [74.65, 42.95],
+            [74.60, 42.95],
+            [74.60, 42.90],
+          ],
+        ],
+      },
+    });
+    final container = MarketMapFeature.fromJson({
+      'type': 'Feature',
+      'id': 'container-1',
+      'properties': {'kind': 'container', 'name': '1', 'min_zoom': 15},
+      'geometry': {
+        'type': 'Point',
+        'coordinates': [74.62, 42.94],
+      },
+    });
+
+    final data = MarketMapRenderData.fromFeatures(
+      [bazar, container],
+      zoom: 16,
+      center: const LatLng(42.94, 74.62),
+      maxContainerFeatures: 0,
+    );
+
+    expect(data.polygons, hasLength(1));
+    expect(data.markers, hasLength(1));
+  });
 }

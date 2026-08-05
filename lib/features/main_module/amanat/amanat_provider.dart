@@ -12,6 +12,7 @@ class AmanatProvider extends ChangeNotifier {
 
   final List<AmanatCategory> _categories = [];
   final List<AmanatCampaign> _campaigns = [];
+  AmanatCampaign? _featuredCampaign;
 
   List<AmanatCategory> get categories => List.unmodifiable(_categories);
   List<AmanatCampaign> get campaigns => List.unmodifiable(_campaigns);
@@ -34,11 +35,13 @@ class AmanatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  AmanatCampaign? get featuredCampaign {
-    for (final campaign in _campaigns) {
+  AmanatCampaign? get featuredCampaign => _featuredCampaign;
+
+  AmanatCampaign? _pickFeatured(List<AmanatCampaign> campaigns) {
+    for (final campaign in campaigns) {
       if (campaign.isFeatured) return campaign;
     }
-    return _campaigns.isEmpty ? null : _campaigns.first;
+    return campaigns.isEmpty ? null : campaigns.first;
   }
 
   Future<void> load() async {
@@ -47,9 +50,13 @@ class AmanatProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final categories = await _repository.loadCategories();
+      final allCampaigns = _selectedCategorySlug == null
+          ? null
+          : await _repository.loadCampaigns();
       final campaigns = await _repository.loadCampaigns(
         categorySlug: _selectedCategorySlug,
       );
+      _featuredCampaign = _pickFeatured(allCampaigns ?? campaigns);
       _categories
         ..clear()
         ..addAll(categories);
@@ -83,6 +90,9 @@ class AmanatProvider extends ChangeNotifier {
         _campaigns[index] = updated;
       } else {
         _campaigns.add(updated);
+      }
+      if (_featuredCampaign?.id == updated.id || updated.isFeatured) {
+        _featuredCampaign = updated;
       }
       notifyListeners();
       return updated;

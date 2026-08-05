@@ -174,7 +174,10 @@ final class MarketMapRenderData {
   }) {
     final limit = maxContainerFeatures;
     final sorted = features.toList();
-    if (limit == null || limit <= 0 || center == null) return sorted;
+    if (limit == null || limit < 0 || center == null) return sorted;
+    if (limit == 0) {
+      return sorted.where((feature) => !feature.isContainer).toList();
+    }
 
     final containerIndexes = <int>[];
     for (var i = 0; i < sorted.length; i++) {
@@ -256,7 +259,7 @@ final class MarketMapRenderData {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: color,
-            fontSize: 12,
+            fontSize: 11,
             height: 1,
             fontWeight: FontWeight.w800,
             shadows: const [

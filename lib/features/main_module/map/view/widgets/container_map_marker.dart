@@ -25,6 +25,7 @@ class ContainerMapMarker extends StatelessWidget {
 
   /// Размер зоны нажатия маркера.
   static const double hitSize = 44;
+  static const double labelFontSize = 11;
 
   final ContainerRef container;
   final bool selected;
@@ -74,7 +75,7 @@ class _LabelText extends StatelessWidget {
       style: TextStyle(
         fontFamily: AppTypography.fontFamily,
         color: selected ? AppColors.primary : AppColors.textPrimary,
-        fontSize: selected ? 13 : 12,
+        fontSize: ContainerMapMarker.labelFontSize,
         height: 1,
         fontWeight: FontWeight.w800,
         shadows: const [
@@ -96,7 +97,7 @@ class _Dot extends StatelessWidget {
       style: TextStyle(
         fontFamily: AppTypography.fontFamily,
         color: AppColors.textPrimary,
-        fontSize: 16,
+        fontSize: ContainerMapMarker.labelFontSize,
         height: 1,
         fontWeight: FontWeight.w800,
         shadows: [

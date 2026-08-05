@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider(this._repo);
 
   UserRole? _role;
+  SpecialistType? _specialistType;
   bool _loading = false;
   String? _error;
   RegisterResponse? _user;
@@ -22,6 +23,7 @@ class AuthProvider extends ChangeNotifier {
   bool _loggedIn = false;
 
   UserRole? get role => _role;
+  SpecialistType? get specialistType => _specialistType;
   bool get loading => _loading;
   String? get error => _error;
   RegisterResponse? get user => _user;
@@ -70,6 +72,13 @@ class AuthProvider extends ChangeNotifier {
 
   void setRole(UserRole role) {
     _role = role;
+    if (role == UserRole.client) _specialistType = null;
+    notifyListeners();
+  }
+
+  void setSpecialistType(SpecialistType type) {
+    _role = UserRole.carrier;
+    _specialistType = type;
     notifyListeners();
   }
 
@@ -93,6 +102,7 @@ class AuthProvider extends ChangeNotifier {
       lastName: lastName,
       avatarPath: avatarPath,
       role: _role ?? UserRole.client,
+      specialistType: _specialistType,
       password: password,
       passwordConfirm: passwordConfirm,
       idFrontPath: idFront,
@@ -117,7 +127,8 @@ class AuthProvider extends ChangeNotifier {
               e.message.toLowerCase().contains('уже зарегистрирован'));
       if (alreadyExists) {
         _loading = false;
-        _error = 'Аккаунт с этим номером уже существует. Войдите через экран авторизации.';
+        _error =
+            'Аккаунт с этим номером уже существует. Войдите через экран авторизации.';
         notifyListeners();
         return false;
       }

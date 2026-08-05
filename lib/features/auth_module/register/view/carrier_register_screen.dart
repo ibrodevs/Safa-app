@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../data/models/register_request_model.dart';
 import '../provider/auth_provider.dart';
 import 'components/image_source_sheet.dart';
 import 'components/register_dots_indicator.dart';
@@ -164,6 +165,8 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final loading = context.watch<AuthProvider>().loading;
+    final specialistType =
+        context.watch<AuthProvider>().specialistType ?? SpecialistType.delivery;
 
     return AppScreenScaffold(
       backgroundColor: AppColors.surface,
@@ -194,8 +197,8 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AuthBrandHeader(
-            title: 'Регистрация специалиста',
+          AuthBrandHeader(
+            title: 'Регистрация: ${specialistType.title}',
             subtitle:
                 'Заполните данные и загрузите документ, '
                 'чтобы принимать заказы',

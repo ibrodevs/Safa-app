@@ -68,8 +68,68 @@ class RoleSelectScreen extends StatelessWidget {
                 onTapCarrier ??
                 () {
                   context.read<AuthProvider>().setRole(UserRole.carrier);
-                  context.push('/register-carrier');
+                  context.push('/select-specialist-type');
                 },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SpecialistTypeSelectScreen extends StatelessWidget {
+  const SpecialistTypeSelectScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppScreenScaffold(
+      backgroundColor: AppColors.surface,
+      showBackButton: true,
+      footer: Column(
+        children: [
+          const Hero(
+            tag: 'register_dots',
+            child: RegisterDotsIndicator(activeIndex: 0),
+          ),
+          AppTextButton(
+            label: 'Назад к выбору роли',
+            muted: true,
+            onPressed: () => context.pop(),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AuthBrandHeader(
+            title: 'Какой вы специалист?',
+            subtitle: 'Выберите формат работы, чтобы видеть подходящие заказы',
+          ),
+          AppSpacing.gapXl,
+          _RoleCard(
+            imageAsset: AppImages.roleCarrier,
+            icon: Icons.shopping_cart_outlined,
+            title: 'Тачкист',
+            subtitle: 'Работает внутри базаров и принимает заказы “Тачки”',
+            onTap: () {
+              context.read<AuthProvider>().setSpecialistType(
+                SpecialistType.cart,
+              );
+              context.push('/register-carrier');
+            },
+          ),
+          AppSpacing.gapSm,
+          _RoleCard(
+            imageAsset: AppImages.roleCarrier,
+            icon: Icons.local_shipping_outlined,
+            title: 'Доставщик',
+            subtitle: 'Работает с доставкой вне базара и аманат-заказами',
+            onTap: () {
+              context.read<AuthProvider>().setSpecialistType(
+                SpecialistType.delivery,
+              );
+              context.push('/register-carrier');
+            },
           ),
         ],
       ),

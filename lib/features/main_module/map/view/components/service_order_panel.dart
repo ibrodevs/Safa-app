@@ -61,7 +61,9 @@ class ServiceOrderPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final keyboard = media.viewInsets.bottom;
-    final safeBottom = media.viewPadding.bottom;
+    final safeBottom = media.viewPadding.bottom < 16
+        ? 16.0
+        : media.viewPadding.bottom;
 
     // Панель никогда не занимает больше 78% экрана и всегда поднимается
     // над клавиатурой — при вводе описания «Аманата» кнопка остаётся видимой.

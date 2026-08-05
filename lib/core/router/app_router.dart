@@ -94,6 +94,11 @@ final class AppRouter {
             _build(state, const RoleSelectScreen()),
       ),
       GoRoute(
+        path: '/select-specialist-type',
+        pageBuilder: (context, state) =>
+            _build(state, const SpecialistTypeSelectScreen()),
+      ),
+      GoRoute(
         path: '/login',
         pageBuilder: (context, state) => _build(state, const LoginScreen()),
       ),

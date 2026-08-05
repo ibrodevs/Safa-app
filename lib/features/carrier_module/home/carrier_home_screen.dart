@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
@@ -14,6 +15,9 @@ import '../../../core/utils/snackbar_utils.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
+import '../../main_module/map/data/model/market_map_feature.dart';
+import '../../main_module/map/data/repo/market_map_repository.dart';
+import '../../main_module/map/view/widgets/market_map_layers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/model/nearby_shipment.dart';
@@ -57,11 +61,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
   final MapController _mapController = MapController();
+  final MarketMapRepository _marketMapRepository = MarketMapRepository();
 
   double _myLat = 42.8746;
   double _myLon = 74.6122;
   double _centerLat = 42.8746;
   double _centerLon = 74.6122;
+  double _zoom = 15;
 
   StreamSubscription<Position>? _posSub;
 
@@ -94,6 +100,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   bool get _hasActive => _activeId != null;
   bool _showEmptyOrders = false;
   Timer? _nearbyPollTimer;
+  bool _marketMapLoading = false;
+  int? _marketMapPointsHash;
+  List<MarketMapFeature> _marketMapFeatures = const [];
+  MarketMapRenderData? _marketMapRenderCache;
 
   @override
   void initState() {
@@ -679,30 +689,195 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return const [];
   }
 
-  Future<List<LatLng>> _buildOsrmRouteMultiLeg(List<LatLng> pts) async {
+  Future<void> _loadMarketMapForPoints(List<LatLng> pts) async {
+    if (_marketMapLoading || pts.isEmpty) return;
+    final hash = Object.hashAll(
+      pts.map((p) => '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}'),
+    );
+    if (_marketMapPointsHash == hash && _marketMapFeatures.isNotEmpty) return;
+
+    var minLat = pts.first.latitude;
+    var maxLat = pts.first.latitude;
+    var minLon = pts.first.longitude;
+    var maxLon = pts.first.longitude;
+    for (final p in pts.skip(1)) {
+      minLat = math.min(minLat, p.latitude);
+      maxLat = math.max(maxLat, p.latitude);
+      minLon = math.min(minLon, p.longitude);
+      maxLon = math.max(maxLon, p.longitude);
+    }
+
+    const padding = 0.004;
+    _marketMapLoading = true;
+    try {
+      final collection = await _marketMapRepository.loadPublished(
+        zoom: 16,
+        minLat: minLat - padding,
+        maxLat: maxLat + padding,
+        minLon: minLon - padding,
+        maxLon: maxLon + padding,
+        centerLat: (minLat + maxLat) / 2,
+        centerLon: (minLon + maxLon) / 2,
+        maxContainers: 260,
+      );
+      if (!mounted) return;
+      setState(() {
+        _marketMapFeatures = collection.features;
+        _marketMapRenderCache = null;
+        _marketMapPointsHash = hash;
+        _routeSignature = null;
+      });
+    } catch (_) {
+      // Маршрут всё равно построится через OSRM.
+    } finally {
+      _marketMapLoading = false;
+    }
+  }
+
+  List<_CarrierPassageLine> _passageLines() {
+    final lines = <_CarrierPassageLine>[];
+    for (final feature in _marketMapFeatures) {
+      if (feature.kind != 'passage' || feature.geometryType != 'LineString') {
+        continue;
+      }
+      final points = _linePointsFromCoordinates(feature.coordinates);
+      if (points.length >= 2) {
+        lines.add(_CarrierPassageLine(id: feature.id, points: points));
+      }
+    }
+    return lines;
+  }
+
+  List<LatLng> _linePointsFromCoordinates(dynamic raw) {
+    if (raw is! List) return const [];
+    final points = <LatLng>[];
+    for (final item in raw) {
+      if (item is! List || item.length < 2) continue;
+      final lon = _asDouble(item[0]);
+      final lat = _asDouble(item[1]);
+      if (lat == null || lon == null) continue;
+      points.add(LatLng(lat, lon));
+    }
+    return points;
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  _CarrierPassageSnap? _nearestPassageSnap(
+    LatLng point,
+    List<_CarrierPassageLine> lines, {
+    double maxDistanceM = 90,
+  }) {
+    _CarrierPassageSnap? best;
+    for (final line in lines) {
+      for (var i = 0; i < line.points.length - 1; i++) {
+        final projected = _projectToSegment(point, line.points[i], line.points[i + 1]);
+        final distanceM = _distanceMeters(point, projected.point);
+        if (distanceM > maxDistanceM) continue;
+        if (best == null || distanceM < best.distanceM) {
+          best = _CarrierPassageSnap(
+            line: line,
+            point: projected.point,
+            segmentIndex: i,
+            distanceM: distanceM,
+          );
+        }
+      }
+    }
+    return best;
+  }
+
+  _CarrierProjectedPoint _projectToSegment(LatLng p, LatLng a, LatLng b) {
+    final latScale = 111320.0;
+    final lonScale = latScale * math.cos(p.latitude * math.pi / 180);
+    final ax = (a.longitude - p.longitude) * lonScale;
+    final ay = (a.latitude - p.latitude) * latScale;
+    final bx = (b.longitude - p.longitude) * lonScale;
+    final by = (b.latitude - p.latitude) * latScale;
+    final dx = bx - ax;
+    final dy = by - ay;
+    final len2 = dx * dx + dy * dy;
+    final rawT = len2 <= 0 ? 0.0 : (-(ax * dx + ay * dy) / len2);
+    final t = rawT.clamp(0.0, 1.0);
+    return _CarrierProjectedPoint(
+      LatLng(
+        a.latitude + (b.latitude - a.latitude) * t,
+        a.longitude + (b.longitude - a.longitude) * t,
+      ),
+    );
+  }
+
+  double _distanceMeters(LatLng a, LatLng b) {
+    return const Distance().as(LengthUnit.Meter, a, b);
+  }
+
+  List<LatLng> _passageSegmentBetween(_CarrierPassageSnap a, _CarrierPassageSnap b) {
+    final points = a.line.points;
+    if (a.line.id != b.line.id || points.length < 2) return const [];
+    final route = <LatLng>[a.point];
+    if (a.segmentIndex <= b.segmentIndex) {
+      for (var i = a.segmentIndex + 1; i <= b.segmentIndex; i++) {
+        if (i >= 0 && i < points.length) route.add(points[i]);
+      }
+    } else {
+      for (var i = a.segmentIndex; i > b.segmentIndex; i--) {
+        if (i >= 0 && i < points.length) route.add(points[i]);
+      }
+    }
+    route.add(b.point);
+    return _dedupeRoutePoints(route);
+  }
+
+  List<LatLng> _dedupeRoutePoints(List<LatLng> points) {
+    final out = <LatLng>[];
+    for (final point in points) {
+      if (out.isEmpty || _distanceMeters(out.last, point) > 0.5) {
+        out.add(point);
+      }
+    }
+    return out;
+  }
+
+  Future<List<LatLng>> _buildRouteMultiLeg(List<LatLng> pts) async {
     if (pts.length < 2) return const [];
+    await _loadMarketMapForPoints(pts);
+    final passages = _passageLines();
     final full = <LatLng>[];
 
-    for (int i = 0; i < pts.length - 1; i++) {
-      final leg = await _buildOsrmLegRoute(a: pts[i], b: pts[i + 1]);
+    for (var i = 0; i < pts.length - 1; i++) {
+      final a = pts[i];
+      final b = pts[i + 1];
+      final snapA = _nearestPassageSnap(a, passages);
+      final snapB = _nearestPassageSnap(b, passages);
+      var leg = <LatLng>[];
 
-      if (leg.isEmpty) {
-        if (full.isNotEmpty) full.add(pts[i]);
-        full.add(pts[i + 1]);
-      } else {
-        if (full.isNotEmpty) {
-          full.addAll(leg.skip(1));
-        } else {
-          full.addAll(leg);
+      if (snapA != null && snapB != null && snapA.line.id == snapB.line.id) {
+        final passage = _passageSegmentBetween(snapA, snapB);
+        if (passage.length >= 2) {
+          leg = _dedupeRoutePoints([a, ...passage, b]);
         }
       }
 
-      if (i != pts.length - 2) {
+      if (leg.isEmpty) {
+        leg = await _buildOsrmLegRoute(a: a, b: b);
+      }
+      if (leg.isEmpty) leg = [a, b];
+
+      if (full.isEmpty) {
+        full.addAll(leg);
+      } else {
+        full.addAll(leg.skip(1));
+      }
+
+      if (leg.length <= 2 && i != pts.length - 2) {
         await Future.delayed(const Duration(milliseconds: 1100));
       }
     }
 
-    return full;
+    return _dedupeRoutePoints(full);
   }
 
   void _fitToPoints(List<LatLng> pts) {
@@ -787,7 +962,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     _routing = true;
 
     try {
-      final route = await _buildOsrmRouteMultiLeg(pts);
+      final route = await _buildRouteMultiLeg(pts);
       if (!mounted) return;
 
       setState(() {
@@ -866,6 +1041,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       );
     }
 
+    final marketMap = _marketMapRenderCache ??= MarketMapRenderData.fromFeatures(
+      _marketMapFeatures,
+      zoom: _zoom,
+      center: LatLng(_centerLat, _centerLon),
+      maxContainerFeatures: 120,
+    );
+
     Widget bottom;
     if (_showWelcome) {
       bottom = _WelcomeCard(loading: _loadingOnline, onTap: _goOnline);
@@ -917,6 +1099,12 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
               onPositionChanged: (pos, hasGesture) {
                 _centerLat = pos.center.latitude;
                 _centerLon = pos.center.longitude;
+                final oldZoomBucket = _zoom.floor();
+                _zoom = pos.zoom;
+                if (oldZoomBucket != _zoom.floor()) {
+                  _marketMapRenderCache = null;
+                  if (mounted) setState(() {});
+                }
               },
             ),
             children: [
@@ -926,6 +1114,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
+              if (marketMap.polygons.isNotEmpty)
+                PolygonLayer(polygons: marketMap.polygons),
+              if (marketMap.polylines.isNotEmpty)
+                PolylineLayer(polylines: marketMap.polylines),
 
               if (_routePoints.isNotEmpty) ...[
                 PolylineLayer(
@@ -943,6 +1135,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   ],
                 ),
               ],
+              if (marketMap.markers.isNotEmpty)
+                MarkerLayer(markers: marketMap.markers),
+              if (markers.isNotEmpty) MarkerLayer(markers: markers),
             ],
           ),
           Positioned.fill(
@@ -1004,6 +1199,33 @@ class _StopDot extends StatelessWidget {
       ),
     );
   }
+}
+
+final class _CarrierPassageLine {
+  const _CarrierPassageLine({required this.id, required this.points});
+
+  final String id;
+  final List<LatLng> points;
+}
+
+final class _CarrierPassageSnap {
+  const _CarrierPassageSnap({
+    required this.line,
+    required this.point,
+    required this.segmentIndex,
+    required this.distanceM,
+  });
+
+  final _CarrierPassageLine line;
+  final LatLng point;
+  final int segmentIndex;
+  final double distanceM;
+}
+
+final class _CarrierProjectedPoint {
+  const _CarrierProjectedPoint(this.point);
+
+  final LatLng point;
 }
 
 class _WelcomeCard extends StatelessWidget {
