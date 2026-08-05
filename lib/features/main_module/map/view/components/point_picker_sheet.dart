@@ -192,7 +192,9 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
       _bazar = null;
       _passage = null;
       _container = null;
-      _bazarCtrl.text = picked.title;
+      _bazarCtrl.text = picked.bazar?.trim().isNotEmpty == true
+          ? picked.bazar!.trim()
+          : picked.title;
       _containerCtrl.text = picked.container ?? '';
       _passageCtrl.text = picked.passage ?? '';
       _error = null;

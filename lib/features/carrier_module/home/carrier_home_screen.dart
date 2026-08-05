@@ -100,6 +100,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   bool get _hasActive => _activeId != null;
   bool _showEmptyOrders = false;
   Timer? _nearbyPollTimer;
+  DateTime? _lastPositionSentAt;
+  bool _sendingPosition = false;
   bool _marketMapLoading = false;
   int? _marketMapPointsHash;
   List<MarketMapFeature> _marketMapFeatures = const [];
@@ -200,6 +202,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _centerLat = _myLat;
         _centerLon = _myLon;
       });
+      unawaited(_sendPositionToServer(force: true));
       _moveMap(LatLng(_myLat, _myLon), zoom: 15);
 
       _posSub?.cancel();
@@ -212,6 +215,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
           ).listen((p) {
             _myLat = p.latitude;
             _myLon = p.longitude;
+            unawaited(_sendPositionToServer());
             if (mounted) setState(() {});
           });
     } catch (_) {
@@ -237,6 +241,25 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     return Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
+  }
+
+  Future<void> _sendPositionToServer({bool force = false}) async {
+    if (_sendingPosition) return;
+    final now = DateTime.now();
+    final last = _lastPositionSentAt;
+    if (!force && last != null && now.difference(last).inSeconds < 20) {
+      return;
+    }
+
+    _sendingPosition = true;
+    try {
+      await ApiService.instance.postCarrierPosition(lat: _myLat, lon: _myLon);
+      _lastPositionSentAt = now;
+    } catch (_) {
+      // Следующее обновление геолокации повторит отправку позиции.
+    } finally {
+      _sendingPosition = false;
+    }
   }
 
   Map<String, dynamic> _asMap(dynamic data) {
@@ -377,6 +400,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
     try {
       final pos = await _getCurrentPositionOrThrow();
+      _myLat = pos.latitude;
+      _myLon = pos.longitude;
+      await _sendPositionToServer(force: true);
 
       final page = await ApiService.instance.getNearbyShipments(
         lat: pos.latitude,

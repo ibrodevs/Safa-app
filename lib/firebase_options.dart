@@ -50,11 +50,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAP6GVNQTVa8R0L_CtTrQTsa5cMVmcmwPA',
-    appId: '1:294846180284:android:4457ac5428905a68ae19b9',
-    messagingSenderId: '294846180284',
-    projectId: 'dogoapp-7b7a2',
-    storageBucket: 'dogoapp-7b7a2.firebasestorage.app',
+    apiKey: 'AIzaSyCmjxrgyyo3JGAQi0rD-hf3PxQyzAZPznI',
+    appId: '1:465051143903:android:e5f2fc195694341eda236a',
+    messagingSenderId: '465051143903',
+    projectId: 'safa-app-87b24',
+    storageBucket: 'safa-app-87b24.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "294846180284",
-    "project_id": "dogoapp-7b7a2",
-    "storage_bucket": "dogoapp-7b7a2.firebasestorage.app"
+    "project_number": "465051143903",
+    "project_id": "safa-app-87b24",
+    "storage_bucket": "safa-app-87b24.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:294846180284:android:4457ac5428905a68ae19b9",
+        "mobilesdk_app_id": "1:465051143903:android:67ddbe63344bc0a5da236a",
+        "android_client_info": {
+          "package_name": "kg.genesis.dogo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmjxrgyyo3JGAQi0rD-hf3PxQyzAZPznI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:465051143903:android:e5f2fc195694341eda236a",
         "android_client_info": {
           "package_name": "kg.genesis.safa_app"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAP6GVNQTVa8R0L_CtTrQTsa5cMVmcmwPA"
+          "current_key": "AIzaSyCmjxrgyyo3JGAQi0rD-hf3PxQyzAZPznI"
         }
       ],
       "services": {

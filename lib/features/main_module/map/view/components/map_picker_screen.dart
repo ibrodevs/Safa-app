@@ -9,10 +9,13 @@ import '../../../../../core/design/app_design.dart';
 import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/delivery_point_model.dart';
 import '../../data/model/delivery_refs_models.dart';
+import '../../data/model/market_map_feature.dart';
 import '../../data/repo/delivery_refs_repository.dart';
+import '../../data/repo/market_map_repository.dart';
 import '../../provider/delivery_address_provider.dart';
 import '../../provider/delivery_autocomplete_provider.dart';
 import '../widgets/container_map_marker.dart';
+import '../widgets/market_map_layers.dart';
 
 /// Экран выбора точки на карте.
 ///
@@ -38,22 +41,41 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   /// Ниже этого масштаба подписи контейнеров скрываются.
   static const double _containerLabelMinZoom = 16;
   static const double _containerShapeMinZoom = 15;
-  static const int _maxRenderedContainerShapes = 180;
+  static const int _maxRenderedContainerShapes = 120;
+  static const int _maxRenderedContainerMarkers = 160;
+  static const int _maxRenderedPublishedContainers = 220;
 
   final MapController _mapController = MapController();
   final TextEditingController _query = TextEditingController();
   final FocusNode _focus = FocusNode();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
+  final MarketMapRepository _marketMapRepository = MarketMapRepository();
 
   LatLng _center = const LatLng(42.8746, 74.6122);
   double _zoom = 15;
   Timer? _reverseDebounce;
   Timer? _containersDebounce;
+  Timer? _marketMapDebounce;
+  Timer? _mapIdleDebounce;
 
   List<ContainerRef> _visibleContainers = const [];
   ContainerRef? _selectedContainer;
+  List<MarketMapFeature> _marketMapFeatures = const [];
+  MarketMapRenderData? _marketMapRenderCache;
+  int? _marketMapRenderZoomBucket;
+  int? _marketMapRenderFeatureCount;
+  int? _marketMapRenderCenterLatBucket;
+  int? _marketMapRenderCenterLonBucket;
+  bool? _marketMapRenderMoving;
+  LatLngBounds? _lastContainersBounds;
+  int? _lastContainersZoomBucket;
+  LatLngBounds? _lastMarketMapBounds;
+  int? _lastMarketMapZoomBucket;
+  bool _mapMoving = false;
   bool _containersLoading = false;
+  bool _marketMapLoading = false;
   int _containersRequestSerial = 0;
+  int _marketMapRequestSerial = 0;
 
   @override
   void initState() {
@@ -77,6 +99,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       );
 
       _scheduleContainersRefresh(immediate: true);
+      _scheduleMarketMapRefresh(immediate: true);
     });
   }
 
@@ -84,6 +107,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   void dispose() {
     _reverseDebounce?.cancel();
     _containersDebounce?.cancel();
+    _marketMapDebounce?.cancel();
+    _mapIdleDebounce?.cancel();
     _query.dispose();
     _focus.dispose();
     super.dispose();
@@ -109,6 +134,37 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     );
   }
 
+  void _scheduleMarketMapRefresh({bool immediate = false}) {
+    _marketMapDebounce?.cancel();
+    _marketMapDebounce = Timer(
+      immediate ? Duration.zero : const Duration(milliseconds: 450),
+      _refreshMarketMap,
+    );
+  }
+
+  void _scheduleMapIdle(LatLng center) {
+    _mapIdleDebounce?.cancel();
+    _mapIdleDebounce = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted) return;
+      setState(() => _mapMoving = false);
+      if (_selectedContainer == null) _scheduleReverse(center);
+      _scheduleContainersRefresh();
+      _scheduleMarketMapRefresh();
+    });
+  }
+
+  bool _shouldReloadBounds(LatLngBounds previous, LatLngBounds next) {
+    final previousLatSpan = (previous.north - previous.south).abs();
+    final previousLonSpan = (previous.east - previous.west).abs();
+    final previousCenter = previous.center;
+    final nextCenter = next.center;
+    final latShift = (previousCenter.latitude - nextCenter.latitude).abs();
+    final lonShift = (previousCenter.longitude - nextCenter.longitude).abs();
+
+    return latShift > previousLatSpan * 0.25 ||
+        lonShift > previousLonSpan * 0.25;
+  }
+
   Future<void> _refreshVisibleContainers() async {
     if (!mounted) return;
 
@@ -116,6 +172,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     try {
       bounds = _mapController.camera.visibleBounds;
     } catch (_) {
+      return;
+    }
+
+    final zoomBucket = _zoom.floor();
+    final previousBounds = _lastContainersBounds;
+    if (previousBounds != null &&
+        _lastContainersZoomBucket == zoomBucket &&
+        !_shouldReloadBounds(previousBounds, bounds)) {
       return;
     }
 
@@ -151,6 +215,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       setState(() {
         _visibleContainers = merged;
         _containersLoading = false;
+        _lastContainersBounds = bounds;
+        _lastContainersZoomBucket = zoomBucket;
       });
     } catch (_) {
       // Keep the last successfully loaded markers on transient network errors.
@@ -163,6 +229,57 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
+  Future<void> _refreshMarketMap() async {
+    if (!mounted) return;
+    if (_marketMapLoading) return;
+
+    late final LatLngBounds bounds;
+    try {
+      bounds = _mapController.camera.visibleBounds;
+    } catch (_) {
+      return;
+    }
+
+    final zoomBucket = _zoom.floor();
+    final previousBounds = _lastMarketMapBounds;
+    if (previousBounds != null &&
+        _lastMarketMapZoomBucket == zoomBucket &&
+        !_shouldReloadBounds(previousBounds, bounds)) {
+      return;
+    }
+
+    final serial = ++_marketMapRequestSerial;
+    _marketMapLoading = true;
+    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03).toDouble() * 0.2;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03).toDouble() * 0.2;
+
+    try {
+      final collection = await _marketMapRepository.loadPublished(
+        zoom: zoomBucket,
+        minLat: bounds.south - latPadding,
+        maxLat: bounds.north + latPadding,
+        minLon: bounds.west - lonPadding,
+        maxLon: bounds.east + lonPadding,
+        centerLat: _center.latitude,
+        centerLon: _center.longitude,
+        maxContainers: _maxRenderedPublishedContainers * 2,
+      );
+      if (!mounted || serial != _marketMapRequestSerial) return;
+      setState(() {
+        _marketMapFeatures = collection.features;
+        _marketMapRenderCache = null;
+        _marketMapLoading = false;
+        _lastMarketMapBounds = bounds;
+        _lastMarketMapZoomBucket = zoomBucket;
+      });
+    } catch (_) {
+      if (!mounted || serial != _marketMapRequestSerial) return;
+      setState(() => _marketMapLoading = false);
+    }
+  }
+
   void _moveTo(LatLng point, {double zoom = 16}) {
     setState(() {
       _center = point;
@@ -172,6 +289,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _mapController.move(point, zoom);
     _scheduleReverse(point);
     _scheduleContainersRefresh();
+    _scheduleMarketMapRefresh();
   }
 
   void _selectContainer(ContainerRef container) {
@@ -190,16 +308,16 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     });
 
     _mapController.move(point, 17);
-    _scheduleReverse(point);
     _scheduleContainersRefresh();
+    _scheduleMarketMapRefresh();
   }
 
   String _containerSubtitle(ContainerRef container) {
     final parts = <String>[
       if (container.number.trim().isNotEmpty)
-        'Контейнер ${container.number.trim()}',
+        'Контейнер: ${container.number.trim()}',
       if (container.passageNumber.trim().isNotEmpty)
-        'Проход ${container.passageNumber.trim()}',
+        'Проход: ${container.passageNumber.trim()}',
     ];
 
     return parts.join(' • ');
@@ -265,7 +383,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final horizontal = AppResponsive.horizontalPadding(context);
     final showLabels = _zoom >= _containerLabelMinZoom;
+    final marketMap = _marketMapRenderData();
     final showShapes =
+        !_mapMoving &&
         _zoom >= _containerShapeMinZoom &&
         (_visibleContainers.length <= _maxRenderedContainerShapes ||
             _zoom >= _containerLabelMinZoom);
@@ -291,6 +411,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
     final markers = _visibleContainers
         .where((c) => c.latValue != null && c.lonValue != null)
+        .where(
+          (c) =>
+              !_mapMoving ||
+              selectedContainer?.id == c.id ||
+              _visibleContainers.length <= 24,
+        )
+        .take(_mapMoving ? 24 : _maxRenderedContainerMarkers)
         .map(
           (container) => Marker(
             point: LatLng(container.latValue!, container.lonValue!),
@@ -321,18 +448,30 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 _center = position.center;
 
                 if (hasGesture) {
+                  if (!_mapMoving && mounted) {
+                    setState(() => _mapMoving = true);
+                  }
                   if (_selectedContainer != null) {
                     setState(() => _selectedContainer = null);
                   }
-                  _scheduleReverse(position.center);
+                  _scheduleMapIdle(position.center);
                 }
 
                 final wasLabelled = _zoom >= _containerLabelMinZoom;
                 final isLabelled = position.zoom >= _containerLabelMinZoom;
+                final oldZoomBucket = _zoom.floor();
+                final newZoomBucket = position.zoom.floor();
                 _zoom = position.zoom;
-                if (wasLabelled != isLabelled && mounted) setState(() {});
+                if ((wasLabelled != isLabelled ||
+                        oldZoomBucket != newZoomBucket) &&
+                    mounted) {
+                  setState(() {});
+                }
 
-                _scheduleContainersRefresh();
+                if (!hasGesture) {
+                  _scheduleContainersRefresh();
+                  _scheduleMarketMapRefresh();
+                }
               },
             ),
             children: [
@@ -342,9 +481,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
+              if (marketMap.polygons.isNotEmpty)
+                PolygonLayer(polygons: marketMap.polygons),
+              if (marketMap.polylines.isNotEmpty)
+                PolylineLayer(polylines: marketMap.polylines),
               if (containerPolygons.isNotEmpty)
                 PolygonLayer(polygons: containerPolygons),
-              if (markers.isNotEmpty) MarkerLayer(markers: markers),
+              if (markers.isNotEmpty || marketMap.markers.isNotEmpty)
+                MarkerLayer(markers: [...marketMap.markers, ...markers]),
             ],
           ),
 
@@ -394,8 +538,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   child: AppMapStatusChip(
                     label: _containersLoading
                         ? 'Контейнеры…'
+                        : _marketMapLoading
+                        ? 'Карта базара…'
                         : 'Контейнеры: ${_visibleContainers.length}',
-                    loading: _containersLoading,
+                    loading: _containersLoading || _marketMapLoading,
                   ),
                 ),
               ],
@@ -438,6 +584,35 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       LatLng(lat + dLat, lon + dLon),
       LatLng(lat + dLat, lon - dLon),
     ];
+  }
+
+  MarketMapRenderData _marketMapRenderData() {
+    final zoomBucket = _zoom.floor();
+    final centerLatBucket = (_center.latitude * 10000).round();
+    final centerLonBucket = (_center.longitude * 10000).round();
+    final cached = _marketMapRenderCache;
+    if (cached != null &&
+        _marketMapRenderZoomBucket == zoomBucket &&
+        _marketMapRenderFeatureCount == _marketMapFeatures.length &&
+        _marketMapRenderCenterLatBucket == centerLatBucket &&
+        _marketMapRenderCenterLonBucket == centerLonBucket &&
+        _marketMapRenderMoving == _mapMoving) {
+      return cached;
+    }
+
+    final next = MarketMapRenderData.fromFeatures(
+      _marketMapFeatures,
+      zoom: _zoom,
+      center: _center,
+      maxContainerFeatures: _mapMoving ? 0 : _maxRenderedPublishedContainers,
+    );
+    _marketMapRenderCache = next;
+    _marketMapRenderZoomBucket = zoomBucket;
+    _marketMapRenderFeatureCount = _marketMapFeatures.length;
+    _marketMapRenderCenterLatBucket = centerLatBucket;
+    _marketMapRenderCenterLonBucket = centerLonBucket;
+    _marketMapRenderMoving = _mapMoving;
+    return next;
   }
 }
 

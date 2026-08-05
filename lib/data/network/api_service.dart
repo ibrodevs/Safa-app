@@ -670,6 +670,19 @@ final class ApiService {
     }
   }
 
+  Future<void> postCarrierPosition({
+    required double lat,
+    required double lon,
+  }) async {
+    try {
+      await _dio.post('delivery/position/', data: {'lat': lat, 'lon': lon});
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось обновить позицию');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
   Future<ShipmentDetail> advanceShipment(int id) async {
     try {
       final resp = await _dio.post('delivery/shipments/$id/advance/');
