@@ -6,14 +6,29 @@ final class MarketMapRepository {
 
   final ApiService _api;
 
-  Future<MarketMapCollection> loadPublished({int? bazarId}) async {
+  Future<MarketMapCollection> loadPublished({
+    int? bazarId,
+    int? zoom,
+    double? minLat,
+    double? maxLat,
+    double? minLon,
+    double? maxLon,
+    double? centerLat,
+    double? centerLon,
+    int? maxContainers,
+  }) async {
     final response = await _api.dio.get<dynamic>(
       'delivery/map/features/',
       queryParameters: {
         if (bazarId != null) 'bazar_id': bazarId,
-        // Загружаем опубликованный набор один раз и фильтруем по масштабу
-        // локально, чтобы панорамирование карты не создавало лишние запросы.
-        'zoom': 22,
+        if (zoom != null) 'zoom': zoom,
+        if (minLat != null) 'min_lat': minLat,
+        if (maxLat != null) 'max_lat': maxLat,
+        if (minLon != null) 'min_lon': minLon,
+        if (maxLon != null) 'max_lon': maxLon,
+        if (centerLat != null) 'center_lat': centerLat,
+        if (centerLon != null) 'center_lon': centerLon,
+        if (maxContainers != null) 'max_containers': maxContainers,
       },
     );
 

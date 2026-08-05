@@ -18,13 +18,18 @@ final class MarketMapRenderData {
   factory MarketMapRenderData.fromFeatures(
     Iterable<MarketMapFeature> features, {
     required double zoom,
+    LatLng? center,
+    int? maxContainerFeatures,
   }) {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
     final markers = <Marker>[];
 
-    final sortedFeatures = features.toList()
-      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    final sortedFeatures = _limitContainerFeatures(
+      features,
+      center: center,
+      maxContainerFeatures: maxContainerFeatures,
+    )..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
     for (final feature in sortedFeatures) {
       if (_effectiveMinZoom(feature) > zoom) continue;
@@ -47,7 +52,7 @@ final class MarketMapRenderData {
               borderStrokeWidth: feature.strokeWidth,
             ),
           );
-          if (feature.kind == 'container') {
+          if (feature.kind == 'container' && zoom >= 16) {
             markers.add(
               _labelMarker(
                 _boundsCenter(points),
@@ -89,7 +94,7 @@ final class MarketMapRenderData {
               pattern: pattern,
             ),
           );
-          if (feature.kind == 'container') {
+          if (feature.kind == 'container' && zoom >= 16) {
             markers.add(
               _labelMarker(
                 _boundsCenter(points),
@@ -120,7 +125,7 @@ final class MarketMapRenderData {
                 pattern: pattern,
               ),
             );
-            if (feature.kind == 'container') {
+            if (feature.kind == 'container' && zoom >= 16) {
               markers.add(
                 _labelMarker(
                   _boundsCenter(points),
@@ -160,6 +165,80 @@ final class MarketMapRenderData {
       default:
         return feature.minZoom;
     }
+  }
+
+  static List<MarketMapFeature> _limitContainerFeatures(
+    Iterable<MarketMapFeature> features, {
+    required LatLng? center,
+    required int? maxContainerFeatures,
+  }) {
+    final limit = maxContainerFeatures;
+    final sorted = features.toList();
+    if (limit == null || limit <= 0 || center == null) return sorted;
+
+    final containerIndexes = <int>[];
+    for (var i = 0; i < sorted.length; i++) {
+      if (sorted[i].isContainer) containerIndexes.add(i);
+    }
+    if (containerIndexes.length <= limit) return sorted;
+
+    final containerDistances =
+        containerIndexes
+            .map(
+              (index) => MapEntry(
+                index,
+                _featureDistanceSquared(sorted[index], center),
+              ),
+            )
+            .toList()
+          ..sort((a, b) => a.value.compareTo(b.value));
+
+    final keepContainers = containerDistances
+        .take(limit)
+        .map((entry) => entry.key)
+        .toSet();
+    final output = <MarketMapFeature>[];
+    for (var i = 0; i < sorted.length; i++) {
+      final feature = sorted[i];
+      if (!feature.isContainer || keepContainers.contains(i)) {
+        output.add(feature);
+      }
+    }
+    return output;
+  }
+
+  static double _featureDistanceSquared(
+    MarketMapFeature feature,
+    LatLng center,
+  ) {
+    final point = _featureCenter(feature.coordinates);
+    if (point == null) return double.infinity;
+    final dLat = point.latitude - center.latitude;
+    final dLon = point.longitude - center.longitude;
+    return dLat * dLat + dLon * dLon;
+  }
+
+  static LatLng? _featureCenter(dynamic coordinates) {
+    final points = <LatLng>[];
+    void visit(dynamic raw) {
+      if (raw is List && raw.length >= 2) {
+        final lon = _double(raw[0]);
+        final lat = _double(raw[1]);
+        if (lat != null && lon != null) {
+          points.add(LatLng(lat, lon));
+          return;
+        }
+      }
+      if (raw is List) {
+        for (final item in raw) {
+          visit(item);
+        }
+      }
+    }
+
+    visit(coordinates);
+    if (points.isEmpty) return null;
+    return _boundsCenter(points);
   }
 
   static Marker _labelMarker(LatLng point, String text, Color color) {

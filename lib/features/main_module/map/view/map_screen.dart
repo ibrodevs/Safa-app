@@ -55,6 +55,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   static const double _containerLabelMinZoom = 16;
   static const double _containerShapeMinZoom = 15;
   static const int _maxRenderedLooseContainers = 180;
+  static const int _maxRenderedContainerMarkers = 240;
+  static const int _maxRenderedContainerLabels = 120;
+  static const int _maxRenderedPublishedContainers = 260;
 
   ServiceConfig get _config => ServiceConfig.fromType(widget.serviceType);
 
@@ -99,6 +102,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
   StreamSubscription<ServiceStatus>? _serviceStatusStream;
   Timer? _containersDebounce;
+  Timer? _marketMapDebounce;
   List<ContainerRef> _visibleContainers = const [];
   ContainerRef? _selectedContainer;
   bool _containersLoading = false;
@@ -115,6 +119,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   int? _publishedContainerHash;
   bool _marketMapLoading = false;
   int _marketMapRequestSerial = 0;
+  LatLngBounds? _lastMarketMapBounds;
+  int? _lastMarketMapZoomBucket;
 
   // --- Маршрут OSRM -----------------------------------------------------
 
@@ -325,17 +331,58 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     }
   }
 
+  void _scheduleMarketMapRefresh({bool immediate = false}) {
+    _marketMapDebounce?.cancel();
+    _marketMapDebounce = Timer(
+      immediate ? Duration.zero : const Duration(milliseconds: 450),
+      _loadMarketMap,
+    );
+  }
+
   Future<void> _loadMarketMap() async {
     if (_marketMapLoading) return;
+
+    late final LatLngBounds bounds;
+    try {
+      bounds = _mapController.camera.visibleBounds;
+    } catch (_) {
+      return;
+    }
+
+    final zoomBucket = _zoom.floor();
+    final previousBounds = _lastMarketMapBounds;
+    if (previousBounds != null &&
+        _lastMarketMapZoomBucket == zoomBucket &&
+        !_shouldReloadContainers(previousBounds, bounds)) {
+      return;
+    }
+
     final serial = ++_marketMapRequestSerial;
     _marketMapLoading = true;
+    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.2;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.2;
 
     try {
-      final collection = await _marketMapRepository.loadPublished();
+      final collection = await _marketMapRepository.loadPublished(
+        zoom: zoomBucket,
+        minLat: bounds.south - latPadding,
+        maxLat: bounds.north + latPadding,
+        minLon: bounds.west - lonPadding,
+        maxLon: bounds.east + lonPadding,
+        centerLat: _centerLat,
+        centerLon: _centerLon,
+        maxContainers: _maxRenderedPublishedContainers * 2,
+      );
       if (!mounted || serial != _marketMapRequestSerial) return;
       setState(() {
         _marketMapFeatures = collection.features;
+        _marketMapRenderCache = null;
+        _publishedContainerHash = null;
         _marketMapLoading = false;
+        _lastMarketMapBounds = bounds;
+        _lastMarketMapZoomBucket = zoomBucket;
       });
     } catch (_) {
       if (!mounted || serial != _marketMapRequestSerial) return;
@@ -421,7 +468,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
-      unawaited(_loadMarketMap());
+      _scheduleMarketMapRefresh(immediate: true);
       final p = context.read<ActiveShipmentProvider>();
       await p.load();
       if (!mounted) return;
@@ -482,6 +529,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     WidgetsBinding.instance.removeObserver(this);
     _serviceStatusStream?.cancel();
     _containersDebounce?.cancel();
+    _marketMapDebounce?.cancel();
     _descriptionController.dispose();
     _stopShipmentPolling();
     super.dispose();
@@ -627,6 +675,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     final next = MarketMapRenderData.fromFeatures(
       _marketMapFeatures,
       zoom: _zoom,
+      center: LatLng(_centerLat, _centerLon),
+      maxContainerFeatures: _maxRenderedPublishedContainers,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;
@@ -646,6 +696,32 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     _publishedContainerHash = hash;
     _publishedContainerIdsCache = ids;
     return ids;
+  }
+
+  List<MarketMapFeature> _renderedMarketMapContainerFeatures() {
+    if (_zoom < _containerShapeMinZoom) return const [];
+    final center = LatLng(_centerLat, _centerLon);
+    final features =
+        _marketMapFeatures
+            .where((feature) => feature.isContainer && feature.minZoom <= _zoom)
+            .map((feature) {
+              final point = _featureCenter(feature.coordinates);
+              if (point == null) return null;
+              final dLat = point.latitude - center.latitude;
+              final dLon = point.longitude - center.longitude;
+              return MapEntry(feature, dLat * dLat + dLon * dLon);
+            })
+            .whereType<MapEntry<MarketMapFeature, double>>()
+            .toList()
+          ..sort((a, b) => a.value.compareTo(b.value));
+
+    if (features.length <= _maxRenderedPublishedContainers) {
+      return features.map((entry) => entry.key).toList();
+    }
+    return features
+        .take(_maxRenderedPublishedContainers)
+        .map((entry) => entry.key)
+        .toList();
   }
 
   bool _shouldReloadContainers(LatLngBounds previous, LatLngBounds next) {
@@ -1269,12 +1345,18 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     final containerPolygons = <Polygon>[];
     final marketMap = _marketMapRenderData();
     final publishedContainerIds = _publishedContainerIds();
+    final renderedLooseContainers = _renderedLooseContainers(
+      publishedContainerIds,
+    );
     final shouldDrawLooseContainerShapes =
         _zoom >= _containerShapeMinZoom &&
-        (_visibleContainers.length <= _maxRenderedLooseContainers ||
+        (renderedLooseContainers.length <= _maxRenderedLooseContainers ||
             _zoom >= _containerLabelMinZoom);
+    final showLooseContainerLabels =
+        showContainerLabels &&
+        renderedLooseContainers.length <= _maxRenderedContainerLabels;
 
-    for (final feature in _marketMapFeatures) {
+    for (final feature in _renderedMarketMapContainerFeatures()) {
       if (!feature.isContainer ||
           feature.minZoom > _zoom ||
           _zoom < _containerShapeMinZoom) {
@@ -1297,8 +1379,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       );
     }
 
-    for (final container in _visibleContainers) {
-      if (publishedContainerIds.contains(container.id)) continue;
+    for (final container in renderedLooseContainers) {
       final lat = container.latValue;
       final lon = container.lonValue;
       if (lat == null || lon == null) continue;
@@ -1327,7 +1408,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           child: ContainerMapMarker(
             container: container,
             selected: selected,
-            showLabel: showContainerLabels,
+            showLabel: showLooseContainerLabels,
             onTap: () => _onContainerTapped(container),
           ),
         ),
@@ -1381,7 +1462,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       options: MapOptions(
         initialCenter: LatLng(_centerLat, _centerLon),
         initialZoom: 15,
-        onMapReady: () => _scheduleContainersRefresh(immediate: true),
+        onMapReady: () {
+          _scheduleContainersRefresh(immediate: true);
+          _scheduleMarketMapRefresh(immediate: true);
+        },
         onPositionChanged: (pos, hasGesture) {
           final c = pos.center;
           _centerLat = c.latitude;
@@ -1401,6 +1485,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           }
 
           _scheduleContainersRefresh();
+          _scheduleMarketMapRefresh();
         },
       ),
       children: [
@@ -1446,6 +1531,43 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       LatLng(lat + dLat, lon + dLon),
       LatLng(lat + dLat, lon - dLon),
     ];
+  }
+
+  List<ContainerRef> _renderedLooseContainers(Set<int> publishedContainerIds) {
+    final selected = _selectedContainer;
+    final center = LatLng(_centerLat, _centerLon);
+    final candidates = _visibleContainers
+        .where(
+          (container) =>
+              !publishedContainerIds.contains(container.id) &&
+              container.latValue != null &&
+              container.lonValue != null,
+        )
+        .toList();
+
+    final sorted = candidates.map((container) {
+      final lat = container.latValue;
+      final lon = container.lonValue;
+      if (lat == null || lon == null) {
+        return MapEntry(container, double.infinity);
+      }
+      final dLat = lat - center.latitude;
+      final dLon = lon - center.longitude;
+      return MapEntry(container, dLat * dLat + dLon * dLon);
+    }).toList();
+
+    sorted.sort((a, b) {
+      if (selected != null) {
+        if (a.key.id == selected.id) return -1;
+        if (b.key.id == selected.id) return 1;
+      }
+      return a.value.compareTo(b.value);
+    });
+
+    final limited = sorted.length <= _maxRenderedContainerMarkers
+        ? sorted
+        : sorted.take(_maxRenderedContainerMarkers);
+    return limited.map((entry) => entry.key).toList();
   }
 
   Widget _buildBottomPanel({
