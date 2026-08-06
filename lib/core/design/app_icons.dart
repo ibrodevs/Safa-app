@@ -34,6 +34,7 @@ class AppImages {
   static const String serviceDelivery = '$_base/boxes2.png';
   static const String serviceCars = '$_base/img_home_car2.png';
   static const String serviceAmanat = '$_base/img_home_amanat.png';
+  static const String amanatBanner = '$_base/img_amanat_banner.jpg';
   static const String roleClient = '$_base/img_client.jpg';
   static const String roleCarrier = '$_base/img_spec.jpg';
   static const String pattern = '$_base/img_tunduk.png';

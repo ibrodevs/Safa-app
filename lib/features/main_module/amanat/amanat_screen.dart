@@ -292,7 +292,7 @@ class _HeroCampaignCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _CampaignImage(campaign: campaign, warm: true),
+              const _CampaignImage(warm: true),
               Container(color: Colors.black.withValues(alpha: 0.34)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
@@ -440,7 +440,7 @@ class _CampaignDescriptionCard extends StatelessWidget {
             child: SizedBox(
               height: 152,
               width: double.infinity,
-              child: _CampaignImage(campaign: campaign),
+              child: const _CampaignImage(),
             ),
           ),
           const SizedBox(height: 13),
@@ -735,19 +735,14 @@ class _AmanatLoadingBlock extends StatelessWidget {
 }
 
 class _CampaignImage extends StatelessWidget {
-  const _CampaignImage({required this.campaign, this.warm = false});
+  const _CampaignImage({this.warm = false});
 
-  final AmanatCampaign campaign;
   final bool warm;
 
   @override
   Widget build(BuildContext context) {
-    final url = campaign.coverImageUrl.trim();
-    if (url.isEmpty) {
-      return warm ? const _WarmHeroArt() : const _BlueCampaignArt();
-    }
-    return Image.network(
-      url,
+    return Image.asset(
+      AppImages.amanatBanner,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) =>
           warm ? const _WarmHeroArt() : const _BlueCampaignArt(),
