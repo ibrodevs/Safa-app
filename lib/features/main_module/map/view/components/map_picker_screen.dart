@@ -64,6 +64,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   MarketMapRenderData? _marketMapRenderCache;
   int? _marketMapRenderZoomBucket;
   int? _marketMapRenderFeatureCount;
+  int? _marketMapRenderFeatureHash;
   int? _marketMapRenderCenterLatBucket;
   int? _marketMapRenderCenterLonBucket;
   bool? _marketMapRenderMoving;
@@ -384,6 +385,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final horizontal = AppResponsive.horizontalPadding(context);
     final showLabels = _zoom >= _containerLabelMinZoom;
     final marketMap = _marketMapRenderData();
+    final hasPublishedContainers = marketMap.hasRenderedContainers;
     final showShapes =
         !_mapMoving &&
         _zoom >= _containerShapeMinZoom &&
@@ -392,7 +394,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
     final containerPolygons = _visibleContainers
         .where((c) => c.latValue != null && c.lonValue != null)
-        .where((c) => showShapes || selectedContainer?.id == c.id)
+        .where(
+          (c) =>
+              !hasPublishedContainers &&
+              (selectedContainer?.id == c.id || showShapes),
+        )
         .map((container) {
           final selected = selectedContainer?.id == container.id;
           return Polygon(
@@ -419,20 +425,34 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         )
         .take(_mapMoving ? 24 : _maxRenderedContainerMarkers)
         .map(
-          (container) => Marker(
-            point: LatLng(container.latValue!, container.lonValue!),
-            width: ContainerMapMarker.hitSize,
-            height: ContainerMapMarker.hitSize,
-            alignment: Alignment.center,
-            child: ContainerMapMarker(
-              container: container,
-              selected: selectedContainer?.id == container.id,
-              showLabel: showLabels,
-              onTap: () => _selectContainer(container),
-            ),
-          ),
+          (container) {
+            final selected = selectedContainer?.id == container.id;
+            final hideLooseVisual = hasPublishedContainers;
+            return Marker(
+              point: LatLng(container.latValue!, container.lonValue!),
+              width: ContainerMapMarker.hitSize,
+              height: ContainerMapMarker.hitSize,
+              alignment: Alignment.center,
+              child: hideLooseVisual
+                  ? _ContainerTapTarget(
+                      container: container,
+                      onTap: () => _selectContainer(container),
+                    )
+                  : ContainerMapMarker(
+                      container: container,
+                      selected: selected,
+                      showLabel: showLabels && !hasPublishedContainers,
+                      onTap: () => _selectContainer(container),
+                    ),
+            );
+          },
         )
         .toList();
+
+    final mapMarkers = <Marker>[
+      ...marketMap.markers,
+      ...markers,
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -443,7 +463,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 15,
-              onMapReady: () => _scheduleContainersRefresh(immediate: true),
+              onMapReady: () {
+                _scheduleContainersRefresh(immediate: true);
+                _scheduleMarketMapRefresh(immediate: true);
+              },
               onPositionChanged: (position, hasGesture) {
                 _center = position.center;
 
@@ -487,8 +510,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 PolylineLayer(polylines: marketMap.polylines),
               if (containerPolygons.isNotEmpty)
                 PolygonLayer(polygons: containerPolygons),
-              if (markers.isNotEmpty || marketMap.markers.isNotEmpty)
-                MarkerLayer(markers: [...marketMap.markers, ...markers]),
+              if (mapMarkers.isNotEmpty) MarkerLayer(markers: mapMarkers),
             ],
           ),
 
@@ -590,10 +612,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final zoomBucket = _zoom.floor();
     final centerLatBucket = (_center.latitude * 10000).round();
     final centerLonBucket = (_center.longitude * 10000).round();
+    final featureHash = _marketFeatureHash();
     final cached = _marketMapRenderCache;
     if (cached != null &&
         _marketMapRenderZoomBucket == zoomBucket &&
         _marketMapRenderFeatureCount == _marketMapFeatures.length &&
+        _marketMapRenderFeatureHash == featureHash &&
         _marketMapRenderCenterLatBucket == centerLatBucket &&
         _marketMapRenderCenterLonBucket == centerLonBucket &&
         _marketMapRenderMoving == _mapMoving) {
@@ -609,10 +633,43 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;
     _marketMapRenderFeatureCount = _marketMapFeatures.length;
+    _marketMapRenderFeatureHash = featureHash;
     _marketMapRenderCenterLatBucket = centerLatBucket;
     _marketMapRenderCenterLonBucket = centerLonBucket;
     _marketMapRenderMoving = _mapMoving;
     return next;
+  }
+
+  int _marketFeatureHash() {
+    var hash = 17;
+    for (final feature in _marketMapFeatures) {
+      hash = 37 * hash + feature.id.hashCode;
+      hash = 37 * hash + feature.kind.hashCode;
+      hash = 37 * hash + feature.minZoom;
+    }
+    return hash;
+  }
+}
+
+class _ContainerTapTarget extends StatelessWidget {
+  const _ContainerTapTarget({required this.container, required this.onTap});
+
+  final ContainerRef container;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label:
+          'Контейнер ${container.number}'
+          '${container.bazarName.isEmpty ? '' : ', ${container.bazarName}'}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: onTap,
+        child: const SizedBox.expand(),
+      ),
+    );
   }
 }
 

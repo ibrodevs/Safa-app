@@ -1513,6 +1513,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     final publishedContainerIds = _publishedContainerIds();
     final renderedLooseContainers = _renderedLooseContainers(
       publishedContainerIds,
+      hideWhenPublishedContainersVisible: marketMap.hasRenderedContainers,
     );
     final shouldDrawLooseContainerShapes =
         _zoom >= _containerShapeMinZoom &&
@@ -1705,8 +1706,14 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     ];
   }
 
-  List<ContainerRef> _renderedLooseContainers(Set<int> publishedContainerIds) {
+  List<ContainerRef> _renderedLooseContainers(
+    Set<int> publishedContainerIds, {
+    required bool hideWhenPublishedContainersVisible,
+  }) {
     if (_mapMoving && _selectedContainer == null) return const [];
+    if (hideWhenPublishedContainersVisible) {
+      return const [];
+    }
     final selected = _selectedContainer;
     final center = LatLng(_centerLat, _centerLon);
     final candidates = _visibleContainers

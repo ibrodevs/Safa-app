@@ -39,9 +39,20 @@ class AmanatProvider extends ChangeNotifier {
 
   AmanatCampaign? _pickFeatured(List<AmanatCampaign> campaigns) {
     for (final campaign in campaigns) {
+      if (_isMedreseCampaign(campaign)) return campaign;
+    }
+    for (final campaign in campaigns) {
       if (campaign.isFeatured) return campaign;
     }
     return campaigns.isEmpty ? null : campaigns.first;
+  }
+
+  bool _isMedreseCampaign(AmanatCampaign campaign) {
+    final title = '${campaign.title} ${campaign.shortTitle}'.toLowerCase();
+    return campaign.categorySlug == 'education' ||
+        title.contains('медрес') ||
+        title.contains('medrese') ||
+        title.contains('madras');
   }
 
   Future<void> load() async {

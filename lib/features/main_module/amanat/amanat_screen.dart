@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'amanat_models.dart';
 import 'amanat_provider.dart';
 
+const String _medreseDonationTitle = 'Пожертвование на Медресе';
+
 class AmanatScreen extends StatelessWidget {
   const AmanatScreen({super.key});
 
@@ -82,8 +84,11 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
                 message: state.error!,
                 onRetry: () => context.read<AmanatProvider>().load(),
               )
-            else if (featured != null)
+            else if (featured != null) ...[
               _HeroCampaignCard(campaign: featured),
+              const SizedBox(height: 14),
+              const _TransparencyReportCard(),
+            ],
           ],
         ),
       ),
@@ -152,9 +157,11 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AmanatHeader(title: selectedCampaign.title),
+              const _AmanatHeader(title: _medreseDonationTitle),
               const SizedBox(height: 24),
               _DonationSummaryCard(campaign: selectedCampaign),
+              const SizedBox(height: 14),
+              const _TransparencyReportCard(),
               const SizedBox(height: 18),
               _CampaignDescriptionCard(
                 campaign: selectedCampaign,
@@ -207,7 +214,7 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
                 ),
               ),
               onPressed: () => _showDonateSheet(context, selectedCampaign),
-              child: const Text('Пожертвовать'),
+              child: const Text('Пожертвовать на Медресе'),
             ),
           ),
         ),
@@ -293,9 +300,7 @@ class _HeroCampaignCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      campaign.shortTitle.isNotEmpty
-                          ? campaign.shortTitle
-                          : campaign.title,
+                      _medreseDonationTitle,
                       style: const TextStyle(
                         fontFamily: AppTypography.fontFamily,
                         fontSize: 20,
@@ -386,7 +391,7 @@ class _HeroCampaignCard extends StatelessWidget {
                           ),
                         ),
                         onPressed: () => _showDonateSheet(context, campaign),
-                        child: const Text('Пожертвовать'),
+                        child: const Text('На Медресе'),
                       ),
                     ),
                   ],
@@ -490,6 +495,106 @@ class _CampaignDescriptionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TransparencyReportCard extends StatelessWidget {
+  const _TransparencyReportCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(13),
+        onTap: () => _openTransparencyReports(context),
+        child: Container(
+          height: 62,
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x26000000),
+                blurRadius: 22,
+                spreadRadius: -4,
+                offset: Offset(0, 9),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.inventory_2_outlined,
+                size: 27,
+                color: Color(0xFF9CA3AF),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Прозрачность',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 15,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Все отчетные документы',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 12,
+                        height: 1.05,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF8F8F94),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: const Color(0xFFFFF2E8),
+                  minimumSize: const Size(86, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  textStyle: const TextStyle(
+                    fontFamily: AppTypography.fontFamily,
+                    fontSize: 12,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onPressed: () => _openTransparencyReports(context),
+                child: const Text('Посмотреть'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _openTransparencyReports(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Отчетные документы Медресе скоро появятся')),
+  );
 }
 
 class _InfoLine extends StatelessWidget {
@@ -687,7 +792,7 @@ Future<void> _showDonateSheet(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  campaign.title,
+                  _medreseDonationTitle,
                   style: const TextStyle(
                     fontFamily: AppTypography.fontFamily,
                     fontSize: 20,
@@ -784,7 +889,9 @@ Future<void> _showDonateSheet(
                               Navigator.of(context).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Спасибо за пожертвование'),
+                                  content: Text(
+                                    'Спасибо за пожертвование на Медресе',
+                                  ),
                                 ),
                               );
                             }
@@ -798,7 +905,7 @@ Future<void> _showDonateSheet(
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Пожертвовать'),
+                        : const Text('Пожертвовать на Медресе'),
                   ),
                 ),
                 if (provider.error != null) ...[

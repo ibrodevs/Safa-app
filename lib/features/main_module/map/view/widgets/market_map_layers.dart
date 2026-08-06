@@ -9,11 +9,15 @@ final class MarketMapRenderData {
     required this.polygons,
     required this.polylines,
     required this.markers,
+    required this.renderedContainerCount,
   });
 
   final List<Polygon> polygons;
   final List<Polyline> polylines;
   final List<Marker> markers;
+  final int renderedContainerCount;
+
+  bool get hasRenderedContainers => renderedContainerCount > 0;
 
   factory MarketMapRenderData.fromFeatures(
     Iterable<MarketMapFeature> features, {
@@ -24,6 +28,7 @@ final class MarketMapRenderData {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
     final markers = <Marker>[];
+    var renderedContainerCount = 0;
 
     final sortedFeatures = _limitContainerFeatures(
       features,
@@ -53,6 +58,7 @@ final class MarketMapRenderData {
             ),
           );
           if (feature.kind == 'container' && zoom >= 16) {
+            renderedContainerCount++;
             markers.add(
               _labelMarker(
                 _boundsCenter(points),
@@ -64,6 +70,9 @@ final class MarketMapRenderData {
             markers.add(
               _labelMarker(_boundsCenter(points), feature.name, border),
             );
+          }
+          if (feature.kind == 'container' && zoom < 16) {
+            renderedContainerCount++;
           }
           break;
         case 'LineString':
@@ -95,6 +104,7 @@ final class MarketMapRenderData {
             ),
           );
           if (feature.kind == 'container' && zoom >= 16) {
+            renderedContainerCount++;
             markers.add(
               _labelMarker(
                 _boundsCenter(points),
@@ -108,6 +118,9 @@ final class MarketMapRenderData {
             markers.add(
               _labelMarker(_boundsCenter(points), feature.name, border),
             );
+          }
+          if (feature.kind == 'container' && zoom < 16) {
+            renderedContainerCount++;
           }
           break;
         case 'MultiPolygon':
@@ -126,6 +139,7 @@ final class MarketMapRenderData {
               ),
             );
             if (feature.kind == 'container' && zoom >= 16) {
+              renderedContainerCount++;
               markers.add(
                 _labelMarker(
                   _boundsCenter(points),
@@ -138,6 +152,9 @@ final class MarketMapRenderData {
                 _labelMarker(_boundsCenter(points), feature.name, border),
               );
             }
+            if (feature.kind == 'container' && zoom < 16) {
+              renderedContainerCount++;
+            }
           }
           break;
         default:
@@ -149,6 +166,7 @@ final class MarketMapRenderData {
       polygons: polygons,
       polylines: polylines,
       markers: markers,
+      renderedContainerCount: renderedContainerCount,
     );
   }
 

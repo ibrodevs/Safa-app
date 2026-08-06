@@ -54,11 +54,13 @@ void main() {
     expect(data.polygons, hasLength(1));
     expect(data.polylines, isEmpty);
     expect(data.markers, isEmpty);
+    expect(data.hasRenderedContainers, isTrue);
 
     final labelledData = MarketMapRenderData.fromFeatures([feature], zoom: 16);
     expect(labelledData.polygons, hasLength(1));
     expect(labelledData.polylines, isEmpty);
     expect(labelledData.markers, hasLength(1));
+    expect(labelledData.renderedContainerCount, 1);
   });
 
   test('container feature rendering is capped near map center', () {
