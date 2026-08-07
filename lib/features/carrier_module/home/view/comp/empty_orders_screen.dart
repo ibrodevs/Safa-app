@@ -26,8 +26,6 @@ class _EmptyOrdersBody extends StatefulWidget {
 }
 
 class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
-  bool _leavingLine = false;
-
   @override
   void initState() {
     super.initState();
@@ -37,8 +35,6 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
   }
 
   Future<void> _leaveLine() async {
-    if (_leavingLine) return;
-
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -65,11 +61,11 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
 
     if (!confirmed || !mounted) return;
 
-    setState(() => _leavingLine = true);
-
-    // Переход создаёт новый CarrierHomeScreen. Старый экран уничтожается,
-    // вместе с ним останавливается таймер поиска ближайших заказов.
-    context.go('/home-carrier?line=off');
+    // Каждый выход получает новый reset token. Роутер использует URI как ключ
+    // CarrierHomeScreen, поэтому старый экран гарантированно уничтожается вместе
+    // с таймером поиска заказов и создаётся чистый экран с кнопкой «На линию».
+    final resetToken = DateTime.now().microsecondsSinceEpoch;
+    context.go('/home-carrier?line=off&reset=$resetToken');
   }
 
   @override
@@ -121,17 +117,11 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton.icon(
-                    onPressed: _leavingLine ? null : _leaveLine,
-                    icon: _leavingLine
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.power_settings_new_rounded),
-                    label: Text(
-                      _leavingLine ? 'Выходим…' : 'Выйти с линии',
-                      style: const TextStyle(
+                    onPressed: _leaveLine,
+                    icon: const Icon(Icons.power_settings_new_rounded),
+                    label: const Text(
+                      'Выйти с линии',
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
