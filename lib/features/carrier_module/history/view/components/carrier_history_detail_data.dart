@@ -147,7 +147,9 @@ class _HistoryDetailsBody extends StatelessWidget {
 
         final routeText = d.stops.isEmpty
             ? 'Маршрут не указан'
-            : d.stops.map((s) => '${s.position}. ${s.title}').join('\n');
+            : d.stops
+                  .map((s) => '${s.position}. ${s.displayTitle}')
+                  .join('\n');
 
         final compositionBuffer = StringBuffer();
         if (d.description.isNotEmpty) {

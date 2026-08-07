@@ -27,6 +27,10 @@ class ContainerMapMarker extends StatelessWidget {
   static const double hitSize = 44;
   static const double labelFontSize = 11;
 
+  /// Оптическая компенсация метрик шрифта: без неё цифры визуально сидят
+  /// немного выше геометрического центра маркера.
+  static const double labelVerticalOffset = 1;
+
   final ContainerRef container;
   final bool selected;
   final VoidCallback? onTap;
@@ -50,7 +54,13 @@ class ContainerMapMarker extends StatelessWidget {
           height: hitSize,
           child: Center(
             child: showLabel || selected
-                ? _LabelText(number: container.number, selected: selected)
+                ? Transform.translate(
+                    offset: const Offset(0, labelVerticalOffset),
+                    child: _LabelText(
+                      number: container.number,
+                      selected: selected,
+                    ),
+                  )
                 : const _Dot(),
           ),
         ),
@@ -72,6 +82,15 @@ class _LabelText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.center,
+      textHeightBehavior: const TextHeightBehavior(
+        applyHeightToFirstAscent: false,
+        applyHeightToLastDescent: false,
+      ),
+      strutStyle: const StrutStyle(
+        fontSize: ContainerMapMarker.labelFontSize,
+        height: 1,
+        forceStrutHeight: true,
+      ),
       style: TextStyle(
         fontFamily: AppTypography.fontFamily,
         color: selected ? AppColors.primary : AppColors.textPrimary,
