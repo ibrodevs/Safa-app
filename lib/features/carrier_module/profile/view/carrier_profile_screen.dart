@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../data/repo/carrier_profile_repository.dart';
 import '../provider/carrier_profile_provider.dart';
+import '../widgets/carrier_logout_button.dart';
 
 const _accent = AppColors.primary;
 const _greyText = Color(0xFF9FA4AD);
@@ -277,6 +278,8 @@ class _CarrierProfileBody extends StatelessWidget {
                 const SizedBox(height: 18),
                 if (profile != null)
                   _StatisticsCard(createdAt: profile.createdAt),
+                const SizedBox(height: 24),
+                const CarrierLogoutButton(),
               ],
             ),
           ),
