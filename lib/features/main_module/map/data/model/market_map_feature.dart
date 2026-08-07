@@ -11,6 +11,8 @@ final class MarketMapFeature {
     required this.strokeWidth,
     required this.fillOpacity,
     required this.properties,
+    this.centerLat,
+    this.centerLon,
   });
 
   final String id;
@@ -24,6 +26,11 @@ final class MarketMapFeature {
   final double strokeWidth;
   final double fillOpacity;
   final Map<String, dynamic> properties;
+
+  /// Геометрический центр считаем один раз при JSON-парсинге, а не при каждом
+  /// build карты. На сотнях контейнеров это убирает повторный обход GeoJSON.
+  final double? centerLat;
+  final double? centerLon;
 
   bool get isContainer => kind == 'container';
   int get zIndex => _asInt(properties['z_index'], fallback: 1);
@@ -41,13 +48,15 @@ final class MarketMapFeature {
     final geometry = rawGeometry is Map
         ? Map<String, dynamic>.from(rawGeometry)
         : <String, dynamic>{};
+    final coordinates = geometry['coordinates'];
+    final center = _geometryCenter(coordinates);
 
     return MarketMapFeature(
       id: (json['id'] ?? '').toString(),
       kind: (properties['kind'] ?? '').toString().trim().toLowerCase(),
       name: (properties['name'] ?? properties['number'] ?? '').toString(),
       geometryType: (geometry['type'] ?? '').toString(),
-      coordinates: geometry['coordinates'],
+      coordinates: coordinates,
       minZoom: _clampInt(_asInt(properties['min_zoom'], fallback: 0), 0, 22),
       strokeColor: (properties['stroke_color'] ?? '#E47F26').toString(),
       fillColor: (properties['fill_color'] ?? '#FF8656').toString(),
@@ -62,7 +71,41 @@ final class MarketMapFeature {
         1,
       ),
       properties: properties,
+      centerLat: center?.$1,
+      centerLon: center?.$2,
     );
+  }
+
+  static (double, double)? _geometryCenter(dynamic coordinates) {
+    var hasPoint = false;
+    var minLat = double.infinity;
+    var maxLat = -double.infinity;
+    var minLon = double.infinity;
+    var maxLon = -double.infinity;
+
+    void visit(dynamic raw) {
+      if (raw is List && raw.length >= 2) {
+        final lon = _asNullableDouble(raw[0]);
+        final lat = _asNullableDouble(raw[1]);
+        if (lat != null && lon != null) {
+          hasPoint = true;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+          return;
+        }
+      }
+      if (raw is List) {
+        for (final item in raw) {
+          visit(item);
+        }
+      }
+    }
+
+    visit(coordinates);
+    if (!hasPoint) return null;
+    return ((minLat + maxLat) / 2, (minLon + maxLon) / 2);
   }
 
   static int _asInt(dynamic value, {required int fallback}) {
@@ -74,6 +117,11 @@ final class MarketMapFeature {
   static double _asDouble(dynamic value, {required double fallback}) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  static double? _asNullableDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   static int _clampInt(int value, int minimum, int maximum) {
