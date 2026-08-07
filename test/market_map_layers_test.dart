@@ -118,6 +118,77 @@ void main() {
     expect(data.markers, hasLength(5));
   });
 
+  test('mobile performance budget caps dense published containers', () {
+    final features = List.generate(180, (index) {
+      return MarketMapFeature.fromJson({
+        'type': 'Feature',
+        'id': 'dense-container-$index',
+        'properties': {
+          'kind': 'container',
+          'name': '${index + 1}',
+          'min_zoom': 15,
+        },
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [
+            74.62 + (index % 20) * 0.0001,
+            42.94 + (index ~/ 20) * 0.0001,
+          ],
+        },
+      });
+    });
+
+    final dataAt16 = MarketMapRenderData.fromFeatures(
+      features,
+      zoom: 16,
+      center: const LatLng(42.94, 74.62),
+      maxContainerFeatures: 500,
+    );
+    final dataAt17 = MarketMapRenderData.fromFeatures(
+      features,
+      zoom: 17,
+      center: const LatLng(42.94, 74.62),
+      maxContainerFeatures: 500,
+    );
+
+    expect(
+      dataAt16.renderedContainerCount,
+      MarketMapRenderData.containerRenderLimitForZoom(16),
+    );
+    expect(dataAt16.polygons, hasLength(64));
+    expect(dataAt16.markers, hasLength(64));
+
+    expect(
+      dataAt17.renderedContainerCount,
+      MarketMapRenderData.containerRenderLimitForZoom(17),
+    );
+    expect(dataAt17.polygons, hasLength(96));
+    expect(dataAt17.markers, hasLength(96));
+  });
+
+  test('feature center is precomputed once while parsing GeoJSON', () {
+    final feature = MarketMapFeature.fromJson({
+      'type': 'Feature',
+      'id': 'container-center',
+      'properties': {'kind': 'container', 'name': '1'},
+      'geometry': {
+        'type': 'Polygon',
+        'coordinates': [
+          [
+            [74.62, 42.94],
+            [74.64, 42.94],
+            [74.64, 42.96],
+            [74.62, 42.96],
+            [74.62, 42.94],
+          ],
+        ],
+      },
+    });
+
+    expect(feature.centerLat, closeTo(42.95, 0.000001));
+    expect(feature.centerLon, closeTo(74.63, 0.000001));
+  });
+
   test('container feature rendering can be disabled while map moves', () {
     final bazar = MarketMapFeature.fromJson({
       'type': 'Feature',
