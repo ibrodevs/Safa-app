@@ -132,9 +132,9 @@ class _DetailContent extends StatelessWidget {
                               ? RoutePointRole.end
                               : RoutePointRole.stop,
                           index: (i > 0 && i < stops.length - 1) ? i : null,
-                          title: stops[i].title.isEmpty
+                          title: stops[i].displayTitle.isEmpty
                               ? 'Точка ${stops[i].position}'
-                              : stops[i].title,
+                              : stops[i].displayTitle,
                           isLast: i == stops.length - 1,
                           dense: true,
                         ),
