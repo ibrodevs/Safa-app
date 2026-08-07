@@ -270,20 +270,34 @@ final class MarketMapRenderData {
       height: 28,
       alignment: Alignment.center,
       child: IgnorePointer(
-        child: Text(
-          label.isEmpty ? '•' : label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            height: 1,
-            fontWeight: FontWeight.w800,
-            shadows: const [
-              Shadow(color: Colors.white, blurRadius: 3),
-              Shadow(color: Colors.white, blurRadius: 6),
-            ],
+        child: Center(
+          child: Transform.translate(
+            offset: const Offset(0, 1),
+            child: Text(
+              label.isEmpty ? '•' : label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              textHeightBehavior: const TextHeightBehavior(
+                applyHeightToFirstAscent: false,
+                applyHeightToLastDescent: false,
+              ),
+              strutStyle: const StrutStyle(
+                fontSize: 11,
+                height: 1,
+                forceStrutHeight: true,
+              ),
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                shadows: const [
+                  Shadow(color: Colors.white, blurRadius: 3),
+                  Shadow(color: Colors.white, blurRadius: 6),
+                ],
+              ),
+            ),
           ),
         ),
       ),
