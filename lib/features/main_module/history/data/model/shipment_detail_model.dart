@@ -34,12 +34,20 @@ class ShipmentStop {
   final String title;
   final double? lat;
   final double? lon;
+  final String bazar;
+  final String passage;
+  final String container;
+  final String label;
 
   const ShipmentStop({
     required this.position,
     required this.title,
     required this.lat,
     required this.lon,
+    this.bazar = '',
+    this.passage = '',
+    this.container = '',
+    this.label = '',
   });
 
   factory ShipmentStop.fromJson(Map<String, dynamic> json) {
@@ -48,7 +56,41 @@ class ShipmentStop {
       title: _asString(json['title']),
       lat: _asDouble(json['lat']),
       lon: _asDouble(json['lon']),
+      bazar: _asString(json['bazar']),
+      passage: _asString(json['passage']),
+      container: _asString(json['container']),
+      label: _asString(json['label']),
     );
+  }
+
+  /// Понятная подпись точки для истории заказа.
+  ///
+  /// Для контейнерных точек backend уже отдаёт bazar/passage/container.
+  /// Старые и произвольные точки продолжают использовать сохранённый title.
+  String get displayTitle {
+    final bazarValue = bazar.trim();
+    final passageValue = passage.trim();
+    final containerValue = container.trim();
+
+    final parts = <String>[];
+    if (bazarValue.isNotEmpty) parts.add(bazarValue);
+    if (passageValue.isNotEmpty) {
+      final lower = passageValue.toLowerCase();
+      parts.add(lower.contains('проход') ? passageValue : 'Проход $passageValue');
+    }
+    if (containerValue.isNotEmpty) {
+      final lower = containerValue.toLowerCase();
+      parts.add(
+        lower.contains('контейнер') ? containerValue : 'Контейнер $containerValue',
+      );
+    }
+
+    if (parts.isNotEmpty) return parts.join(' · ');
+
+    final titleValue = title.trim();
+    if (titleValue.isNotEmpty) return titleValue;
+
+    return label.trim();
   }
 }
 
