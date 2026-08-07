@@ -47,6 +47,24 @@ void main() {
       expect(find.text('125'), findsOneWidget);
     });
 
+    testWidgets('номер контейнера оптически центрируется по вертикали', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildMarker());
+
+      final transformFinder = find.ancestor(
+        of: find.text('125'),
+        matching: find.byType(Transform),
+      );
+      expect(transformFinder, findsOneWidget);
+
+      final transform = tester.widget<Transform>(transformFinder);
+      expect(
+        transform.transform.getTranslation().y,
+        ContainerMapMarker.labelVerticalOffset,
+      );
+    });
+
     testWidgets('область нажатия не меньше 44 px', (tester) async {
       await tester.pumpWidget(buildMarker(onTap: () {}));
 
