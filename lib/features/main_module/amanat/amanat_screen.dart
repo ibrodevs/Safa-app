@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'amanat_models.dart';
 import 'amanat_provider.dart';
 
+const String _amanatHomeTitle = 'Аманат';
 const String _medreseDonationTitle = 'Пожертвование на Медресе';
 
 class AmanatScreen extends StatelessWidget {
@@ -75,8 +76,8 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _AmanatHeader(title: 'Safa Amanat'),
-            const SizedBox(height: 31),
+            const _AmanatHeader(title: _amanatHomeTitle),
+            const SizedBox(height: 24),
             if (state.loading && campaigns.isEmpty)
               const _AmanatLoadingBlock()
             else if (state.error != null && campaigns.isEmpty)
@@ -133,7 +134,7 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _AmanatHeader(title: 'Safa Amanat'),
+              const _AmanatHeader(title: _amanatHomeTitle),
               const SizedBox(height: 24),
               _AmanatErrorState(
                 message: state.error!,
@@ -158,7 +159,7 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _AmanatHeader(title: _medreseDonationTitle),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               _DonationSummaryCard(campaign: selectedCampaign),
               const SizedBox(height: 14),
               const _TransparencyReportCard(),
@@ -230,45 +231,52 @@ class _AmanatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-          child: const SizedBox(
-            width: 15,
-            height: 44,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Icon(
+    final compactTitle = title.length <= 18;
+    return SizedBox(
+      height: compactTitle ? 48 : 58,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              tooltip: 'Назад',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              splashRadius: 22,
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+              icon: const Icon(
                 Icons.chevron_left_rounded,
-                size: 25,
+                size: 30,
                 color: Colors.black,
               ),
             ),
           ),
-        ),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: AppTypography.fontFamily,
-              fontSize: 25,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 52),
+            child: Text(
+              title,
+              maxLines: compactTitle ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: AppTypography.fontFamily,
+                fontSize: compactTitle ? 24 : 20,
+                height: 1.08,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -278,12 +286,15 @@ class _HeroCampaignCard extends StatelessWidget {
 
   final AmanatCampaign campaign;
 
+  void _openDetails(BuildContext context) {
+    context.push('${AmanatDetailScreen.route}?id=${campaign.id}');
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () =>
-          context.push('${AmanatDetailScreen.route}?id=${campaign.id}'),
+      onTap: () => _openDetails(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(7),
         child: SizedBox(
@@ -373,26 +384,59 @@ class _HeroCampaignCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 11),
-                    SizedBox(
-                      height: 34,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF8425),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 19),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          textStyle: const TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        SizedBox(
+                          height: 34,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF8425),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 19),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onPressed: () => _showDonateSheet(context, campaign),
+                            child: const Text('На Медресе'),
                           ),
                         ),
-                        onPressed: () => _showDonateSheet(context, campaign),
-                        child: const Text('На Медресе'),
-                      ),
+                        const Spacer(),
+                        SizedBox(
+                          height: 34,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.black.withValues(alpha: .28),
+                              padding: const EdgeInsets.symmetric(horizontal: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: .72),
+                                ),
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onPressed: () => _openDetails(context),
+                            icon: const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 17,
+                            ),
+                            iconAlignment: IconAlignment.end,
+                            label: const Text('Подробнее'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
