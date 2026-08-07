@@ -259,8 +259,12 @@ final class AppRouter {
             routes: [
               GoRoute(
                 path: '/home-carrier',
-                pageBuilder: (context, state) =>
-                    _build(state, const CarrierHomeScreen()),
+                pageBuilder: (context, state) => _build(
+                  state,
+                  CarrierHomeScreen(
+                    key: ValueKey('carrier-home-${state.uri}'),
+                  ),
+                ),
               ),
             ],
           ),
