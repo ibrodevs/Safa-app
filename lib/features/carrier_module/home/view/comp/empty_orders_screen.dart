@@ -1,6 +1,7 @@
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/main_module/profile/provider/profile_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../../data/notifications/service/push_service.dart';
 import '../widgets/header_empty_row.dart';
@@ -25,12 +26,50 @@ class _EmptyOrdersBody extends StatefulWidget {
 }
 
 class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
+  bool _leavingLine = false;
+
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
       PushService.instance.registerOnServerOnce(kind: 'carrier');
     });
+  }
+
+  Future<void> _leaveLine() async {
+    if (_leavingLine) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Выйти с линии?'),
+            content: const Text(
+              'Вы перестанете искать новые заказы. В аккаунте вы останетесь.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Отмена'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text(
+                  'Выйти с линии',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed || !mounted) return;
+
+    setState(() => _leavingLine = true);
+
+    // Переход создаёт новый CarrierHomeScreen. Старый экран уничтожается,
+    // вместе с ним останавливается таймер поиска ближайших заказов.
+    context.go('/home-carrier?line=off');
   }
 
   @override
@@ -65,8 +104,8 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 HeaderEmptyRow(avatarUrl: avatarUrl, title: greeting),
-                const SizedBox(height: 300),
-                Center(
+                const SizedBox(height: 260),
+                const Center(
                   child: Text(
                     'Пока нет активных\nзаказов',
                     style: TextStyle(
@@ -75,6 +114,35 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
                       fontWeight: FontWeight.w600,
                     ),
                     textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _leavingLine ? null : _leaveLine,
+                    icon: _leavingLine
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.power_settings_new_rounded),
+                    label: Text(
+                      _leavingLine ? 'Выходим…' : 'Выйти с линии',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red, width: 1.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                   ),
                 ),
               ],
