@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dogo/features/main_module/map/data/model/market_map_feature.dart';
@@ -61,6 +62,36 @@ void main() {
     expect(labelledData.polylines, isEmpty);
     expect(labelledData.markers, hasLength(1));
     expect(labelledData.renderedContainerCount, 1);
+  });
+
+  test('published container label stays vertically centered inside marker', () {
+    final feature = MarketMapFeature.fromJson({
+      'type': 'Feature',
+      'id': 'container-centered',
+      'properties': {'kind': 'container', 'name': '125', 'min_zoom': 15},
+      'geometry': {
+        'type': 'Point',
+        'coordinates': [74.62, 42.94],
+      },
+    });
+
+    final marker = MarketMapRenderData.fromFeatures(
+      [feature],
+      zoom: 16,
+    ).markers.single;
+
+    expect(marker.alignment, Alignment.center);
+    expect(marker.child, isA<IgnorePointer>());
+
+    final ignorePointer = marker.child as IgnorePointer;
+    expect(ignorePointer.child, isA<Center>());
+
+    final center = ignorePointer.child! as Center;
+    expect(center.child, isA<Transform>());
+
+    final transform = center.child! as Transform;
+    expect(transform.transform.getTranslation().y, 1);
+    expect(transform.child, isA<Text>());
   });
 
   test('container feature rendering is capped near map center', () {
