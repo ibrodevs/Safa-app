@@ -19,6 +19,18 @@ final class MarketMapRenderData {
 
   bool get hasRenderedContainers => renderedContainerCount > 0;
 
+  /// Безопасный бюджет контейнеров для мобильного GPU.
+  ///
+  /// На малом масштабе пользователю важнее видеть базар/районы/проходы, чем
+  /// сотни отдельных прямоугольников. При приближении бюджет постепенно
+  /// растёт. Порог применяется даже если экран запросил больше объектов.
+  static int containerRenderLimitForZoom(double zoom) {
+    if (zoom < 15) return 0;
+    if (zoom < 16) return 36;
+    if (zoom < 17) return 64;
+    return 96;
+  }
+
   factory MarketMapRenderData.fromFeatures(
     Iterable<MarketMapFeature> features, {
     required double zoom,
@@ -30,10 +42,16 @@ final class MarketMapRenderData {
     final markers = <Marker>[];
     var renderedContainerCount = 0;
 
+    final performanceLimit = containerRenderLimitForZoom(zoom);
+    final requestedLimit = maxContainerFeatures;
+    final effectiveLimit = requestedLimit == null || requestedLimit < 0
+        ? performanceLimit
+        : requestedLimit.clamp(0, performanceLimit).toInt();
+
     final sortedFeatures = _limitContainerFeatures(
       features,
       center: center,
-      maxContainerFeatures: maxContainerFeatures,
+      maxContainerFeatures: effectiveLimit,
     )..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
     for (final feature in sortedFeatures) {
@@ -232,6 +250,14 @@ final class MarketMapRenderData {
     MarketMapFeature feature,
     LatLng center,
   ) {
+    final lat = feature.centerLat;
+    final lon = feature.centerLon;
+    if (lat != null && lon != null) {
+      final dLat = lat - center.latitude;
+      final dLon = lon - center.longitude;
+      return dLat * dLat + dLon * dLon;
+    }
+
     final point = _featureCenter(feature.coordinates);
     if (point == null) return double.infinity;
     final dLat = point.latitude - center.latitude;
@@ -294,7 +320,6 @@ final class MarketMapRenderData {
                 fontWeight: FontWeight.w800,
                 shadows: const [
                   Shadow(color: Colors.white, blurRadius: 3),
-                  Shadow(color: Colors.white, blurRadius: 6),
                 ],
               ),
             ),
