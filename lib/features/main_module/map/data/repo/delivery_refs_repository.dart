@@ -11,6 +11,16 @@ class DeliveryRefsRepository {
 
   static List<BazarRef>? _bazarsCache;
 
+  /// На телефоне нет смысла одновременно держать сотни обычных контейнерных
+  /// маркеров: опубликованная карта уже отдаёт свои контейнеры отдельным слоем.
+  /// Ограничение снижает JSON-парсинг, количество Widget/Polygon и нагрузку на
+  /// GPU при входе в карту.
+  static const int _maxBoundsPageSize = 96;
+  static const int _maxBoundsCacheEntries = 20;
+  static const Duration _boundsCacheTtl = Duration(seconds: 8);
+  static final Map<String, _ContainerBoundsCacheEntry> _boundsCache = {};
+  static final Map<String, Future<List<ContainerRef>>> _boundsInFlight = {};
+
   List<Map<String, dynamic>> _resultsOf(Map<String, dynamic> json) {
     final results = json['results'];
     if (results is! List) return const [];
@@ -109,6 +119,54 @@ class DeliveryRefsRepository {
     required double maxLon,
     int pageSize = 200,
   }) async {
+    final effectivePageSize = pageSize.clamp(1, _maxBoundsPageSize).toInt();
+    final key = _boundsKey(
+      minLat: minLat,
+      maxLat: maxLat,
+      minLon: minLon,
+      maxLon: maxLon,
+      pageSize: effectivePageSize,
+    );
+
+    final now = DateTime.now();
+    final cached = _boundsCache[key];
+    if (cached != null) {
+      if (cached.expiresAt.isAfter(now)) return cached.items;
+      _boundsCache.remove(key);
+    }
+
+    // Два почти одновременных события карты (init + onMapReady) раньше могли
+    // отправлять одинаковые запросы. Теперь один запрос делится между ними.
+    final pending = _boundsInFlight[key];
+    if (pending != null) return pending;
+
+    final request = _loadContainersInBoundsUncached(
+      minLat: minLat,
+      maxLat: maxLat,
+      minLon: minLon,
+      maxLon: maxLon,
+      pageSize: effectivePageSize,
+    );
+    _boundsInFlight[key] = request;
+
+    try {
+      final items = await request;
+      _rememberBounds(key, items);
+      return items;
+    } finally {
+      if (identical(_boundsInFlight[key], request)) {
+        _boundsInFlight.remove(key);
+      }
+    }
+  }
+
+  Future<List<ContainerRef>> _loadContainersInBoundsUncached({
+    required double minLat,
+    required double maxLat,
+    required double minLon,
+    required double maxLon,
+    required int pageSize,
+  }) async {
     final json = await _api.getJson(
       'delivery/containers/',
       queryParameters: {
@@ -124,6 +182,36 @@ class DeliveryRefsRepository {
     return _resultsOf(json)
         .map(ContainerRef.fromJson)
         .where((c) => c.isActive && c.latValue != null && c.lonValue != null)
-        .toList();
+        .toList(growable: false);
   }
+
+  static void _rememberBounds(String key, List<ContainerRef> items) {
+    if (_boundsCache.length >= _maxBoundsCacheEntries &&
+        !_boundsCache.containsKey(key)) {
+      _boundsCache.remove(_boundsCache.keys.first);
+    }
+    _boundsCache[key] = _ContainerBoundsCacheEntry(
+      items: items,
+      expiresAt: DateTime.now().add(_boundsCacheTtl),
+    );
+  }
+
+  static String _boundsKey({
+    required double minLat,
+    required double maxLat,
+    required double minLon,
+    required double maxLon,
+    required int pageSize,
+  }) {
+    int bucket(double value) => (value * 10000).round();
+    return '${bucket(minLat)}:${bucket(maxLat)}:'
+        '${bucket(minLon)}:${bucket(maxLon)}:$pageSize';
+  }
+}
+
+final class _ContainerBoundsCacheEntry {
+  const _ContainerBoundsCacheEntry({required this.items, required this.expiresAt});
+
+  final List<ContainerRef> items;
+  final DateTime expiresAt;
 }
