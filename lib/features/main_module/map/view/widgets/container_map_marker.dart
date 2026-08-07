@@ -99,7 +99,6 @@ class _LabelText extends StatelessWidget {
         fontWeight: FontWeight.w800,
         shadows: const [
           Shadow(color: AppColors.white, blurRadius: 3),
-          Shadow(color: AppColors.white, blurRadius: 6),
         ],
       ),
     );
@@ -121,7 +120,6 @@ class _Dot extends StatelessWidget {
         fontWeight: FontWeight.w800,
         shadows: [
           Shadow(color: AppColors.white, blurRadius: 3),
-          Shadow(color: AppColors.white, blurRadius: 6),
         ],
       ),
     );
