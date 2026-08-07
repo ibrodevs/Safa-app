@@ -138,6 +138,10 @@ class _IntermediateList extends StatelessWidget {
         physics: const ClampingScrollPhysics(),
         buildDefaultDragHandles: false,
         itemCount: points.length,
+        // На Flutter 3.41 это ещё совместимый callback, а на новых версиях он
+        // помечен deprecated. Игнорируем только этот warning, чтобы сборка
+        // оставалась совместимой с обеими версиями SDK.
+        // ignore: deprecated_member_use
         onReorder: onReorder,
         proxyDecorator: (child, index, animation) => Material(
           color: AppColors.surface,
