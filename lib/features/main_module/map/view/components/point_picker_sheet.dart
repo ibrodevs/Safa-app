@@ -319,11 +319,6 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
           const Divider(height: 1, color: AppColors.border),
           AppSpacing.gapLg,
           Text('Контейнер и проход', style: AppTypography.cardTitle),
-          AppSpacing.gapXxs,
-          Text(
-            'Точка должна быть из справочника — так у заказа будут координаты',
-            style: AppTypography.captionMuted,
-          ),
           AppSpacing.gapSm,
           RefSuggestField<ContainerRef>(
             controller: _containerCtrl,
