@@ -1,10 +1,10 @@
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
-import '../../../core/router/app_router.dart';
+import 'notification_router.dart';
 
 class NotificationService {
   NotificationService._();
@@ -12,8 +12,8 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   static const _channelId = 'dogo_main';
-  static const _channelName = 'DoGo';
-  static const _channelDesc = 'Delivery updates and alerts';
+  static const _channelName = 'Safa';
+  static const _channelDesc = 'Заказы и системные уведомления Safa';
 
   final FlutterLocalNotificationsPlugin _fln =
       FlutterLocalNotificationsPlugin();
@@ -39,8 +39,6 @@ class NotificationService {
           _handleTapPayload(payload!);
         }
       },
-      onDidReceiveBackgroundNotificationResponse:
-          NotificationService._onBackgroundTap,
     );
 
     const channel = AndroidNotificationChannel(
@@ -57,6 +55,15 @@ class NotificationService {
         ?.createNotificationChannel(channel);
 
     _inited = true;
+
+    // A foreground local notification can still be tapped after the app was
+    // terminated. flutter_local_notifications exposes that launch separately
+    // from FirebaseMessaging.getInitialMessage().
+    final launch = await _fln.getNotificationAppLaunchDetails();
+    final payload = launch?.notificationResponse?.payload;
+    if (launch?.didNotificationLaunchApp == true && payload?.isNotEmpty == true) {
+      _handleTapPayload(payload!);
+    }
   }
 
   Future<void> show({
@@ -73,7 +80,7 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.high,
         icon: 'ic_stat_taxi',
-        styleInformation: const BigTextStyleInformation(''),
+        styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -98,7 +105,7 @@ class NotificationService {
         notif?.title ??
         (data['title']?.toString().isNotEmpty == true
             ? data['title'].toString()
-            : 'Уведомление');
+            : 'Уведомление Safa');
     final body =
         notif?.body ??
         (data['body']?.toString().isNotEmpty == true
@@ -108,40 +115,19 @@ class NotificationService {
     await show(title: title, body: body, data: data);
   }
 
-  @pragma('vm:entry-point')
-  static void _onBackgroundTap(NotificationResponse resp) {
-    final payload = resp.payload;
-    if (payload?.isEmpty ?? true) {
-      return;
-    }
-    NotificationService._()._handleTapPayload(payload!);
-  }
-
   factory NotificationService() => instance;
 
   void _handleTapPayload(String payload) {
     try {
-      final data = jsonDecode(payload) as Map<String, dynamic>;
-      final route = _extractRoute(data);
-      if (route != null && route.isNotEmpty) {
-        AppRouter.router.go(route);
-      }
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map) return;
+      NotificationRouter.routeFromData(
+        Map<String, dynamic>.from(decoded),
+      );
     } catch (e) {
       if (kDebugMode) {
         print('Tap payload parse error: $e');
       }
     }
-  }
-
-  String? _extractRoute(Map<String, dynamic> data) {
-    final r = data['route']?.toString();
-    if (r != null && r.isNotEmpty) {
-      return r;
-    }
-    final dl = data['deep_link']?.toString();
-    if (dl != null && dl.isNotEmpty) {
-      return dl;
-    }
-    return null;
   }
 }
