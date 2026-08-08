@@ -2418,51 +2418,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.label});
-
-  final String icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 18,
-            width: 16,
-            child: SvgPicture.asset(
-              icon,
-              colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StopUi {
   final String title;
   final String? bazar;
