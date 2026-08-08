@@ -10,6 +10,12 @@ on:
       - lib/features/main_module/payments/**
       - lib/features/main_module/profile/**
       - test/order_role_map_notifications_contract_test.dart
+      - test/delivery_point_compact_route_test.dart
+      - test/nearby_shipment_display_test.dart
+      - test/notification_role_ui_contract_test.dart
+      - test/carrier_market_map_viewport_contract_test.dart
+      - test/order_summary_price_source_contract_test.dart
+      - test/specialist_order_card_contract_test.dart
       - .github/workflows/order_role_ui_checks.yml
 
 jobs:
@@ -21,6 +27,13 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test/order_role_map_notifications_contract_test.dart
       - run: flutter analyze
-      - run: flutter test test/order_role_map_notifications_contract_test.dart
+      - run: >-
+          flutter test
+          test/order_role_map_notifications_contract_test.dart
+          test/delivery_point_compact_route_test.dart
+          test/nearby_shipment_display_test.dart
+          test/notification_role_ui_contract_test.dart
+          test/carrier_market_map_viewport_contract_test.dart
+          test/order_summary_price_source_contract_test.dart
+          test/specialist_order_card_contract_test.dart
