@@ -4,8 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/router/app_router.dart';
 import '../../../data/network/api_service.dart';
+import 'notification_router.dart';
 import 'notification_service.dart';
 
 class PushService {
@@ -16,6 +16,7 @@ class PushService {
   final FirebaseMessaging _fm = FirebaseMessaging.instance;
   bool _inited = false;
   String? _lastToken;
+  String? _activeKind;
 
   Future<void> init() async {
     if (_inited) return;
@@ -27,60 +28,44 @@ class PushService {
       provisional: false,
     );
 
+    // Foreground notifications are rendered by NotificationService on both
+    // platforms. Keeping native iOS presentation off avoids duplicate banners
+    // now that backend messages also contain an OS-visible notification block.
     await _fm.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
+      alert: false,
+      badge: false,
+      sound: false,
     );
 
     _lastToken = await _fm.getToken();
 
     FirebaseMessaging.onMessage.listen((msg) async {
+      if (msg.data['silent']?.toString() == '1') return;
       await NotificationService.instance.showFromMessage(msg);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
-      _routeFromData(msg.data);
+      NotificationRouter.routeFromData(msg.data);
     });
     final initial = await _fm.getInitialMessage();
     if (initial != null) {
-      _routeFromData(initial.data);
+      NotificationRouter.routeFromData(initial.data);
     }
 
     _fm.onTokenRefresh.listen((token) async {
       _lastToken = token;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('fcm_registered_token_client');
-      await prefs.remove('fcm_registered_token_carrier');
+      await _clearRegistrationCache(prefs);
+
+      // Token rotation can happen while the user keeps the home screen open.
+      // Register the replacement immediately instead of waiting for another
+      // login/navigation cycle.
+      final kind = _activeKind;
+      if (kind != null && kind.isNotEmpty) {
+        unawaited(_registerTokenOnServer(token: token, kind: kind));
+      }
     });
     _inited = true;
-  }
-
-  void _routeFromData(Map<String, dynamic> data) {
-    final app = data['app']?.toString().toLowerCase();
-    final shipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
-
-    if (app == 'client' && shipmentId != null) {
-      AppRouter.router.go('/history/detail', extra: shipmentId);
-      return;
-    }
-    if (app == 'carrier') {
-      AppRouter.router.go('/home-carrier');
-      return;
-    }
-
-    final route = _extractRoute(data);
-    if (route != null && route.startsWith('/')) {
-      AppRouter.router.go(route);
-    }
-  }
-
-  String? _extractRoute(Map<String, dynamic> data) {
-    final route = data['route']?.toString();
-    if (route != null && route.isNotEmpty) return route;
-    final deepLink = data['deep_link']?.toString();
-    if (deepLink != null && deepLink.startsWith('/')) return deepLink;
-    return null;
   }
 
   Future<void> subscribeTo(String topic) => _fm.subscribeToTopic(topic);
@@ -88,9 +73,22 @@ class PushService {
   Future<void> unsubscribeFrom(String topic) => _fm.unsubscribeFromTopic(topic);
 
   Future<void> registerOnServerOnce({required String kind}) async {
-    final token = _lastToken ?? await _fm.getToken();
+    _activeKind = kind;
+    String? token = _lastToken;
+    try {
+      token ??= await _fm.getToken();
+    } catch (_) {
+      return;
+    }
     if (token == null || token.isEmpty) return;
+    _lastToken = token;
+    await _registerTokenOnServer(token: token, kind: kind);
+  }
 
+  Future<void> _registerTokenOnServer({
+    required String token,
+    required String kind,
+  }) async {
     final api = ApiService();
     final bearer = api.currentAccessToken;
     if (bearer == null || bearer.isEmpty) return;
@@ -107,7 +105,41 @@ class PushService {
       await api.postFcmRegister(token: token, platform: platform);
       await prefs.setString(key, token);
     } catch (_) {
-      // Следующий вход на домашний экран повторит регистрацию.
+      // Следующий вход на домашний экран или refresh токена повторит регистрацию.
     }
+  }
+
+  Future<void> unregisterCurrentDevice() async {
+    final api = ApiService();
+    String? token = _lastToken;
+    try {
+      token ??= await _fm.getToken();
+    } catch (_) {}
+
+    // Unregister while the access token still exists. The backend then stops
+    // sending to this account immediately instead of waiting for FCM to reject
+    // a stale registration token.
+    if (token != null && token.isNotEmpty && api.currentAccessToken?.isNotEmpty == true) {
+      try {
+        await api.dio.delete<dynamic>(
+          'fcm/unregister/',
+          data: {'token': token},
+        );
+      } catch (_) {}
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await _clearRegistrationCache(prefs);
+    _lastToken = null;
+    _activeKind = null;
+
+    try {
+      await _fm.deleteToken();
+    } catch (_) {}
+  }
+
+  Future<void> _clearRegistrationCache(SharedPreferences prefs) async {
+    await prefs.remove('fcm_registered_token_client');
+    await prefs.remove('fcm_registered_token_carrier');
   }
 }
