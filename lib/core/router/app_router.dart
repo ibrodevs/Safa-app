@@ -138,8 +138,10 @@ final class AppRouter {
       ),
       GoRoute(
         path: '/profile/notifications',
-        pageBuilder: (context, state) =>
-            _build(state, const ProfileNotificationsScreen()),
+        pageBuilder: (context, state) {
+          final role = state.uri.queryParameters['role'] ?? 'client';
+          return _build(state, ProfileNotificationsScreen(role: role));
+        },
       ),
       GoRoute(
         path: '/profile/account',

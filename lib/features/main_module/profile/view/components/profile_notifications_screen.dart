@@ -7,7 +7,10 @@ import '../../data/repo/notifications_repo.dart';
 import '../../provider/notifications_provider.dart';
 
 class ProfileNotificationsScreen extends StatefulWidget {
-  const ProfileNotificationsScreen({super.key});
+  const ProfileNotificationsScreen({super.key, this.role = 'client'});
+
+  final String role;
+  bool get isCarrier => role == 'carrier';
 
   @override
   State<ProfileNotificationsScreen> createState() =>
@@ -138,15 +141,17 @@ class _ProfileNotificationsScreenState
                               ),
                               child: Column(
                                 children: [
-                                  _SwitchTile(
-                                    title: 'Новые заказы рядом',
-                                    subtitle:
-                                        'Когда появляется новый груз поблизости.',
-                                    value: _newShipments,
-                                    onChanged: (v) =>
-                                        setState(() => _newShipments = v),
-                                  ),
-                                  const _SettingsDivider(),
+                                  if (widget.isCarrier) ...[
+                                    _SwitchTile(
+                                      title: 'Новые заказы рядом',
+                                      subtitle:
+                                          'Когда появляется подходящий заказ поблизости.',
+                                      value: _newShipments,
+                                      onChanged: (v) =>
+                                          setState(() => _newShipments = v),
+                                    ),
+                                    const _SettingsDivider(),
+                                  ],
                                   _SwitchTile(
                                     title: 'Изменение статуса',
                                     subtitle:
@@ -219,16 +224,6 @@ class _ProfileNotificationsScreenState
                               const SizedBox(height: 12),
                               const _EndHint(),
                             ],
-                            const SizedBox(height: 10),
-                            Text(
-                              'Источник: сервер',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.3,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.grey,
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -388,26 +383,16 @@ class _NotificationCard extends StatelessWidget {
                         color: AppColors.grey2,
                       ),
                     ),
-                    if (n.channel.isNotEmpty || n.type.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _Tag(text: n.channel.isEmpty ? 'channel' : n.channel),
-                          const SizedBox(width: 8),
-                          _Tag(text: n.type.isEmpty ? 'type' : n.type),
-                          const Spacer(),
-                          Text(
-                            n.isRead ? 'Прочитано' : 'Новое',
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.0,
-                              fontWeight: FontWeight.w800,
-                              color: n.isRead
-                                  ? AppColors.grey
-                                  : AppColors.accent,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 10),
+                    Text(
+                      n.isRead ? 'Прочитано' : 'Новое',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.0,
+                        fontWeight: FontWeight.w800,
+                        color: n.isRead ? AppColors.grey : AppColors.accent,
+                      ),
+                    ),
                       ),
                     ],
                   ],
@@ -451,33 +436,6 @@ class _NotificationCard extends StatelessWidget {
     final dd = dt.day.toString().padLeft(2, '0');
     final mo = dt.month.toString().padLeft(2, '0');
     return '$dd.$mo $hh:$mm';
-  }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          height: 1.0,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF5F6670),
-        ),
-      ),
-    );
   }
 }
 
