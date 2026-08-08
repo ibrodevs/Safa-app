@@ -8,8 +8,8 @@ void main() {
       'lib/features/main_module/map/view/components/order_summary_sheet.dart',
     ).readAsStringSync();
 
-    expect(source, contains('getQuote('));
-    expect(source, contains("data['estimated_fare']"));
-    expect(source, contains('_fare = parsedFare'));
+    expect(source, contains('final quote = await _repo.getQuote('));
+    expect(source, contains("quote['estimated_fare']"));
+    expect(source, contains('_quoteAmount ='));
   });
 }
