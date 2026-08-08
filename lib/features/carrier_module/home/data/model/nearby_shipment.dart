@@ -3,6 +3,7 @@ class NearbyShipment {
   final String publicCode;
   final String status;
   final String title;
+  final String serviceType;
   final NearbyShipmentSegment? segment;
 
   final String size;
@@ -31,6 +32,7 @@ class NearbyShipment {
     required this.publicCode,
     required this.status,
     required this.title,
+    required this.serviceType,
     required this.segment,
     required this.size,
     required this.quantity,
@@ -48,6 +50,22 @@ class NearbyShipment {
     required this.paidAt,
     required this.distanceM,
   });
+
+  int get displayFare => finalFare > 0 ? finalFare : (estimatedFare ?? 0);
+
+  String get serviceLabel {
+    switch (serviceType) {
+      case 'cars':
+        return 'Тачки';
+      case 'amanat':
+        return 'Аманат';
+      case 'delivery':
+        return 'Доставка';
+      default:
+        final name = segment?.name.trim() ?? '';
+        return name.isNotEmpty ? name : 'Заказ';
+    }
+  }
 
   static int _asInt(dynamic v) {
     if (v is int) return v;
@@ -95,28 +113,22 @@ class NearbyShipment {
       publicCode: _asString(json['public_code']),
       status: _asString(json['status']),
       title: _asString(json['title']),
-
+      serviceType: _asString(json['service_type']),
       segment: segment,
-
       size: _asString(json['size']),
       quantity: _asInt(json['quantity']),
       fragile: json['fragile'] == true,
       description: _asString(json['description']),
-
       stops: stops,
       stopsCount: _asString(json['stops_count']),
-
       estimatedFare: _asNullableInt(json['estimated_fare']),
       finalFare: _asInt(json['final_fare']),
       commission: _asString(json['commission']),
       courierIncome: _asString(json['courier_income']),
-
       createdAt: _asDateTime(json['created_at']),
       finishedAt: _asNullableDateTime(json['finished_at']),
-
       isPaid: json['is_paid'] == true,
       paidAt: _asNullableDateTime(json['paid_at']),
-
       distanceM: _asInt(json['distance_m']),
     );
   }
@@ -159,6 +171,7 @@ class NearbyShipmentStop {
   final String title;
 
   final String? bazar;
+  final String? district;
   final String? passage;
   final String? container;
 
@@ -171,6 +184,7 @@ class NearbyShipmentStop {
     required this.lat,
     required this.lon,
     this.bazar,
+    this.district,
     this.passage,
     this.container,
   });
@@ -183,14 +197,15 @@ class NearbyShipmentStop {
     return double.tryParse(s) ?? 0;
   }
 
+  static String? _clean(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
   static String? _pickContainer(Map<String, dynamic> json) {
-    final a = json['container_number']?.toString();
-    if (a != null && a.trim().isNotEmpty) return a.trim();
-    final b = json['container_label']?.toString();
-    if (b != null && b.trim().isNotEmpty) return b.trim();
-    final c = json['container']?.toString();
-    if (c != null && c.trim().isNotEmpty) return c.trim();
-    return null;
+    return _clean(json['container_number']) ??
+        _clean(json['container']) ??
+        _clean(json['container_label']);
   }
 
   factory NearbyShipmentStop.fromJson(Map<String, dynamic> json) {
@@ -204,34 +219,54 @@ class NearbyShipmentStop {
     return NearbyShipmentStop(
       position: asInt(json['position']),
       title: (json['title'] ?? '').toString(),
-      bazar: json['bazar']?.toString(),
-      passage: json['passage']?.toString(),
+      bazar: _clean(json['bazar']),
+      district: _clean(json['district']),
+      passage: _clean(json['passage']),
       container: _pickContainer(json),
       lat: _asDouble(json['lat']),
       lon: _asDouble(json['lon']),
     );
   }
 
-  String get headerLine {
-    final c = (container ?? '').trim();
+  String get compactAddress {
+    final parts = <String>[];
+    final b = (bazar ?? '').trim();
+    final d = (district ?? '').trim();
     final p = (passage ?? '').trim();
-    if (c.isNotEmpty && p.isNotEmpty) return 'Контейнер $c, $p проход';
-    if (c.isNotEmpty) return 'Контейнер $c';
-    if (p.isNotEmpty) return '$p проход';
-    return title.isNotEmpty ? title : 'Точка';
+    final c = (container ?? '').trim();
+    if (b.isNotEmpty) parts.add('Базар: $b');
+    if (d.isNotEmpty) parts.add('Район: $d');
+    if (p.isNotEmpty) parts.add('Проход: $p');
+    if (c.isNotEmpty) parts.add('Контейнер: $c');
+    if (parts.isNotEmpty) return parts.join(' · ');
+    return title.trim().isNotEmpty ? title.trim() : 'Точка';
+  }
+
+  String get headerLine {
+    final parts = <String>[];
+    final b = (bazar ?? '').trim();
+    final d = (district ?? '').trim();
+    if (b.isNotEmpty) parts.add('Базар: $b');
+    if (d.isNotEmpty) parts.add('Район: $d');
+    if (parts.isNotEmpty) return parts.join(' · ');
+
+    final p = (passage ?? '').trim();
+    final c = (container ?? '').trim();
+    if (p.isNotEmpty) parts.add('Проход: $p');
+    if (c.isNotEmpty) parts.add('Контейнер: $c');
+    return parts.isNotEmpty
+        ? parts.join(' · ')
+        : (title.trim().isNotEmpty ? title.trim() : 'Точка');
   }
 
   String get subLine {
-    final b = (bazar ?? '').trim();
-    return b.isNotEmpty ? b : '';
-  }
-
-  String get shortHint {
+    final parts = <String>[];
     final p = (passage ?? '').trim();
     final c = (container ?? '').trim();
-    final parts = <String>[];
-    if (p.isNotEmpty) parts.add('$p проход');
-    if (c.isNotEmpty) parts.add('$c контейнер');
-    return parts.join(', ');
+    if (p.isNotEmpty) parts.add('Проход: $p');
+    if (c.isNotEmpty) parts.add('Контейнер: $c');
+    return parts.join(' · ');
   }
+
+  String get shortHint => compactAddress;
 }

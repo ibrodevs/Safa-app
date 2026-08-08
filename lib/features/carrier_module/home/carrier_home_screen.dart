@@ -103,9 +103,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   DateTime? _lastPositionSentAt;
   bool _sendingPosition = false;
   bool _marketMapLoading = false;
+  bool _marketMapViewportLoading = false;
   int? _marketMapPointsHash;
   List<MarketMapFeature> _marketMapFeatures = const [];
   MarketMapRenderData? _marketMapRenderCache;
+  Timer? _marketMapViewportDebounce;
+  LatLngBounds? _lastMarketMapViewportBounds;
+  int? _lastMarketMapViewportZoomBucket;
+  int _marketMapViewportRequestSerial = 0;
 
   @override
   void initState() {
@@ -163,6 +168,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _nearbyPollTimer?.cancel();
+    _marketMapViewportDebounce?.cancel();
     _posSub?.cancel();
     super.dispose();
   }
@@ -292,7 +298,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final statusRaw = (j['status'] ?? '').toString();
     final status = parseShipmentStatus(statusRaw);
     final publicCode = (j['public_code'] ?? '').toString();
-    final fare = (j['estimated_fare'] as num?)?.toInt() ?? 0;
+    final estimatedFare = (j['estimated_fare'] as num?)?.toInt() ?? 0;
+    final finalFare = (j['final_fare'] as num?)?.toInt() ?? 0;
+    final fare = finalFare > 0 ? finalFare : estimatedFare;
 
     int? idx;
     final a = j['current_stop_index'];
@@ -760,6 +768,78 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
   }
 
+
+void _scheduleMarketMapViewportRefresh({bool immediate = false}) {
+  _marketMapViewportDebounce?.cancel();
+  _marketMapViewportDebounce = Timer(
+    immediate ? Duration.zero : const Duration(milliseconds: 420),
+    _refreshMarketMapForViewport,
+  );
+}
+
+bool _shouldReloadMarketMapBounds(
+  LatLngBounds previous,
+  LatLngBounds next,
+) {
+  final latSpan = (previous.north - previous.south).abs();
+  final lonSpan = (previous.east - previous.west).abs();
+  final latShift =
+      (previous.center.latitude - next.center.latitude).abs();
+  final lonShift =
+      (previous.center.longitude - next.center.longitude).abs();
+  return latShift > latSpan * 0.25 || lonShift > lonSpan * 0.25;
+}
+
+Future<void> _refreshMarketMapForViewport() async {
+  if (!mounted || _marketMapViewportLoading) return;
+
+  late final LatLngBounds bounds;
+  try {
+    bounds = _mapController.camera.visibleBounds;
+  } catch (_) {
+    return;
+  }
+
+  final zoomBucket = _zoom.floor();
+  final previous = _lastMarketMapViewportBounds;
+  if (previous != null &&
+      _lastMarketMapViewportZoomBucket == zoomBucket &&
+      !_shouldReloadMarketMapBounds(previous, bounds)) {
+    return;
+  }
+
+  final serial = ++_marketMapViewportRequestSerial;
+  final latPadding =
+      (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.2;
+  final lonPadding =
+      (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.2;
+  _marketMapViewportLoading = true;
+  try {
+    final collection = await _marketMapRepository.loadPublished(
+      zoom: zoomBucket,
+      minLat: bounds.south - latPadding,
+      maxLat: bounds.north + latPadding,
+      minLon: bounds.west - lonPadding,
+      maxLon: bounds.east + lonPadding,
+      centerLat: bounds.center.latitude,
+      centerLon: bounds.center.longitude,
+      maxContainers: 192,
+    );
+    if (!mounted || serial != _marketMapViewportRequestSerial) return;
+    setState(() {
+      _marketMapFeatures = collection.features;
+      _marketMapRenderCache = null;
+      _lastMarketMapViewportBounds = bounds;
+      _lastMarketMapViewportZoomBucket = zoomBucket;
+      _marketMapPointsHash = null;
+    });
+  } catch (_) {
+    // Keep last map snapshot on transient network errors.
+  } finally {
+    _marketMapViewportLoading = false;
+  }
+}
+
   List<_CarrierPassageLine> _passageLines() {
     final lines = <_CarrierPassageLine>[];
     for (final feature in _marketMapFeatures) {
@@ -1122,6 +1202,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
             options: MapOptions(
               initialCenter: LatLng(_centerLat, _centerLon),
               initialZoom: 15,
+              onMapReady: () =>
+                  _scheduleMarketMapViewportRefresh(immediate: true),
               onPositionChanged: (pos, hasGesture) {
                 _centerLat = pos.center.latitude;
                 _centerLon = pos.center.longitude;
@@ -1131,6 +1213,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                   _marketMapRenderCache = null;
                   if (mounted) setState(() {});
                 }
+                _scheduleMarketMapViewportRefresh();
               },
             ),
             children: [
@@ -1359,13 +1442,7 @@ class _ShipmentSheet extends StatelessWidget {
     final distance = shipment.distanceM;
     final distanceText = distance >= 1000
         ? '${(distance / 1000).toStringAsFixed(1)} км'
-        : '$distance метров';
-
-    final stopsCount = shipment.stops.length;
-    final sigment = shipment.segment?.name;
-    final nearestHint = shipment.stops.isNotEmpty
-        ? shipment.stops.first.shortHint
-        : '';
+        : '$distance м';
 
     return Container(
       width: double.infinity,
@@ -1380,86 +1457,101 @@ class _ShipmentSheet extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$distanceText от вас',
-            style: const TextStyle(
-              fontSize: 22,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            nearestHint.isNotEmpty
-                ? 'Ближайшая подача: $nearestHint'
-                : 'Ближайшая подача',
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.25,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF9FA4AD),
-            ),
-          ),
-          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                flex: 3,
-                child: _Chip(
-                  icon: 'assets/icons/ic_box.svg',
-                  label: '$sigment',
+                child: Text(
+                  shipment.serviceLabel,
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: _Chip(
-                  icon: 'assets/icons/ic_map.svg',
-                  label: '$stopsCount точки',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
               Text(
-                '${shipment.estimatedFare} сом',
+                '${shipment.displayFare} сом',
                 style: const TextStyle(
-                  fontSize: 22,
-                  height: 1.1,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
                   color: Colors.black,
                 ),
               ),
-
-              const Spacer(),
-
-              SvgPicture.asset('assets/icons/ic_add_raiting.svg'),
-              const SizedBox(width: 2),
-              const Text(
-                '+1 рейтинг',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF22C55E),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 18),
-          if (routeLoading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8.0),
-              child: LinearProgressIndicator(minHeight: 2),
+          const SizedBox(height: 5),
+          Text(
+            '$distanceText от вас · ${shipment.stops.length} точек',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF9FA4AD),
             ),
+          ),
+          if (shipment.stops.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 170),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (var i = 0; i < shipment.stops.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: i == shipment.stops.length - 1 ? 0 : 9,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                shipment.stops[i].compactAddress,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.25,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF4B5563),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (routeLoading) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          const SizedBox(height: 16),
           SizedBox(
             height: 52,
             width: double.infinity,
@@ -1481,7 +1573,7 @@ class _ShipmentSheet extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 52,
+            height: 48,
             width: double.infinity,
             child: OutlinedButton(
               onPressed: onReject,
@@ -1494,7 +1586,7 @@ class _ShipmentSheet extends StatelessWidget {
               ),
               child: const Text(
                 'Отказать',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -1863,8 +1955,10 @@ class _StopRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: titleStyle),
-              const SizedBox(height: 4),
-              Text(subtitle, style: subStyle),
+              if (subtitle.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(subtitle, style: subStyle),
+              ],
             ],
           ),
         ),
@@ -2324,54 +2418,10 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.label});
-
-  final String icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 18,
-            width: 16,
-            child: SvgPicture.asset(
-              icon,
-              colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StopUi {
   final String title;
   final String? bazar;
+  final String? district;
   final String? passage;
   final String? container;
   final double? lat;
@@ -2382,6 +2432,7 @@ class _StopUi {
     required this.lat,
     required this.lon,
     this.bazar,
+    this.district,
     this.passage,
     this.container,
   });
@@ -2394,21 +2445,23 @@ class _StopUi {
     return d;
   }
 
+  static String? _clean(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
   static String? _pickContainer(Map<String, dynamic> json) {
-    final a = json['container_number']?.toString();
-    if (a != null && a.trim().isNotEmpty) return a.trim();
-    final b = json['container_label']?.toString();
-    if (b != null && b.trim().isNotEmpty) return b.trim();
-    final c = json['container']?.toString();
-    if (c != null && c.trim().isNotEmpty) return c.trim();
-    return null;
+    return _clean(json['container_number']) ??
+        _clean(json['container']) ??
+        _clean(json['container_label']);
   }
 
   factory _StopUi.fromJson(Map<String, dynamic> j) {
     return _StopUi(
       title: (j['title'] ?? '').toString(),
-      bazar: j['bazar']?.toString(),
-      passage: j['passage']?.toString(),
+      bazar: _clean(j['bazar']),
+      district: _clean(j['district']),
+      passage: _clean(j['passage']),
       container: _pickContainer(j),
       lat: _toDouble(j['lat']),
       lon: _toDouble(j['lon']),
@@ -2419,6 +2472,7 @@ class _StopUi {
     return _StopUi(
       title: s.title,
       bazar: s.bazar,
+      district: s.district,
       passage: s.passage,
       container: s.container,
       lat: s.lat,
@@ -2426,28 +2480,41 @@ class _StopUi {
     );
   }
 
-  String get headerLine {
-    final c = (container ?? '').trim();
+  String get compactAddress {
+    final parts = <String>[];
+    final b = (bazar ?? '').trim();
+    final d = (district ?? '').trim();
     final p = (passage ?? '').trim();
-    if (c.isNotEmpty && p.isNotEmpty) return 'Контейнер $c, $p проход';
-    if (c.isNotEmpty) return 'Контейнер $c';
-    if (p.isNotEmpty) return '$p проход';
-    return title.isNotEmpty ? title : 'Точка';
+    final c = (container ?? '').trim();
+    if (b.isNotEmpty) parts.add('Базар: $b');
+    if (d.isNotEmpty) parts.add('Район: $d');
+    if (p.isNotEmpty) parts.add('Проход: $p');
+    if (c.isNotEmpty) parts.add('Контейнер: $c');
+    return parts.isNotEmpty
+        ? parts.join(' · ')
+        : (title.trim().isNotEmpty ? title.trim() : 'Точка');
+  }
+
+  String get headerLine {
+    final parts = <String>[];
+    final b = (bazar ?? '').trim();
+    final d = (district ?? '').trim();
+    if (b.isNotEmpty) parts.add('Базар: $b');
+    if (d.isNotEmpty) parts.add('Район: $d');
+    if (parts.isNotEmpty) return parts.join(' · ');
+    return compactAddress;
   }
 
   String get subLine {
-    final b = (bazar ?? '').trim();
-    return b.isNotEmpty ? b : '';
-  }
-
-  String get shortLine {
+    final parts = <String>[];
     final p = (passage ?? '').trim();
     final c = (container ?? '').trim();
-    final parts = <String>[];
-    if (p.isNotEmpty) parts.add('$p проход');
-    if (c.isNotEmpty) parts.add('$c контейнер');
-    return parts.join(', ');
+    if (p.isNotEmpty) parts.add('Проход: $p');
+    if (c.isNotEmpty) parts.add('Контейнер: $c');
+    return parts.join(' · ');
   }
+
+  String get shortLine => compactAddress;
 }
 
 class _ActiveUi {

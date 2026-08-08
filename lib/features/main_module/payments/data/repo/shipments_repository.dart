@@ -87,6 +87,12 @@ class ShipmentsListItemDto {
     return double.tryParse(v.toString());
   }
 
+  static int _toInt(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
   factory ShipmentsListItemDto.fromJson(Map<String, dynamic> j) {
     final rawStops = j['stops'];
     final stops = <DeliveryPoint>[];
@@ -98,6 +104,7 @@ class ShipmentsListItemDto {
 
         final title = (m['title'] ?? '').toString();
         final bazar = m['bazar']?.toString();
+        final district = m['district']?.toString();
         final passage = m['passage']?.toString();
         final containerRaw = m['container']?.toString();
 
@@ -116,23 +123,26 @@ class ShipmentsListItemDto {
         final lon = _toDouble(m['lon']);
 
         final subtitleParts = <String>[];
-        if (bazar != null && bazar.trim().isNotEmpty) {
-          subtitleParts.add(bazar.trim());
-        }
-        if (container != null && container.trim().isNotEmpty) {
-          subtitleParts.add('Контейнер $container');
+        if (district != null && district.trim().isNotEmpty) {
+          subtitleParts.add('Район: ${district.trim()}');
         }
         if (passage != null && passage.trim().isNotEmpty) {
-          subtitleParts.add('Проход $passage');
+          subtitleParts.add('Проход: ${passage.trim()}');
+        }
+        if (container != null && container.trim().isNotEmpty) {
+          subtitleParts.add('Контейнер: ${container.trim()}');
         }
 
         stops.add(
           DeliveryPoint(
-            title: title.isNotEmpty ? title : 'Точка',
-            subtitle: subtitleParts.join(' • '),
+            title: bazar?.trim().isNotEmpty == true
+                ? 'Базар: ${bazar!.trim()}'
+                : (title.isNotEmpty ? title : 'Точка'),
+            subtitle: subtitleParts.join(' · '),
             lat: lat,
             lon: lon,
             bazar: bazar ?? '',
+            district: district ?? '',
             passage: passage ?? '',
             container: container ?? '',
             q: '',
@@ -141,18 +151,15 @@ class ShipmentsListItemDto {
       }
     }
 
+    final finalFare = _toInt(j['final_fare']);
+    final estimatedFare = _toInt(j['estimated_fare']);
+
     return ShipmentsListItemDto(
-      id: (j['id'] as num).toInt(),
+      id: _toInt(j['id']),
       status: (j['status'] ?? '').toString(),
       stops: stops,
       isPaid: j['is_paid'] == true,
-      fare: (() {
-        final f = j['final_fare'];
-        final e = j['estimated_fare'];
-        if (f != null && f is num && f > 0) return f.toInt();
-        if (e != null && e is num) return e.toInt();
-        return 0;
-      })(),
+      fare: finalFare > 0 ? finalFare : estimatedFare,
     );
   }
 }
@@ -182,7 +189,7 @@ extension ShipmentsRepositoryActive on ShipmentsRepository {
         if (r is! Map) continue;
         final dto = ShipmentsListItemDto.fromJson(Map<String, dynamic>.from(r));
         if (!_isTerminalStatus(dto.status)) {
-          return dto; // первая активная
+          return dto;
         }
       }
 

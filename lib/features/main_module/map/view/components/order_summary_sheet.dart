@@ -171,8 +171,8 @@ class _OrderSummarySheetState extends State<OrderSummarySheet> {
                         ? RoutePointRole.end
                         : RoutePointRole.stop,
                     index: (i > 0 && i < stops.length - 1) ? i : null,
-                    title: stops[i].title,
-                    subtitle: stops[i].subtitle,
+                    title: stops[i].compactTitle,
+                    subtitle: stops[i].compactSubtitle,
                     isLast: i == stops.length - 1,
                     dense: true,
                   ),

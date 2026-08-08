@@ -176,7 +176,7 @@ class _CarrierProfileBody extends StatelessWidget {
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_notification.svg',
                         title: 'Уведомление',
-                        onTap: () => context.push('/profile/notifications'),
+                        onTap: () => context.push('/profile/notifications?role=carrier'),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(

@@ -1,13 +1,18 @@
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dogo/data/network/api_service.dart';
+
 import '../../data/model/app_notification_model.dart';
 import '../../data/repo/notifications_repo.dart';
 import '../../provider/notifications_provider.dart';
 
 class ProfileNotificationsScreen extends StatefulWidget {
-  const ProfileNotificationsScreen({super.key});
+  const ProfileNotificationsScreen({super.key, this.role = 'client'});
+
+  final String role;
+
+  bool get isCarrier => role == 'carrier';
 
   @override
   State<ProfileNotificationsScreen> createState() =>
@@ -16,34 +21,35 @@ class ProfileNotificationsScreen extends StatefulWidget {
 
 class _ProfileNotificationsScreenState
     extends State<ProfileNotificationsScreen> {
+  late final ScrollController _scrollController;
+
   bool _newShipments = true;
   bool _statusUpdates = true;
   bool _promo = false;
   bool _system = true;
 
-  late final ScrollController _scroll;
-
   @override
   void initState() {
     super.initState();
-    _scroll = ScrollController()..addListener(_onScroll);
+    _scrollController = ScrollController()..addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _scroll.removeListener(_onScroll);
-    _scroll.dispose();
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
     super.dispose();
   }
 
   void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final p = context.read<NotificationsProvider>();
-    if (p.loading || p.loadingMore || !p.hasMore) return;
+    if (!_scrollController.hasClients) return;
+    final provider = context.read<NotificationsProvider>();
+    if (provider.loading || provider.loadingMore || !provider.hasMore) return;
 
-    final pos = _scroll.position;
-    if (pos.pixels >= pos.maxScrollExtent - 420) {
-      p.loadMore();
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 320) {
+      provider.loadMore();
     }
   }
 
@@ -51,189 +57,146 @@ class _ProfileNotificationsScreenState
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) {
-        final repo = NotificationsRepository(ApiService.instance);
-        final p = NotificationsProvider(repo);
-        p.loadInitial();
-        return p;
+        final provider = NotificationsProvider(
+          NotificationsRepository(ApiService.instance),
+        );
+        provider.loadInitial();
+        return provider;
       },
       child: Builder(
         builder: (context) {
-          final p = context.watch<NotificationsProvider>();
-
+          final provider = context.watch<NotificationsProvider>();
           return Scaffold(
-            backgroundColor: AppColors.white,
-            body: SafeArea(
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            backgroundColor: const Color(0xFFF7F8FA),
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              ),
+              title: const Text(
+                'Уведомления',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black,
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: _UnreadBadge(count: provider.unreadCount),
+                  ),
+                ),
+              ],
+            ),
+            body: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: provider.refresh,
+              child: ListView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-                    child: Row(
+                  _SectionCard(
+                    title: 'Настройки',
+                    child: Column(
                       children: [
-                        InkWell(
-                          borderRadius: BorderRadius.circular(99),
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(6),
-                            child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 20,
-                              color: AppColors.black,
-                            ),
+                        if (widget.isCarrier) ...[
+                          _NotificationSettingTile(
+                            icon: Icons.local_shipping_outlined,
+                            title: 'Новые заказы рядом',
+                            subtitle:
+                                'Подходящие заказы для вашего типа работы.',
+                            value: _newShipments,
+                            onChanged: (value) {
+                              setState(() => _newShipments = value);
+                            },
                           ),
+                          const Divider(height: 1),
+                        ],
+                        _NotificationSettingTile(
+                          icon: Icons.sync_rounded,
+                          title: 'Статусы заказов',
+                          subtitle:
+                              'Принятие, выполнение, завершение и отмена.',
+                          value: _statusUpdates,
+                          onChanged: (value) {
+                            setState(() => _statusUpdates = value);
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Уведомления',
-                          style: TextStyle(
-                            fontSize: 20,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.black,
-                          ),
+                        const Divider(height: 1),
+                        _NotificationSettingTile(
+                          icon: Icons.local_offer_outlined,
+                          title: 'Акции и бонусы',
+                          subtitle: 'Промокоды и специальные предложения.',
+                          value: _promo,
+                          onChanged: (value) {
+                            setState(() => _promo = value);
+                          },
                         ),
-                        const Spacer(),
-                        _UnreadPill(count: p.unreadCount),
+                        const Divider(height: 1),
+                        _NotificationSettingTile(
+                          icon: Icons.shield_outlined,
+                          title: 'Системные уведомления',
+                          subtitle: 'Важная информация о работе Safa.',
+                          value: _system,
+                          onChanged: (value) {
+                            setState(() => _system = value);
+                          },
+                        ),
                       ],
                     ),
                   ),
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: AppColors.tileBorder,
-                  ),
-                  Expanded(
-                    child: RefreshIndicator(
-                      color: AppColors.accent,
-                      onRefresh: p.refresh,
-                      child: SingleChildScrollView(
-                        controller: _scroll,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'История',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
                         ),
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                        child: Column(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.tileBorder,
-                                  width: 1,
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: AppColors.boxShadow,
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                  BoxShadow(
-                                    color: AppColors.boxShadow2,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  _SwitchTile(
-                                    title: 'Новые заказы рядом',
-                                    subtitle:
-                                        'Когда появляется новый груз поблизости.',
-                                    value: _newShipments,
-                                    onChanged: (v) =>
-                                        setState(() => _newShipments = v),
-                                  ),
-                                  const _SettingsDivider(),
-                                  _SwitchTile(
-                                    title: 'Изменение статуса',
-                                    subtitle:
-                                        'Принятие, выполнение и отмена заказов.',
-                                    value: _statusUpdates,
-                                    onChanged: (v) =>
-                                        setState(() => _statusUpdates = v),
-                                  ),
-                                  const _SettingsDivider(),
-                                  _SwitchTile(
-                                    title: 'Акции и промокоды',
-                                    subtitle:
-                                        'Редкие, но приятные уведомления о бонусах.',
-                                    value: _promo,
-                                    onChanged: (v) =>
-                                        setState(() => _promo = v),
-                                  ),
-                                  const _SettingsDivider(),
-                                  _SwitchTile(
-                                    title: 'Системные уведомления',
-                                    subtitle:
-                                        'Важно для стабильной работы приложения.',
-                                    value: _system,
-                                    onChanged: (v) =>
-                                        setState(() => _system = v),
-                                  ),
-                                  const _SettingsDivider(),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      14,
-                                      16,
-                                      14,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Text(
-                                          'История',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            height: 1.1,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        _FilterPill(
-                                          value: p.filter,
-                                          onChanged: p.setFilter,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      16,
-                                    ),
-                                    child: _NotificationsBody(provider: p),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (p.loadingMore) ...[
-                              const SizedBox(height: 12),
-                              const _LoadMoreBar(),
-                            ] else if (!p.hasMore && p.items.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              const _EndHint(),
-                            ],
-                            const SizedBox(height: 10),
-                            Text(
-                              'Источник: сервер',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.3,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.grey,
-                              ),
-                            ),
-                          ],
+                      ),
+                      _ReadFilter(
+                        value: provider.filter,
+                        onChanged: provider.setFilter,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _NotificationsContent(provider: provider),
+                  if (provider.loadingMore) ...[
+                    const SizedBox(height: 14),
+                    const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      ),
+                    ),
+                  ],
+                  if (!provider.hasMore && provider.items.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    const Center(
+                      child: Text(
+                        'Это все уведомления',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -244,105 +207,193 @@ class _ProfileNotificationsScreenState
   }
 }
 
-class _NotificationsBody extends StatelessWidget {
-  const _NotificationsBody({required this.provider});
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7E9ED)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationSettingTile extends StatelessWidget {
+  const _NotificationSettingTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: const Color(0xFF4B5563)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.3,
+                    color: Color(0xFF8A9099),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch.adaptive(
+            value: value,
+            activeTrackColor: AppColors.primary,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationsContent extends StatelessWidget {
+  const _NotificationsContent({required this.provider});
 
   final NotificationsProvider provider;
 
   @override
   Widget build(BuildContext context) {
     if (provider.loading) {
-      return Column(
-        children: List.generate(
-          6,
-          (i) => const Padding(
-            padding: EdgeInsets.only(bottom: 10),
-            child: _NotificationSkeleton(),
-          ),
+      return const _LoadingNotifications();
+    }
+
+    if (provider.error != null && provider.items.isEmpty) {
+      return _StateCard(
+        icon: Icons.error_outline_rounded,
+        title: 'Не удалось загрузить уведомления',
+        subtitle: provider.error!,
+        action: TextButton(
+          onPressed: provider.loadInitial,
+          child: const Text('Повторить'),
         ),
       );
     }
 
-    if (provider.error != null && provider.items.isEmpty) {
-      return _InlineError(text: provider.error!, onRetry: provider.loadInitial);
-    }
-
     if (provider.items.isEmpty) {
-      final text = provider.filter == NotificationsReadFilter.unread
-          ? 'Непрочитанных уведомлений нет.'
-          : 'Уведомлений пока нет.';
-      return _EmptyBlock(text: text, onRefresh: provider.refresh);
+      return _StateCard(
+        icon: Icons.notifications_none_rounded,
+        title: 'Уведомлений пока нет',
+        subtitle: provider.filter == NotificationsReadFilter.unread
+            ? 'Все уведомления уже прочитаны.'
+            : 'Новые события появятся здесь.',
+      );
     }
 
     return Column(
       children: [
-        for (final n in provider.items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _NotificationCard(
-              n: n,
-              onTap: () => provider.markRead(n.id),
-            ),
+        for (var i = 0; i < provider.items.length; i++) ...[
+          _NotificationCard(
+            notification: provider.items[i],
+            onTap: () => provider.markRead(provider.items[i].id),
           ),
+          if (i != provider.items.length - 1) const SizedBox(height: 10),
+        ],
       ],
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.n, this.onTap});
+  const _NotificationCard({
+    required this.notification,
+    required this.onTap,
+  });
 
-  final AppNotificationModel n;
-  final VoidCallback? onTap;
+  final AppNotificationModel notification;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final icon = _iconFor(n.channel);
-    final meta = _formatTime(n.createdAt);
-    final r = BorderRadius.circular(14);
+    final icon = _iconFor(notification.channel, notification.type);
+    final time = _formatTime(notification.createdAt);
 
     return Material(
-      color: Colors.transparent,
-      borderRadius: r,
+      color: notification.isRead ? Colors.white : const Color(0xFFFFF8F1),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: r,
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: n.isRead ? AppColors.white : AppColors.chev3,
-            borderRadius: r,
-            border: Border.all(color: AppColors.tileBorder, width: 1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE7E9ED)),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: n.isRead ? AppColors.grey : AppColors.org2,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.tileBorder, width: 1),
-                    ),
-                    child: Icon(icon, size: 22, color: Colors.black),
-                  ),
-                  if (!n.isRead)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ),
-                ],
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, size: 21, color: AppColors.primary),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -350,15 +401,18 @@ class _NotificationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
-                            n.title.isEmpty ? 'Уведомление' : n.title,
-                            maxLines: 1,
+                            notification.title.trim().isEmpty
+                                ? 'Уведомление'
+                                : notification.title.trim(),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 15,
-                              height: 1.1,
+                              height: 1.2,
                               fontWeight: FontWeight.w800,
                               color: Colors.black,
                             ),
@@ -366,50 +420,40 @@ class _NotificationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          meta,
+                          time,
                           style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.0,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.grey,
+                            color: Color(0xFF9CA3AF),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      n.body,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.grey2,
-                      ),
-                    ),
-                    if (n.channel.isNotEmpty || n.type.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _Tag(text: n.channel.isEmpty ? 'channel' : n.channel),
-                          const SizedBox(width: 8),
-                          _Tag(text: n.type.isEmpty ? 'type' : n.type),
-                          const Spacer(),
-                          Text(
-                            n.isRead ? 'Прочитано' : 'Новое',
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.0,
-                              fontWeight: FontWeight.w800,
-                              color: n.isRead
-                                  ? AppColors.grey
-                                  : AppColors.accent,
-                            ),
-                          ),
-                        ],
+                    if (notification.body.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        notification.body.trim(),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF5F6670),
+                        ),
                       ),
                     ],
+                    const SizedBox(height: 8),
+                    Text(
+                      notification.isRead ? 'Прочитано' : 'Новое',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: notification.isRead
+                            ? const Color(0xFF9CA3AF)
+                            : AppColors.primary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -420,500 +464,184 @@ class _NotificationCard extends StatelessWidget {
     );
   }
 
-  IconData _iconFor(String channel) {
-    switch (channel) {
-      case 'orders':
-        return Icons.local_shipping_rounded;
-      case 'system':
-        return Icons.shield_rounded;
-      case 'payments':
-        return Icons.payments_rounded;
-      case 'chat':
-        return Icons.chat_bubble_rounded;
-      default:
-        return Icons.notifications_rounded;
+  IconData _iconFor(String channel, String type) {
+    final value = '$channel $type'.toLowerCase();
+    if (value.contains('payment')) return Icons.payments_outlined;
+    if (value.contains('shipment') || value.contains('order')) {
+      return Icons.local_shipping_outlined;
     }
+    if (value.contains('promo') || value.contains('bonus')) {
+      return Icons.local_offer_outlined;
+    }
+    return Icons.notifications_outlined;
   }
 
-  String _formatTime(DateTime dt) {
+  String _formatTime(DateTime value) {
     final now = DateTime.now();
-    final d0 = DateTime(now.year, now.month, now.day);
-    final d1 = DateTime(dt.year, dt.month, dt.day);
+    final local = value.toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(local.year, local.month, local.day);
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
 
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
+    if (date == today) return '$hour:$minute';
+    if (today.difference(date).inDays == 1) return 'Вчера';
 
-    if (d0 == d1) return '$hh:$mm';
-
-    final diffDays = d0.difference(d1).inDays;
-    if (diffDays == 1) return 'Вчера $hh:$mm';
-
-    final dd = dt.day.toString().padLeft(2, '0');
-    final mo = dt.month.toString().padLeft(2, '0');
-    return '$dd.$mo $hh:$mm';
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day.$month';
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          height: 1.0,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF5F6670),
-        ),
-      ),
-    );
-  }
-}
-
-class _UnreadPill extends StatelessWidget {
-  const _UnreadPill({required this.count});
-
-  final int count;
-
-  static const _accent = AppColors.primary;
-
-  @override
-  Widget build(BuildContext context) {
-    if (count <= 0) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFE9EDF2)),
-        ),
-        child: const Text(
-          '0',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.0,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF9FA4AD),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF1E3),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFFFDAB8)),
-      ),
-      child: Text(
-        '$count',
-        style: const TextStyle(
-          fontSize: 12,
-          height: 1.0,
-          fontWeight: FontWeight.w900,
-          color: _accent,
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({required this.value, required this.onChanged});
+class _ReadFilter extends StatelessWidget {
+  const _ReadFilter({required this.value, required this.onChanged});
 
   final NotificationsReadFilter value;
   final ValueChanged<NotificationsReadFilter> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _FilterChip(
-            text: NotificationsReadFilter.all.label(),
-            active: value == NotificationsReadFilter.all,
-            onTap: () => onChanged(NotificationsReadFilter.all),
-          ),
-          _FilterChip(
-            text: NotificationsReadFilter.unread.label(),
-            active: value == NotificationsReadFilter.unread,
-            onTap: () => onChanged(NotificationsReadFilter.unread),
-          ),
-          _FilterChip(
-            text: NotificationsReadFilter.read.label(),
-            active: value == NotificationsReadFilter.read,
-            onTap: () => onChanged(NotificationsReadFilter.read),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.text,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String text;
-  final bool active;
-  final VoidCallback onTap;
-
-  static const _accent = AppColors.primary;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+    return PopupMenuButton<NotificationsReadFilter>(
+      initialValue: value,
+      onSelected: onChanged,
+      itemBuilder: (context) => NotificationsReadFilter.values
+          .map(
+            (item) => PopupMenuItem<NotificationsReadFilter>(
+              value: item,
+              child: Text(item.label()),
+            ),
+          )
+          .toList(growable: false),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFFFF1E3) : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE7E9ED)),
         ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.0,
-            fontWeight: FontWeight.w900,
-            color: active ? _accent : const Color(0xFF5F6670),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value.label(),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF4B5563),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more_rounded, size: 18),
+          ],
         ),
       ),
     );
   }
 }
 
-class _EmptyBlock extends StatelessWidget {
-  const _EmptyBlock({required this.text, required this.onRefresh});
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
 
-  final String text;
-  final Future<void> Function() onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.inbox_rounded, size: 20, color: Color(0xFF9FA4AD)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.25,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF5F6670),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: onRefresh,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFFE9EDF2)),
-              ),
-              child: const Text(
-                'Обновить',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.0,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.text, required this.onRetry});
-
-  final String text;
-  final Future<void> Function() onRetry;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      constraints: const BoxConstraints(minWidth: 30),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3F3),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFD1D1)),
+        color: count > 0 ? const Color(0xFFFFEFE0) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            size: 20,
-            color: Color(0xFFB00020),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.25,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF6B1B1B),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: onRetry,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFFFFD1D1)),
-              ),
-              child: const Text(
-                'Повторить',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.0,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LoadMoreBar extends StatelessWidget {
-  const _LoadMoreBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 12),
-          Text(
-            'Загружаем ещё…',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.0,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF5F6670),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EndHint extends StatelessWidget {
-  const _EndHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-      ),
-      child: const Text(
-        'Это всё — дальше уведомлений нет.',
+      child: Text(
+        '$count',
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 13,
-          height: 1.2,
+          fontSize: 12,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF9FA4AD),
+          color: count > 0 ? AppColors.primary : const Color(0xFF9CA3AF),
         ),
       ),
     );
   }
 }
 
-class _NotificationSkeleton extends StatelessWidget {
-  const _NotificationSkeleton();
+class _StateCard extends StatelessWidget {
+  const _StateCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 78,
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE7E9ED)),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 44,
-            height: 44,
+          Icon(icon, size: 34, color: const Color(0xFF9CA3AF)),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: Color(0xFF8A9099),
+            ),
+          ),
+          if (action != null) ...[
+            const SizedBox(height: 8),
+            action!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingNotifications extends StatelessWidget {
+  const _LoadingNotifications();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        4,
+        (index) => Padding(
+          padding: EdgeInsets.only(bottom: index == 3 ? 0 : 10),
+          child: Container(
+            height: 96,
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF2F6),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE7E9ED)),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 12,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF2F6),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  height: 10,
-                  width: 240,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF2F6),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
-  }
-}
-
-class _SwitchTile extends StatelessWidget {
-  const _SwitchTile({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  static const _greyText = Color(0xFF9FA4AD);
-  static const _accent = AppColors.primary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    height: 1.1,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.25,
-                    fontWeight: FontWeight.w500,
-                    color: _greyText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch.adaptive(
-            value: value,
-            activeThumbColor: Colors.white,
-            activeTrackColor: _accent,
-            inactiveThumbColor: Colors.white,
-            inactiveTrackColor: const Color(0xFFE9EDF2),
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsDivider extends StatelessWidget {
-  const _SettingsDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Divider(height: 1, thickness: 1, color: Color(0xFFE9EDF2));
   }
 }
