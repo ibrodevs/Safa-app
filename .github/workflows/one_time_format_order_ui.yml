@@ -1,0 +1,53 @@
+name: One-time format order UI
+
+on:
+  push:
+    branches:
+      - agent/unify-order-map-notifications-ui
+    paths:
+      - .github/workflows/one_time_format_order_ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'Run one-time format and type fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unify-order-map-notifications-ui
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Fix viewport doubles and format
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('lib/features/carrier_module/home/carrier_home_screen.dart')
+          s = p.read_text()
+          old = """    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.2;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.2;
+"""
+          new = """    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03).toDouble() *
+        0.2;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03).toDouble() *
+        0.2;
+"""
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+          dart format lib test/order_role_map_notifications_contract_test.dart test/delivery_point_compact_route_test.dart test/nearby_shipment_display_test.dart test/notification_role_ui_contract_test.dart test/carrier_market_map_viewport_contract_test.dart test/order_summary_price_source_contract_test.dart test/specialist_order_card_contract_test.dart
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib test
+          git commit -m "Format unified order UI changes"
+          git push origin HEAD:agent/unify-order-map-notifications-ui
