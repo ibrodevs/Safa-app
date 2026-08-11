@@ -1,13 +1,12 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 final class FinikConfig {
-  static String get apiKey => dotenv.env['FINIK_API_KEY'] ?? '';
+  const FinikConfig._();
 
-  static String get accountId => dotenv.env['FINIK_ACCOUNT_ID'] ?? '';
+  static const apiKey = String.fromEnvironment('FINIK_API_KEY');
 
-  static bool get isBeta =>
-      (dotenv.env['FINIK_BETA'] ?? 'false').toLowerCase() == 'true';
+  static const isBeta = bool.fromEnvironment('FINIK_BETA', defaultValue: false);
 
-  static String get itemNameEn =>
-      dotenv.env['FINIK_ITEM_NAME_EN'] ?? 'Delivery payment';
+  static const itemNameEn = String.fromEnvironment(
+    'FINIK_ITEM_NAME_EN',
+    defaultValue: 'Safa delivery payment',
+  );
 }

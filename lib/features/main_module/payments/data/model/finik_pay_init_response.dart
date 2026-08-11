@@ -4,6 +4,7 @@ class FinikPayInitResponse {
   final String callbackUrl;
   final num amount;
   final String currency;
+  final String accountId;
   final Map<String, dynamic> requiredFields;
 
   const FinikPayInitResponse({
@@ -12,6 +13,7 @@ class FinikPayInitResponse {
     required this.callbackUrl,
     required this.amount,
     required this.currency,
+    required this.accountId,
     required this.requiredFields,
   });
 
@@ -23,6 +25,7 @@ class FinikPayInitResponse {
       callbackUrl: (j['callbackUrl'] ?? j['callback_url'])?.toString() ?? '',
       amount: j['amount'] is num ? (j['amount'] as num) : 0,
       currency: j['currency']?.toString() ?? 'KGS',
+      accountId: (j['accountId'] ?? j['account_id'])?.toString() ?? '',
       requiredFields: (j['requiredFields'] ?? j['required_fields']) is Map
           ? Map<String, dynamic>.from(
               j['requiredFields'] ?? j['required_fields'],

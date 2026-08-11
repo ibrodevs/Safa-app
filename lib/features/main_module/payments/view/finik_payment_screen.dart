@@ -77,13 +77,13 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
       );
     }
 
-    if (FinikConfig.apiKey.isEmpty || FinikConfig.accountId.isEmpty) {
+    if (FinikConfig.apiKey.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
           child: Center(
             child: Text(
-              'Finik keys are empty.\nCheck assets/finik_key.env and dotenv.load() in main().',
+              'Finik не настроен. Передайте FINIK_API_KEY через --dart-define.',
               textAlign: TextAlign.center,
             ),
           ),
@@ -137,12 +137,13 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               }
             },
             widget: CreateItemHandlerWidget(
-              accountId: FinikConfig.accountId,
+              accountId: init.accountId,
               nameEn: FinikConfig.itemNameEn,
               requestId: init.finikRequestId,
               amount: FixedAmount(init.amount.toDouble()),
               description: 'Shipment #${flow.shipmentId} (${init.currency})',
               callbackUrl: init.callbackUrl,
+              maxAvailableQuantity: 1,
               requiredFields: requiredFields,
               visibilityType: VisibilityType.PRIVATE,
             ),

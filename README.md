@@ -23,7 +23,7 @@ Runtime API URL is read from Dart defines:
 flutter run --dart-define=DOGO_API_BASE_URL=http://127.0.0.1:8000/api/
 ```
 
-Finik values are loaded from `assets/finik_key.env`. Keep real values local and do not commit them.
+Finik uses compile-time `--dart-define` values; no real key is stored in assets or git. See [`docs/FINIK_SETUP.md`](docs/FINIK_SETUP.md) and the backend guide `DoGO/docs/FINIK_CHATFLOW_SETUP.md`.
 
 ## Google Maps
 
@@ -43,7 +43,9 @@ For a test phone, debug APK is enough:
 
 ```bash
 flutter build apk --debug \
-  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/
+  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
+  --dart-define=FINIK_API_KEY=your_finik_api_client_key \
+  --dart-define=FINIK_BETA=true
 ```
 
 Release APK requires Android signing files:
@@ -56,7 +58,9 @@ Build release:
 
 ```bash
 GOOGLE_MAPS_API_KEY=your_key flutter build apk --release \
-  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/
+  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
+  --dart-define=FINIK_API_KEY=your_production_finik_api_client_key \
+  --dart-define=FINIK_BETA=false
 ```
 
 Install on Android:
