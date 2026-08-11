@@ -235,7 +235,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     _PassageSnap? best;
     for (final line in lines) {
       for (var i = 0; i < line.points.length - 1; i++) {
-        final projected = _projectToSegment(point, line.points[i], line.points[i + 1]);
+        final projected = _projectToSegment(
+          point,
+          line.points[i],
+          line.points[i + 1],
+        );
         final distanceM = _distanceMeters(point, projected.point);
         if (distanceM > maxDistanceM) continue;
         if (best == null || distanceM < best.distanceM) {
@@ -644,7 +648,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _isPaid = active.isPaid;
         _fare = active.fare;
         _showFulfillmentSheet =
-            (status == ShipmentStatus.assigned && active.isPaid) ||
+            status == ShipmentStatus.assigned ||
             status == ShipmentStatus.inTransit;
       });
 
@@ -951,7 +955,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       }
 
       final shouldShowFulfillment =
-          (status == ShipmentStatus.assigned && dto.isPaid) ||
+          status == ShipmentStatus.assigned ||
           status == ShipmentStatus.inTransit;
 
       setState(() {
@@ -1792,11 +1796,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         stops: _activeStops,
         statusCode: _currentStatusCode,
       );
-    } else if (_currentStatus == ShipmentStatus.assigned && !_isPaid) {
+    } else if (_currentStatus == ShipmentStatus.awaitingPayment && !_isPaid) {
       panel = ShipmentPaymentSheet(
         shipmentId: _activeShipmentId!,
         amount: _fare,
-        onCancel: () => _cancelShipment(targetStatus: 'pending'),
       );
     } else {
       panel = SearchingSheet(

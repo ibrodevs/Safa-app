@@ -2,6 +2,7 @@ enum ShipmentStatus {
   pending,
   assigned,
   inTransit,
+  awaitingPayment,
   completed,
   canceled,
   unknown,
@@ -15,6 +16,8 @@ ShipmentStatus parseShipmentStatus(String raw) {
       return ShipmentStatus.assigned;
     case 'in_transit':
       return ShipmentStatus.inTransit;
+    case 'awaiting_payment':
+      return ShipmentStatus.awaitingPayment;
     case 'completed':
       return ShipmentStatus.completed;
     case 'canceled':

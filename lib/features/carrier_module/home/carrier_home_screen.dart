@@ -26,6 +26,7 @@ enum ShipmentStatus {
   pending,
   assigned,
   inTransit,
+  awaitingPayment,
   completed,
   canceled,
   unknown,
@@ -39,6 +40,8 @@ ShipmentStatus parseShipmentStatus(String raw) {
       return ShipmentStatus.assigned;
     case 'in_transit':
       return ShipmentStatus.inTransit;
+    case 'awaiting_payment':
+      return ShipmentStatus.awaitingPayment;
     case 'completed':
       return ShipmentStatus.completed;
     case 'canceled':
@@ -89,6 +92,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   int _activeCurrentStopIndex = 0;
   List<_StopUi> _activeStops = const [];
   int _activeFare = 0;
+  int _activeIncome = 0;
 
   Timer? _pollTimer;
 
@@ -128,7 +132,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   Future<void> _restoreActiveShipment() async {
     try {
-      final page = await ApiService.instance.getShipments(page: 1, pageSize: 100);
+      final page = await ApiService.instance.getShipments(
+        page: 1,
+        pageSize: 100,
+      );
       final rawResults = page['results'];
       if (rawResults is! List) return;
 
@@ -137,7 +144,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         final json = Map<String, dynamic>.from(raw);
         final status = parseShipmentStatus((json['status'] ?? '').toString());
         if (status != ShipmentStatus.assigned &&
-            status != ShipmentStatus.inTransit) {
+            status != ShipmentStatus.inTransit &&
+            status != ShipmentStatus.awaitingPayment) {
           continue;
         }
 
@@ -150,6 +158,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
           _activeCurrentStopIndex = parsed.currentStopIndex;
           _activeStops = parsed.stops;
           _activeFare = parsed.fare;
+          _activeIncome = parsed.income;
           _showWelcome = false;
           _showEmptyOrders = false;
           _nearby = const [];
@@ -301,6 +310,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final estimatedFare = (j['estimated_fare'] as num?)?.toInt() ?? 0;
     final finalFare = (j['final_fare'] as num?)?.toInt() ?? 0;
     final fare = finalFare > 0 ? finalFare : estimatedFare;
+    final income = (j['courier_income'] as num?)?.toInt() ?? fare;
 
     int? idx;
     final a = j['current_stop_index'];
@@ -340,6 +350,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       currentStopIndex: idx,
       stops: stops,
       fare: fare,
+      income: income,
     );
   }
 
@@ -500,6 +511,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeCurrentStopIndex = parsed.currentStopIndex;
         _activeStops = parsed.stops;
         _activeFare = parsed.fare;
+        _activeIncome = parsed.income;
         _nearby = const [];
         _nearbyIndex = 0;
         _stopNearbyPolling();
@@ -534,6 +546,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeStops = parsed.stops;
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
+        _activeIncome = parsed.income;
       });
       if (parsed.status == ShipmentStatus.canceled) {
         _stopActiveAndBackToWelcome(message: 'Заказ отменён');
@@ -568,6 +581,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _activeCurrentStopIndex = 0;
       _activeStops = const [];
       _activeFare = 0;
+      _activeIncome = 0;
 
       _showWelcome = true;
 
@@ -600,6 +614,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activeStops = parsed.stops;
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
+        _activeIncome = parsed.income;
 
         _didFitOnce = false;
         _routeSignature = null;
@@ -726,7 +741,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   Future<void> _loadMarketMapForPoints(List<LatLng> pts) async {
     if (_marketMapLoading || pts.isEmpty) return;
     final hash = Object.hashAll(
-      pts.map((p) => '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}'),
+      pts.map(
+        (p) =>
+            '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}',
+      ),
     );
     if (_marketMapPointsHash == hash && _marketMapFeatures.isNotEmpty) return;
 
@@ -768,77 +786,71 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
   }
 
-
-void _scheduleMarketMapViewportRefresh({bool immediate = false}) {
-  _marketMapViewportDebounce?.cancel();
-  _marketMapViewportDebounce = Timer(
-    immediate ? Duration.zero : const Duration(milliseconds: 420),
-    _refreshMarketMapForViewport,
-  );
-}
-
-bool _shouldReloadMarketMapBounds(
-  LatLngBounds previous,
-  LatLngBounds next,
-) {
-  final latSpan = (previous.north - previous.south).abs();
-  final lonSpan = (previous.east - previous.west).abs();
-  final latShift =
-      (previous.center.latitude - next.center.latitude).abs();
-  final lonShift =
-      (previous.center.longitude - next.center.longitude).abs();
-  return latShift > latSpan * 0.25 || lonShift > lonSpan * 0.25;
-}
-
-Future<void> _refreshMarketMapForViewport() async {
-  if (!mounted || _marketMapViewportLoading) return;
-
-  late final LatLngBounds bounds;
-  try {
-    bounds = _mapController.camera.visibleBounds;
-  } catch (_) {
-    return;
-  }
-
-  final zoomBucket = _zoom.floor();
-  final previous = _lastMarketMapViewportBounds;
-  if (previous != null &&
-      _lastMarketMapViewportZoomBucket == zoomBucket &&
-      !_shouldReloadMarketMapBounds(previous, bounds)) {
-    return;
-  }
-
-  final serial = ++_marketMapViewportRequestSerial;
-  final latPadding =
-      (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.2;
-  final lonPadding =
-      (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.2;
-  _marketMapViewportLoading = true;
-  try {
-    final collection = await _marketMapRepository.loadPublished(
-      zoom: zoomBucket,
-      minLat: bounds.south - latPadding,
-      maxLat: bounds.north + latPadding,
-      minLon: bounds.west - lonPadding,
-      maxLon: bounds.east + lonPadding,
-      centerLat: bounds.center.latitude,
-      centerLon: bounds.center.longitude,
-      maxContainers: 192,
+  void _scheduleMarketMapViewportRefresh({bool immediate = false}) {
+    _marketMapViewportDebounce?.cancel();
+    _marketMapViewportDebounce = Timer(
+      immediate ? Duration.zero : const Duration(milliseconds: 420),
+      _refreshMarketMapForViewport,
     );
-    if (!mounted || serial != _marketMapViewportRequestSerial) return;
-    setState(() {
-      _marketMapFeatures = collection.features;
-      _marketMapRenderCache = null;
-      _lastMarketMapViewportBounds = bounds;
-      _lastMarketMapViewportZoomBucket = zoomBucket;
-      _marketMapPointsHash = null;
-    });
-  } catch (_) {
-    // Keep last map snapshot on transient network errors.
-  } finally {
-    _marketMapViewportLoading = false;
   }
-}
+
+  bool _shouldReloadMarketMapBounds(LatLngBounds previous, LatLngBounds next) {
+    final latSpan = (previous.north - previous.south).abs();
+    final lonSpan = (previous.east - previous.west).abs();
+    final latShift = (previous.center.latitude - next.center.latitude).abs();
+    final lonShift = (previous.center.longitude - next.center.longitude).abs();
+    return latShift > latSpan * 0.25 || lonShift > lonSpan * 0.25;
+  }
+
+  Future<void> _refreshMarketMapForViewport() async {
+    if (!mounted || _marketMapViewportLoading) return;
+
+    late final LatLngBounds bounds;
+    try {
+      bounds = _mapController.camera.visibleBounds;
+    } catch (_) {
+      return;
+    }
+
+    final zoomBucket = _zoom.floor();
+    final previous = _lastMarketMapViewportBounds;
+    if (previous != null &&
+        _lastMarketMapViewportZoomBucket == zoomBucket &&
+        !_shouldReloadMarketMapBounds(previous, bounds)) {
+      return;
+    }
+
+    final serial = ++_marketMapViewportRequestSerial;
+    final latPadding =
+        (bounds.north - bounds.south).abs().clamp(0.002, 0.03) * 0.2;
+    final lonPadding =
+        (bounds.east - bounds.west).abs().clamp(0.002, 0.03) * 0.2;
+    _marketMapViewportLoading = true;
+    try {
+      final collection = await _marketMapRepository.loadPublished(
+        zoom: zoomBucket,
+        minLat: bounds.south - latPadding,
+        maxLat: bounds.north + latPadding,
+        minLon: bounds.west - lonPadding,
+        maxLon: bounds.east + lonPadding,
+        centerLat: bounds.center.latitude,
+        centerLon: bounds.center.longitude,
+        maxContainers: 192,
+      );
+      if (!mounted || serial != _marketMapViewportRequestSerial) return;
+      setState(() {
+        _marketMapFeatures = collection.features;
+        _marketMapRenderCache = null;
+        _lastMarketMapViewportBounds = bounds;
+        _lastMarketMapViewportZoomBucket = zoomBucket;
+        _marketMapPointsHash = null;
+      });
+    } catch (_) {
+      // Keep last map snapshot on transient network errors.
+    } finally {
+      _marketMapViewportLoading = false;
+    }
+  }
 
   List<_CarrierPassageLine> _passageLines() {
     final lines = <_CarrierPassageLine>[];
@@ -880,7 +892,11 @@ Future<void> _refreshMarketMapForViewport() async {
     _CarrierPassageSnap? best;
     for (final line in lines) {
       for (var i = 0; i < line.points.length - 1; i++) {
-        final projected = _projectToSegment(point, line.points[i], line.points[i + 1]);
+        final projected = _projectToSegment(
+          point,
+          line.points[i],
+          line.points[i + 1],
+        );
         final distanceM = _distanceMeters(point, projected.point);
         if (distanceM > maxDistanceM) continue;
         if (best == null || distanceM < best.distanceM) {
@@ -920,7 +936,10 @@ Future<void> _refreshMarketMapForViewport() async {
     return const Distance().as(LengthUnit.Meter, a, b);
   }
 
-  List<LatLng> _passageSegmentBetween(_CarrierPassageSnap a, _CarrierPassageSnap b) {
+  List<LatLng> _passageSegmentBetween(
+    _CarrierPassageSnap a,
+    _CarrierPassageSnap b,
+  ) {
     final points = a.line.points;
     if (a.line.id != b.line.id || points.length < 2) return const [];
     final route = <LatLng>[a.point];
@@ -1147,12 +1166,13 @@ Future<void> _refreshMarketMapForViewport() async {
       );
     }
 
-    final marketMap = _marketMapRenderCache ??= MarketMapRenderData.fromFeatures(
-      _marketMapFeatures,
-      zoom: _zoom,
-      center: LatLng(_centerLat, _centerLon),
-      maxContainerFeatures: 120,
-    );
+    final marketMap = _marketMapRenderCache ??=
+        MarketMapRenderData.fromFeatures(
+          _marketMapFeatures,
+          zoom: _zoom,
+          center: LatLng(_centerLat, _centerLon),
+          maxContainerFeatures: 120,
+        );
 
     Widget bottom;
     if (_showWelcome) {
@@ -1169,10 +1189,16 @@ Future<void> _refreshMarketMapForViewport() async {
       if (_activeStatus == ShipmentStatus.completed) {
         bottom = _CompletedSheet(
           publicCode: _activePublicCode,
-          fare: _activeFare,
+          fare: _activeIncome,
           accent: _accent,
           onDone: () => _stopActiveAndBackToWelcome(),
           stops: _activeStops,
+        );
+      } else if (_activeStatus == ShipmentStatus.awaitingPayment) {
+        bottom = _AwaitingPaymentSheet(
+          publicCode: _activePublicCode,
+          fare: _activeFare,
+          income: _activeIncome,
         );
       } else {
         final dist = _distanceToCurrentStopMeters();
@@ -1513,7 +1539,9 @@ class _ShipmentSheet extends StatelessWidget {
                               height: 24,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.12,
+                                ),
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
@@ -2146,6 +2174,73 @@ class _ArrowDown extends StatelessWidget {
   }
 }
 
+class _AwaitingPaymentSheet extends StatelessWidget {
+  const _AwaitingPaymentSheet({
+    required this.publicCode,
+    required this.fare,
+    required this.income,
+  });
+
+  final String publicCode;
+  final int fare;
+  final int income;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 18,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Работа выполнена',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (publicCode.isNotEmpty)
+                Text(
+                  '#$publicCode',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF9AA0A6),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Ожидаем подтверждённую оплату клиента. Заказ завершится автоматически.',
+            style: TextStyle(fontSize: 16, color: Color(0xFF62676E)),
+          ),
+          const SizedBox(height: 16),
+          _StatCard(
+            big: '+$income',
+            small: 'Сомов будет зачислено из $fare сом',
+            icon: 'assets/icons/ic_wallet.svg',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CompletedSheet extends StatelessWidget {
   const _CompletedSheet({
     required this.publicCode,
@@ -2524,6 +2619,7 @@ class _ActiveUi {
   final int currentStopIndex;
   final List<_StopUi> stops;
   final int fare;
+  final int income;
 
   _ActiveUi({
     required this.id,
@@ -2532,5 +2628,6 @@ class _ActiveUi {
     required this.currentStopIndex,
     required this.stops,
     required this.fare,
+    required this.income,
   });
 }

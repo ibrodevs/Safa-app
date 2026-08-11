@@ -23,7 +23,13 @@ final class FinikPaymentsRepository {
       final map = _asMap(resp.data);
       final parsed = FinikPayInitResponse.fromJson(map);
 
-      if (parsed.paymentId.isEmpty || parsed.finikRequestId.isEmpty) {
+      if (parsed.paymentId.isEmpty ||
+          parsed.finikRequestId.isEmpty ||
+          parsed.accountId.isEmpty ||
+          parsed.amount <= 0 ||
+          parsed.requiredFields['paymentId']?.toString() != parsed.paymentId ||
+          parsed.requiredFields['finikRequestId']?.toString() !=
+              parsed.finikRequestId) {
         throw ApiException('Некорректный ответ /pay/finik/');
       }
       if (parsed.callbackUrl.isEmpty) {
