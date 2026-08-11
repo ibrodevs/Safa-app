@@ -39,6 +39,18 @@ The current production map screen still uses the existing `flutter_map` flow whi
 
 ## Build APK
 
+Use the guarded build script. It refuses to create an APK when the Finik key
+or environment is missing, so an old/non-payment build cannot be mistaken for
+the current application:
+
+```bash
+FINIK_API_KEY=your_finik_mobile_key \
+FINIK_BETA=false \
+./tool/build_apk.sh debug
+```
+
+Use `release` instead of `debug` only when the release keystore is configured.
+
 For a test phone, debug APK is enough:
 
 ```bash
