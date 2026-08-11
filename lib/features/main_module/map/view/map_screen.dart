@@ -1333,8 +1333,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
       setState(() {
         _activeShipmentId = shipmentId;
-        // До назначения исполнителя щит оплаты не нужен.
-        _isPaid = true;
+        // Новый заказ ещё не оплачен. Оплата станет доступна только после
+        // того, как backend вернёт awaiting_payment.
+        _isPaid = false;
         _currentStatusCode = 'pending';
       });
       _startShipmentPolling(shipmentId);
