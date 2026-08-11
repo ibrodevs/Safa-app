@@ -50,15 +50,12 @@ FINIK_BETA=false \
 ```
 
 Use `release` instead of `debug` only when the release keystore is configured.
+Before compiling, the script checks the live backend Finik endpoint, payment
+flow version, HTTPS callback, beta mode and API-key fingerprint. It therefore
+requires the updated backend to be deployed and reloaded first.
 
-For a test phone, debug APK is enough:
-
-```bash
-flutter build apk --debug \
-  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
-  --dart-define=FINIK_API_KEY=your_finik_api_client_key \
-  --dart-define=FINIK_BETA=true
-```
+For a test phone, use `./tool/build_apk.sh debug`; do not call
+`flutter build apk` directly, because that bypasses the payment preflight.
 
 Release APK requires Android signing files:
 
@@ -66,13 +63,14 @@ Release APK requires Android signing files:
 - release keystore file referenced by `storeFile`
 - `keyAlias`, `keyPassword`, `storePassword`
 
-Build release:
+Build release through the same guarded script:
 
 ```bash
-GOOGLE_MAPS_API_KEY=your_key flutter build apk --release \
-  --dart-define=DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
-  --dart-define=FINIK_API_KEY=your_production_finik_api_client_key \
-  --dart-define=FINIK_BETA=false
+GOOGLE_MAPS_API_KEY=your_key \
+DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
+FINIK_API_KEY=your_production_finik_api_client_key \
+FINIK_BETA=false \
+./tool/build_apk.sh release
 ```
 
 Install on Android:

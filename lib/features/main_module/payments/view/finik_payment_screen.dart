@@ -137,7 +137,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               }
             },
             widget: CreateItemHandlerWidget(
-              accountId: init.accountId,
+              accountId: AccountId(init.accountId),
               nameEn: FinikConfig.itemNameEn,
               requestId: init.finikRequestId,
               amount: FixedAmount(init.amount.toDouble()),

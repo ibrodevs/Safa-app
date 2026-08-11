@@ -15,14 +15,21 @@ flutter run \
   --dart-define=FINIK_BETA=true
 ```
 
-Production-сборка:
+APK собирайте только защищённым скриптом (для теста замените `release` на
+`debug`):
 
 ```bash
-flutter build apk --release \
-  --dart-define=DOGO_API_BASE_URL=https://api.example.com/api/ \
-  --dart-define=FINIK_API_KEY=your-production-api-client-key \
-  --dart-define=FINIK_BETA=false
+DOGO_API_BASE_URL=https://api.example.com/api/ \
+FINIK_API_KEY=your-production-api-client-key \
+FINIK_BETA=false \
+./tool/build_apk.sh release
 ```
+
+Перед компиляцией скрипт проверяет живой backend: актуальную платёжную логику,
+настройку Finik, HTTPS callback, совпадение beta/production и отпечатка API
+ключа. Если backend ещё не обновлён или ключи различаются, APK не будет создан.
+В конце выводится SHA-256 готового APK, чтобы можно было отличить новый файл от
+старого.
 
 Опционально название платежа задаётся через
 `--dart-define='FINIK_ITEM_NAME_EN=Safa delivery payment'`.

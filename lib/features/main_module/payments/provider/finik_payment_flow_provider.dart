@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/utils/friendly_error.dart';
+import '../../../../core/config/finik_config.dart';
 import '../data/model/finik_pay_init_response.dart';
 import '../data/repo/finik_payments_repository.dart';
 import '../data/repo/shipments_repository.dart';
@@ -57,6 +58,10 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       errorText = null;
       notifyListeners();
 
+      await _paymentsRepo.assertServerReady(
+        expectedBeta: FinikConfig.isBeta,
+        appApiKey: FinikConfig.apiKey,
+      );
       init = await _paymentsRepo.startFinikPayment(id);
 
       status = FinikFlowStatus.awaitingFinikUi;
@@ -66,39 +71,6 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       errorText = friendlyErrorMessage(e, fallback: 'Не удалось начать оплату');
       notifyListeners();
       rethrow;
-    }
-  }
-
-  Future<void> createShipmentAndStartPayment({
-    required String title,
-    required String description,
-    required List<Map<String, dynamic>> stops,
-  }) async {
-    if (status != FinikFlowStatus.initial) return;
-
-    try {
-      status = FinikFlowStatus.waiting;
-      errorText = null;
-      notifyListeners();
-
-      final id = await _shipmentsRepo.createShipment(
-        title: title,
-        description: description,
-        stops: stops,
-      );
-      shipmentId = id;
-
-      status = FinikFlowStatus.waiting;
-      notifyListeners();
-
-      init = await _paymentsRepo.startFinikPayment(id);
-
-      status = FinikFlowStatus.awaitingFinikUi;
-      notifyListeners();
-    } catch (e) {
-      status = FinikFlowStatus.failed;
-      errorText = friendlyErrorMessage(e, fallback: 'Не удалось начать оплату');
-      notifyListeners();
     }
   }
 
