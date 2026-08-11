@@ -621,6 +621,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
         _activeIncome = parsed.income;
+        _showWelcome = false;
+        _showEmptyOrders = false;
 
         _didFitOnce = false;
         _routeSignature = null;
@@ -628,8 +630,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       });
 
       await _syncRouteAndCameraForActive();
+      if (!mounted) return;
 
-      if (parsed.status == ShipmentStatus.completed) {
+      if (parsed.status == ShipmentStatus.awaitingPayment) {
+        AppSnackBar.showInfo(
+          context,
+          message: 'Работа выполнена. Ожидаем оплату клиента.',
+        );
+      } else if (parsed.status == ShipmentStatus.completed) {
         await _clearRejectedIds();
       }
     } catch (e) {
@@ -2213,10 +2221,26 @@ class _AwaitingPaymentSheet extends StatelessWidget {
         children: [
           Row(
             children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFF3E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Работа выполнена',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                  'Ожидаем оплату клиента',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
               ),
               if (publicCode.isNotEmpty)
@@ -2232,7 +2256,8 @@ class _AwaitingPaymentSheet extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Ожидаем подтверждённую оплату клиента. Заказ завершится автоматически.',
+            'Работа выполнена. После подтверждения платежа Finik заказ '
+            'завершится автоматически, а деньги будут начислены.',
             style: TextStyle(fontSize: 16, color: Color(0xFF62676E)),
           ),
           const SizedBox(height: 16),
