@@ -14,6 +14,7 @@ enum OrderStatusGroup { active, completed, canceled }
 ///
 /// Коды статусов не меняются: они приходят с backend как есть
 /// (`pending`, `assigned`/`accepted`, `in_transit`/`in_progress`,
+/// `awaiting_payment`,
 /// `completed`/`delivered`, `canceled`).
 @immutable
 class OrderStatusView {
@@ -71,6 +72,14 @@ class OrderStatusView {
           label: 'В пути',
           tone: AppBadgeTone.primary,
           icon: Icons.local_shipping_outlined,
+          group: OrderStatusGroup.active,
+        );
+      case 'awaiting_payment':
+        return OrderStatusView(
+          code: code,
+          label: 'Ожидает оплаты',
+          tone: AppBadgeTone.warning,
+          icon: Icons.account_balance_wallet_outlined,
           group: OrderStatusGroup.active,
         );
       case 'completed':

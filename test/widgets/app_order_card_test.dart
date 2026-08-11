@@ -64,6 +64,7 @@ void main() {
         'pending': 'Поиск исполнителя',
         'assigned': 'Назначен',
         'in_transit': 'В пути',
+        'awaiting_payment': 'Ожидает оплаты',
         'completed': 'Выполнен',
         'canceled': 'Отменён',
       };
@@ -145,6 +146,7 @@ void main() {
     test('активные, завершённые и отменённые не пересекаются', () {
       expect(OrderFilter.active.matches('pending'), isTrue);
       expect(OrderFilter.active.matches('in_transit'), isTrue);
+      expect(OrderFilter.active.matches('awaiting_payment'), isTrue);
       expect(OrderFilter.active.matches('completed'), isFalse);
 
       expect(OrderFilter.completed.matches('completed'), isTrue);

@@ -8,23 +8,16 @@ import '../../../../../core/utils/friendly_error.dart';
 import '../../../../../core/widgets/app_widgets.dart';
 import 'map_panel_shell.dart';
 
-/// Панель оплаты найденного заказа.
-///
-/// Логика оплаты через Finik не изменена: `startExistingShipmentPayment`
-/// и переход на именованный маршрут `finik_pay`. Изменилось только
-/// оформление и обработка ошибки — вместо `Ошибка инициализации оплаты: $e`
-/// пользователь видит человекочитаемый текст.
+/// Панель оплаты после того, как специалист отметил работу выполненной.
 class ShipmentPaymentSheet extends StatefulWidget {
   const ShipmentPaymentSheet({
     super.key,
     required this.shipmentId,
     required this.amount,
-    required this.onCancel,
   });
 
   final int shipmentId;
   final int amount;
-  final VoidCallback onCancel;
 
   @override
   State<ShipmentPaymentSheet> createState() => _ShipmentPaymentSheetState();
@@ -44,6 +37,9 @@ class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
 
     try {
       final flow = context.read<FinikPaymentFlowProvider>();
+      // Один provider живёт дольше одного заказа. Сбрасываем результат
+      // предыдущей оплаты, чтобы новый заказ всегда создавал новую попытку.
+      flow.reset();
       await flow.startExistingShipmentPayment(widget.shipmentId);
 
       if (!mounted) return;
@@ -90,9 +86,9 @@ class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Исполнитель найден', style: AppTypography.cardTitle),
+                    Text('Работа выполнена', style: AppTypography.cardTitle),
                     Text(
-                      'Заказ №${widget.shipmentId}',
+                      'Оплатите заказ №${widget.shipmentId}, чтобы завершить его',
                       style: AppTypography.captionMuted,
                     ),
                   ],
@@ -128,14 +124,6 @@ class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
             loading: _loading,
             size: AppButtonSize.medium,
             onPressed: _handlePay,
-          ),
-          AppSpacing.gapXs,
-          AppSecondaryButton(
-            label: 'Отменить заказ',
-            danger: true,
-            size: AppButtonSize.medium,
-            enabled: !_loading,
-            onPressed: widget.onCancel,
           ),
         ],
       ),
