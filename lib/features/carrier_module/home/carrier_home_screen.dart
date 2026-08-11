@@ -309,8 +309,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     final publicCode = (j['public_code'] ?? '').toString();
     final estimatedFare = (j['estimated_fare'] as num?)?.toInt() ?? 0;
     final finalFare = (j['final_fare'] as num?)?.toInt() ?? 0;
-    final fare = finalFare > 0 ? finalFare : estimatedFare;
-    final income = (j['courier_income'] as num?)?.toInt() ?? fare;
+    final paymentDueAmount = (j['payment_due_amount'] as num?)?.toInt() ?? 0;
+    final fare = paymentDueAmount > 0
+        ? paymentDueAmount
+        : (finalFare > 0 ? finalFare : estimatedFare);
+    final income =
+        (j['payment_due_income'] as num?)?.toInt() ??
+        (j['courier_income'] as num?)?.toInt() ??
+        fare;
 
     int? idx;
     final a = j['current_stop_index'];

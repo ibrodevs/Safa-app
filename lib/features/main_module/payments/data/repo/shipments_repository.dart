@@ -153,13 +153,16 @@ class ShipmentsListItemDto {
 
     final finalFare = _toInt(j['final_fare']);
     final estimatedFare = _toInt(j['estimated_fare']);
+    final paymentDueAmount = _toInt(j['payment_due_amount']);
 
     return ShipmentsListItemDto(
       id: _toInt(j['id']),
       status: (j['status'] ?? '').toString(),
       stops: stops,
       isPaid: j['is_paid'] == true,
-      fare: finalFare > 0 ? finalFare : estimatedFare,
+      fare: paymentDueAmount > 0
+          ? paymentDueAmount
+          : (finalFare > 0 ? finalFare : estimatedFare),
     );
   }
 }
