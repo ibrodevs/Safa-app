@@ -209,7 +209,9 @@ class _DetailContent extends StatelessWidget {
                 _InfoRow(
                   icon: Icons.credit_card_outlined,
                   label: 'Способ оплаты',
-                  value: detail.paidAt != null ? 'Оплачено' : 'Не оплачено',
+                  value: detail.paidAt != null
+                      ? 'Finik · оплачено'
+                      : 'Не оплачено',
                   isLast: true,
                 ),
               ],

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../payments/provider/finik_payment_flow_provider.dart';
 import 'amanat_models.dart';
 import 'amanat_provider.dart';
 
@@ -393,7 +394,9 @@ class _HeroCampaignCard extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFFFF8425),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 19),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 19,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                               ),
@@ -403,7 +406,8 @@ class _HeroCampaignCard extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            onPressed: () => _showDonateSheet(context, campaign),
+                            onPressed: () =>
+                                _showDonateSheet(context, campaign),
                             child: const Text('На Медресе'),
                           ),
                         ),
@@ -413,8 +417,12 @@ class _HeroCampaignCard extends StatelessWidget {
                           child: TextButton.icon(
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
-                              backgroundColor: Colors.black.withValues(alpha: .28),
-                              padding: const EdgeInsets.symmetric(horizontal: 13),
+                              backgroundColor: Colors.black.withValues(
+                                alpha: .28,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                                 side: BorderSide(
@@ -801,7 +809,9 @@ Future<void> _showDonateSheet(
   context.read<AmanatProvider>().clearError();
   final amountController = TextEditingController(text: '500');
   var isAnonymous = false;
+  var paymentStarting = false;
   String? amountError;
+  String? paymentError;
   const amounts = [100, 500, 1000, 5000];
 
   await showModalBottomSheet<void>(
@@ -901,7 +911,7 @@ Future<void> _showDonateSheet(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: provider.donating
+                    onPressed: paymentStarting
                         ? null
                         : () async {
                             final amount = int.tryParse(
@@ -917,25 +927,54 @@ Future<void> _showDonateSheet(
                               return;
                             }
                             amountError = null;
-                            final ok = await context
-                                .read<AmanatProvider>()
-                                .donate(
-                                  campaign: campaign,
-                                  amount: amount,
-                                  isAnonymous: isAnonymous,
-                                );
-                            if (ok && context.mounted) {
-                              Navigator.of(context).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Спасибо за пожертвование на Медресе',
-                                  ),
-                                ),
+                            setSheetState(() {
+                              paymentStarting = true;
+                              paymentError = null;
+                            });
+                            try {
+                              final flow = context
+                                  .read<FinikPaymentFlowProvider>();
+                              flow.reset();
+                              await flow.startAmanatDonationPayment(
+                                campaignId: campaign.id,
+                                amount: amount,
+                                isAnonymous: isAnonymous,
                               );
+                              if (!context.mounted) return;
+                              final router = GoRouter.of(context);
+                              final messenger = ScaffoldMessenger.of(context);
+                              final amanatProvider = context
+                                  .read<AmanatProvider>();
+                              Navigator.of(context).pop();
+                              final paid = await router.pushNamed<bool>(
+                                'finik_pay',
+                              );
+                              if (paid == true) {
+                                await amanatProvider.refreshCampaign(
+                                  campaign.id,
+                                );
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Спасибо за пожертвование на Медресе',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                final flow = context
+                                    .read<FinikPaymentFlowProvider>();
+                                setSheetState(() {
+                                  paymentStarting = false;
+                                  paymentError =
+                                      flow.errorText ??
+                                      'Не удалось открыть оплату Finik';
+                                });
+                              }
                             }
                           },
-                    child: provider.donating
+                    child: paymentStarting
                         ? const SizedBox(
                             width: 20,
                             height: 20,
@@ -951,6 +990,13 @@ Future<void> _showDonateSheet(
                   const SizedBox(height: 10),
                   Text(
                     provider.error!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ],
+                if (paymentError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    paymentError!,
                     style: const TextStyle(color: AppColors.error),
                   ),
                 ],

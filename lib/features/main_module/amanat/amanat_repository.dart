@@ -39,21 +39,4 @@ class AmanatRepository {
     final resp = await _api.dio.get<dynamic>('delivery/amanat/campaigns/$id/');
     return AmanatCampaign.fromJson(Map<String, dynamic>.from(resp.data as Map));
   }
-
-  Future<AmanatDonation> donate({
-    required int campaignId,
-    required int amount,
-    bool isAnonymous = false,
-    String comment = '',
-  }) async {
-    final resp = await _api.dio.post<dynamic>(
-      'delivery/amanat/campaigns/$campaignId/donate/',
-      data: {
-        'amount': amount,
-        'is_anonymous': isAnonymous,
-        if (comment.trim().isNotEmpty) 'comment': comment.trim(),
-      },
-    );
-    return AmanatDonation.fromJson(Map<String, dynamic>.from(resp.data as Map));
-  }
 }

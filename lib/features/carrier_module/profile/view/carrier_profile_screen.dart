@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/utils/snackbar_utils.dart';
 import '../data/repo/carrier_profile_repository.dart';
 import '../provider/carrier_profile_provider.dart';
 
@@ -31,12 +30,6 @@ class CarrierProfileScreen extends StatelessWidget {
 
 class _CarrierProfileBody extends StatelessWidget {
   const _CarrierProfileBody();
-  void _showSoonSnack(BuildContext context) {
-    AppSnackBar.showSuccess(
-      context,
-      message: 'Интеграция будет добавлена позже.',
-    );
-  }
 
   String formatKgPhone(String? input) {
     if (input == null) return '—';
@@ -176,7 +169,8 @@ class _CarrierProfileBody extends StatelessWidget {
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_notification.svg',
                         title: 'Уведомление',
-                        onTap: () => context.push('/profile/notifications?role=carrier'),
+                        onTap: () =>
+                            context.push('/profile/notifications?role=carrier'),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(
@@ -187,14 +181,8 @@ class _CarrierProfileBody extends StatelessWidget {
                       const _ProfileInnerDivider(),
                       _ProfileTile(
                         iconAsset: 'assets/icons/ic_wallet.svg',
-                        title: 'Пополнить счет',
-                        onTap: () => _showSoonSnack(context),
-                      ),
-                      const _ProfileInnerDivider(),
-                      _ProfileTile(
-                        iconAsset: 'assets/icons/ic_clock.svg',
-                        title: 'История пополнений/трат',
-                        onTap: () => _showSoonSnack(context),
+                        title: 'Баланс и начисления',
+                        onTap: () => context.push('/profile/balance-history'),
                       ),
                       const _ProfileInnerDivider(),
                       _ProfileTile(

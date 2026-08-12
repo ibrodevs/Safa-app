@@ -26,7 +26,12 @@ final class FinikPaymentsRepository {
       final resp = await _api.dio.get('payments/finik/config/');
       final config = _asMap(resp.data);
       final version = (config['paymentFlowVersion'] as num?)?.toInt() ?? 0;
-      if (version < 2) {
+      final purposes =
+          (config['paymentPurposes'] as List?)
+              ?.map((value) => value.toString())
+              .toSet() ??
+          const <String>{};
+      if (version < 3 || !purposes.containsAll(const {'shipment', 'amanat'})) {
         throw ApiException(
           'Backend использует старую платёжную логику. Обновите и '
           'перезапустите сервер.',
@@ -96,6 +101,61 @@ final class FinikPaymentsRepository {
       throw ApiException(
         e.response?.data?.toString() ?? 'Не удалось стартовать оплату Finik',
       );
+    }
+  }
+
+  Future<FinikDonationInit> startAmanatDonation({
+    required int campaignId,
+    required int amount,
+    required bool isAnonymous,
+  }) async {
+    try {
+      final resp = await _api.dio.post(
+        'delivery/amanat/campaigns/$campaignId/donate/',
+        data: {'amount': amount, 'is_anonymous': isAnonymous},
+      );
+      final map = _asMap(resp.data);
+      final parsed = FinikPayInitResponse.fromJson(map);
+      final donationId = (map['donationId'] as num?)?.toInt() ?? 0;
+      _validateInit(parsed);
+      if (donationId <= 0 || parsed.requiredFields['paymentKind'] != 'amanat') {
+        throw ApiException('Некорректный ответ оплаты пожертвования');
+      }
+      return FinikDonationInit(donationId: donationId, payment: parsed);
+    } on DioException catch (e) {
+      throw ApiException(
+        e.response?.data?.toString() ??
+            'Не удалось начать пожертвование через Finik',
+      );
+    }
+  }
+
+  Future<bool> isAmanatDonationPaid({
+    required int campaignId,
+    required int donationId,
+  }) async {
+    try {
+      final resp = await _api.dio.get(
+        'delivery/amanat/campaigns/$campaignId/donations/$donationId/',
+      );
+      return _asMap(resp.data)['status'] == 'paid';
+    } on DioException catch (e) {
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось проверить пожертвование',
+      );
+    }
+  }
+
+  void _validateInit(FinikPayInitResponse parsed) {
+    if (parsed.paymentId.isEmpty ||
+        parsed.finikRequestId.isEmpty ||
+        parsed.accountId.isEmpty ||
+        parsed.amount <= 0 ||
+        parsed.requiredFields['paymentId']?.toString() != parsed.paymentId ||
+        parsed.requiredFields['finikRequestId']?.toString() !=
+            parsed.finikRequestId ||
+        !parsed.callbackUrl.startsWith('https://')) {
+      throw ApiException('Некорректный ответ Finik');
     }
   }
 }

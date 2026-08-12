@@ -21,7 +21,6 @@ import '../../features/carrier_module/history/view/carrier_history_screen.dart';
 import '../../features/carrier_module/history/view/components/carrier_history_detail_data.dart';
 import '../../features/carrier_module/home/carrier_home_screen.dart';
 import '../../features/carrier_module/profile/view/carrier_profile_screen.dart';
-import '../../features/carrier_module/profile/view/components/balance_top_up_screen.dart';
 import '../../features/main_module/bottom_bar/bottom_tab_bar.dart';
 import '../../features/main_module/home/home_screen.dart';
 import '../../features/auth_module/splash/splash_screen.dart';
@@ -169,11 +168,6 @@ final class AppRouter {
         pageBuilder: (context, state) => _build(state, SelfieWaitingScreen()),
       ),
       GoRoute(
-        path: '/profile/topup',
-        pageBuilder: (context, state) =>
-            _build(state, const BalanceTopUpScreen()),
-      ),
-      GoRoute(
         path: '/finik_pay',
         name: 'finik_pay',
         pageBuilder: (context, state) =>
@@ -263,9 +257,7 @@ final class AppRouter {
                 path: '/home-carrier',
                 pageBuilder: (context, state) => _build(
                   state,
-                  CarrierHomeScreen(
-                    key: ValueKey('carrier-home-${state.uri}'),
-                  ),
+                  CarrierHomeScreen(key: ValueKey('carrier-home-${state.uri}')),
                 ),
               ),
             ],

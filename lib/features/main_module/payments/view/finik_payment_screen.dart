@@ -62,7 +62,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
     final flow = context.watch<FinikPaymentFlowProvider>();
     final init = flow.init;
 
-    if (init == null || flow.shipmentId == null) {
+    if (init == null || !flow.hasPaymentTarget) {
       return Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -141,7 +141,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               nameEn: FinikConfig.itemNameEn,
               requestId: init.finikRequestId,
               amount: FixedAmount(init.amount.toDouble()),
-              description: 'Shipment #${flow.shipmentId} (${init.currency})',
+              description: '${flow.paymentDescription} (${init.currency})',
               callbackUrl: init.callbackUrl,
               maxAvailableQuantity: 1,
               requiredFields: requiredFields,
@@ -276,8 +276,8 @@ class _FinikStatusOverlay extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Заказ успешно оплачен',
+          Text(
+            context.read<FinikPaymentFlowProvider>().successMessage,
             style: TextStyle(fontSize: 16, color: AppColors.grey2),
           ),
           const SizedBox(height: 24),
@@ -336,7 +336,7 @@ class _FinikStatusOverlay extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('Вернуться к заказу'),
+              child: const Text('Вернуться'),
             ),
           ),
         ],

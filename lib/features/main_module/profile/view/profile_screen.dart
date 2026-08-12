@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/design/app_design.dart';
 import '../../../../core/utils/kg_phone_format.dart';
-import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../data/services/logout_service.dart';
 import '../provider/profile_provider.dart';
@@ -65,10 +64,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
     if (!mounted) return;
     setState(() => _loggingOut = false);
     context.go('/select_role');
-  }
-
-  void _showSoon() {
-    AppSnackBar.showSoon(context);
   }
 
   @override
@@ -146,9 +141,10 @@ class _ProfileBodyState extends State<_ProfileBody> {
                         onTap: () => context.push('/profile/account'),
                       ),
                       AppListTile(
-                        title: 'История пополнений и трат',
+                        title: 'История заказов и оплат',
+                        subtitle: 'Подтверждённые платежи через Finik',
                         iconAsset: AppIcons.clock,
-                        onTap: _showSoon,
+                        onTap: () => context.go('/history'),
                       ),
                     ],
                   ),

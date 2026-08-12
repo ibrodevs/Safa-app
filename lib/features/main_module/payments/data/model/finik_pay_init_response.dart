@@ -34,3 +34,10 @@ class FinikPayInitResponse {
     );
   }
 }
+
+class FinikDonationInit {
+  const FinikDonationInit({required this.donationId, required this.payment});
+
+  final int donationId;
+  final FinikPayInitResponse payment;
+}

@@ -23,9 +23,6 @@ class AmanatProvider extends ChangeNotifier {
   bool _loading = false;
   bool get loading => _loading;
 
-  bool _donating = false;
-  bool get donating => _donating;
-
   String? _error;
   String? get error => _error;
 
@@ -111,34 +108,6 @@ class AmanatProvider extends ChangeNotifier {
       _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить сбор');
       notifyListeners();
       return null;
-    }
-  }
-
-  Future<bool> donate({
-    required AmanatCampaign campaign,
-    required int amount,
-    bool isAnonymous = false,
-  }) async {
-    _donating = true;
-    _error = null;
-    notifyListeners();
-    try {
-      await _repository.donate(
-        campaignId: campaign.id,
-        amount: amount,
-        isAnonymous: isAnonymous,
-      );
-      await refreshCampaign(campaign.id);
-      return true;
-    } catch (e) {
-      _error = friendlyErrorMessage(
-        e,
-        fallback: 'Не удалось отправить пожертвование',
-      );
-      return false;
-    } finally {
-      _donating = false;
-      notifyListeners();
     }
   }
 }

@@ -47,8 +47,11 @@ except Exception as exc:
 
 expected_fingerprint = hashlib.sha256(api_key.encode()).hexdigest()[:16]
 problems = []
-if int(config.get("paymentFlowVersion") or 0) < 2:
+purposes = set(config.get("paymentPurposes") or [])
+if int(config.get("paymentFlowVersion") or 0) < 3:
     problems.append("backend payment flow is outdated")
+if not {"shipment", "amanat"}.issubset(purposes):
+    problems.append("backend does not support every Finik payment purpose")
 if config.get("configured") is not True:
     problems.append("Finik is not configured on backend")
 if config.get("beta") is not expected_beta:

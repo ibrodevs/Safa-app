@@ -29,7 +29,16 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   String? errorText;
 
   int? shipmentId;
+  int? amanatCampaignId;
+  int? amanatDonationId;
   FinikPayInitResponse? init;
+
+  bool get hasPaymentTarget => shipmentId != null || amanatDonationId != null;
+  String get paymentDescription =>
+      shipmentId != null ? 'Заказ #$shipmentId' : 'Пожертвование Safa Amanat';
+  String get successMessage => amanatDonationId != null
+      ? 'Пожертвование успешно оплачено'
+      : 'Заказ успешно оплачен';
 
   Timer? _pollTimer;
   int _pollTicks = 0;
@@ -43,6 +52,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     status = FinikFlowStatus.initial;
     errorText = null;
     shipmentId = null;
+    amanatCampaignId = null;
+    amanatDonationId = null;
     init = null;
     notifyListeners();
   }
@@ -74,12 +85,48 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> startAmanatDonationPayment({
+    required int campaignId,
+    required int amount,
+    required bool isAnonymous,
+  }) async {
+    if (status != FinikFlowStatus.initial && status != FinikFlowStatus.failed) {
+      return;
+    }
+    try {
+      status = FinikFlowStatus.waiting;
+      errorText = null;
+      notifyListeners();
+      await _paymentsRepo.assertServerReady(
+        expectedBeta: FinikConfig.isBeta,
+        appApiKey: FinikConfig.apiKey,
+      );
+      final donation = await _paymentsRepo.startAmanatDonation(
+        campaignId: campaignId,
+        amount: amount,
+        isAnonymous: isAnonymous,
+      );
+      amanatCampaignId = campaignId;
+      amanatDonationId = donation.donationId;
+      init = donation.payment;
+      status = FinikFlowStatus.awaitingFinikUi;
+      notifyListeners();
+    } catch (e) {
+      status = FinikFlowStatus.failed;
+      errorText = friendlyErrorMessage(
+        e,
+        fallback: 'Не удалось начать пожертвование через Finik',
+      );
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   void startPollingPaid({
     Duration interval = const Duration(seconds: 2),
     int maxSeconds = 40,
   }) {
-    final id = shipmentId;
-    if (id == null) return;
+    if (!hasPaymentTarget) return;
 
     _pollTimer?.cancel();
     _pollTicks = 0;
@@ -95,7 +142,12 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       _pollTicks++;
 
       try {
-        final paid = await _shipmentsRepo.isShipmentPaid(id);
+        final paid = shipmentId != null
+            ? await _shipmentsRepo.isShipmentPaid(shipmentId!)
+            : await _paymentsRepo.isAmanatDonationPaid(
+                campaignId: amanatCampaignId!,
+                donationId: amanatDonationId!,
+              );
         if (paid) {
           t.cancel();
           status = FinikFlowStatus.succeeded;
