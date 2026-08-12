@@ -56,7 +56,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   static const double _containerLabelMinZoom = 16;
   static const double _containerShapeMinZoom = 15;
   static const int _maxRenderedLooseContainers = 180;
-  static const int _maxRenderedContainerMarkers = 240;
+  static const int _maxRenderedContainerMarkers = 96;
   static const int _maxRenderedContainerLabels = 120;
   static const int _maxRenderedPublishedContainers = 260;
 
@@ -842,6 +842,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       zoom: _zoom,
       center: LatLng(_centerLat, _centerLon),
       maxContainerFeatures: _mapMoving ? 0 : _maxRenderedPublishedContainers,
+      showLabels: !_mapMoving,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;
@@ -874,7 +875,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _marketMapFeatures
             .where((feature) => feature.isContainer && feature.minZoom <= _zoom)
             .map((feature) {
-              final point = _featureCenter(feature.coordinates);
+              final lat = feature.centerLat;
+              final lon = feature.centerLon;
+              final point = lat != null && lon != null
+                  ? LatLng(lat, lon)
+                  : _featureCenter(feature.coordinates);
               if (point == null) return null;
               final dLat = point.latitude - center.latitude;
               final dLon = point.longitude - center.longitude;
@@ -884,13 +889,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
             .toList()
           ..sort((a, b) => a.value.compareTo(b.value));
 
-    if (features.length <= _maxRenderedPublishedContainers) {
+    final renderLimit = MarketMapRenderData.containerRenderLimitForZoom(_zoom);
+    if (features.length <= renderLimit) {
       return features.map((entry) => entry.key).toList();
     }
-    return features
-        .take(_maxRenderedPublishedContainers)
-        .map((entry) => entry.key)
-        .toList();
+    return features.take(renderLimit).map((entry) => entry.key).toList();
   }
 
   bool _shouldReloadContainers(LatLngBounds previous, LatLngBounds next) {
@@ -1534,7 +1537,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           _zoom < _containerShapeMinZoom) {
         continue;
       }
-      final center = _featureCenter(feature.coordinates);
+      final lat = feature.centerLat;
+      final lon = feature.centerLon;
+      final center = lat != null && lon != null
+          ? LatLng(lat, lon)
+          : _featureCenter(feature.coordinates);
       if (center == null) continue;
       markers.add(
         Marker(
@@ -1672,11 +1679,20 @@ class _OrderMapScreenState extends State<OrderMapScreen>
               'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
           userAgentPackageName: 'kg.genesis.dogo',
           subdomains: const ['a', 'b', 'c', 'd'],
+          panBuffer: 0,
+          keepBuffer: 1,
+          tileDisplay: const TileDisplay.instantaneous(),
         ),
         if (marketMap.polygons.isNotEmpty)
-          PolygonLayer(polygons: marketMap.polygons),
+          PolygonLayer(
+            polygons: marketMap.polygons,
+            simplificationTolerance: 0.8,
+          ),
         if (marketMap.polylines.isNotEmpty)
-          PolylineLayer(polylines: marketMap.polylines),
+          PolylineLayer(
+            polylines: marketMap.polylines,
+            simplificationTolerance: 0.8,
+          ),
         if (containerPolygons.isNotEmpty)
           PolygonLayer(polygons: containerPolygons),
         if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)

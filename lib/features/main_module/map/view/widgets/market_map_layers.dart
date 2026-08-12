@@ -26,9 +26,9 @@ final class MarketMapRenderData {
   /// растёт. Порог применяется даже если экран запросил больше объектов.
   static int containerRenderLimitForZoom(double zoom) {
     if (zoom < 15) return 0;
-    if (zoom < 16) return 36;
-    if (zoom < 17) return 64;
-    return 96;
+    if (zoom < 16) return 24;
+    if (zoom < 17) return 48;
+    return 72;
   }
 
   factory MarketMapRenderData.fromFeatures(
@@ -36,6 +36,7 @@ final class MarketMapRenderData {
     required double zoom,
     LatLng? center,
     int? maxContainerFeatures,
+    bool showLabels = true,
   }) {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
@@ -77,14 +78,17 @@ final class MarketMapRenderData {
           );
           if (feature.kind == 'container' && zoom >= 16) {
             renderedContainerCount++;
-            markers.add(
-              _labelMarker(
-                _boundsCenter(points),
-                feature.name,
-                const Color(0xFF111827),
-              ),
-            );
-          } else if (feature.kind == 'bazar' || feature.kind == 'district') {
+            if (showLabels) {
+              markers.add(
+                _labelMarker(
+                  _boundsCenter(points),
+                  feature.name,
+                  const Color(0xFF111827),
+                ),
+              );
+            }
+          } else if (showLabels &&
+              (feature.kind == 'bazar' || feature.kind == 'district')) {
             markers.add(
               _labelMarker(_boundsCenter(points), feature.name, border),
             );
@@ -104,7 +108,7 @@ final class MarketMapRenderData {
               pattern: pattern,
             ),
           );
-          if (feature.kind == 'passage') {
+          if (showLabels && feature.kind == 'passage') {
             final center = _boundsCenter(points);
             markers.add(_labelMarker(center, feature.name, border));
           }
@@ -123,16 +127,19 @@ final class MarketMapRenderData {
           );
           if (feature.kind == 'container' && zoom >= 16) {
             renderedContainerCount++;
-            markers.add(
-              _labelMarker(
-                _boundsCenter(points),
-                feature.name,
-                const Color(0xFF111827),
-              ),
-            );
-          } else if (feature.kind == 'passage' ||
-              feature.kind == 'bazar' ||
-              feature.kind == 'district') {
+            if (showLabels) {
+              markers.add(
+                _labelMarker(
+                  _boundsCenter(points),
+                  feature.name,
+                  const Color(0xFF111827),
+                ),
+              );
+            }
+          } else if (showLabels &&
+              (feature.kind == 'passage' ||
+                  feature.kind == 'bazar' ||
+                  feature.kind == 'district')) {
             markers.add(
               _labelMarker(_boundsCenter(points), feature.name, border),
             );
@@ -158,14 +165,17 @@ final class MarketMapRenderData {
             );
             if (feature.kind == 'container' && zoom >= 16) {
               renderedContainerCount++;
-              markers.add(
-                _labelMarker(
-                  _boundsCenter(points),
-                  feature.name,
-                  const Color(0xFF111827),
-                ),
-              );
-            } else if (feature.kind == 'bazar' || feature.kind == 'district') {
+              if (showLabels) {
+                markers.add(
+                  _labelMarker(
+                    _boundsCenter(points),
+                    feature.name,
+                    const Color(0xFF111827),
+                  ),
+                );
+              }
+            } else if (showLabels &&
+                (feature.kind == 'bazar' || feature.kind == 'district')) {
               markers.add(
                 _labelMarker(_boundsCenter(points), feature.name, border),
               );
@@ -318,9 +328,7 @@ final class MarketMapRenderData {
                 fontSize: 11,
                 height: 1,
                 fontWeight: FontWeight.w800,
-                shadows: const [
-                  Shadow(color: Colors.white, blurRadius: 3),
-                ],
+                shadows: const [Shadow(color: Colors.white, blurRadius: 3)],
               ),
             ),
           ),

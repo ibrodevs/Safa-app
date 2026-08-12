@@ -41,8 +41,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   /// Ниже этого масштаба подписи контейнеров скрываются.
   static const double _containerLabelMinZoom = 16;
   static const double _containerShapeMinZoom = 15;
-  static const int _maxRenderedContainerShapes = 120;
-  static const int _maxRenderedContainerMarkers = 160;
+  static const int _maxRenderedContainerShapes = 72;
+  static const int _maxRenderedContainerMarkers = 96;
   static const int _maxRenderedPublishedContainers = 220;
 
   final MapController _mapController = MapController();
@@ -415,6 +415,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         })
         .toList();
 
+    final markerLimit = MarketMapRenderData.containerRenderLimitForZoom(_zoom);
     final markers = _visibleContainers
         .where((c) => c.latValue != null && c.lonValue != null)
         .where(
@@ -423,36 +424,33 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               selectedContainer?.id == c.id ||
               _visibleContainers.length <= 24,
         )
-        .take(_mapMoving ? 24 : _maxRenderedContainerMarkers)
-        .map(
-          (container) {
-            final selected = selectedContainer?.id == container.id;
-            final hideLooseVisual = hasPublishedContainers;
-            return Marker(
-              point: LatLng(container.latValue!, container.lonValue!),
-              width: ContainerMapMarker.hitSize,
-              height: ContainerMapMarker.hitSize,
-              alignment: Alignment.center,
-              child: hideLooseVisual
-                  ? _ContainerTapTarget(
-                      container: container,
-                      onTap: () => _selectContainer(container),
-                    )
-                  : ContainerMapMarker(
-                      container: container,
-                      selected: selected,
-                      showLabel: showLabels && !hasPublishedContainers,
-                      onTap: () => _selectContainer(container),
-                    ),
-            );
-          },
+        .take(
+          _mapMoving ? 1 : markerLimit.clamp(0, _maxRenderedContainerMarkers),
         )
+        .map((container) {
+          final selected = selectedContainer?.id == container.id;
+          final hideLooseVisual = hasPublishedContainers;
+          return Marker(
+            point: LatLng(container.latValue!, container.lonValue!),
+            width: ContainerMapMarker.hitSize,
+            height: ContainerMapMarker.hitSize,
+            alignment: Alignment.center,
+            child: hideLooseVisual
+                ? _ContainerTapTarget(
+                    container: container,
+                    onTap: () => _selectContainer(container),
+                  )
+                : ContainerMapMarker(
+                    container: container,
+                    selected: selected,
+                    showLabel: showLabels && !hasPublishedContainers,
+                    onTap: () => _selectContainer(container),
+                  ),
+          );
+        })
         .toList();
 
-    final mapMarkers = <Marker>[
-      ...marketMap.markers,
-      ...markers,
-    ];
+    final mapMarkers = <Marker>[...marketMap.markers, ...markers];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -503,11 +501,20 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
+                panBuffer: 0,
+                keepBuffer: 1,
+                tileDisplay: const TileDisplay.instantaneous(),
               ),
               if (marketMap.polygons.isNotEmpty)
-                PolygonLayer(polygons: marketMap.polygons),
+                PolygonLayer(
+                  polygons: marketMap.polygons,
+                  simplificationTolerance: 0.8,
+                ),
               if (marketMap.polylines.isNotEmpty)
-                PolylineLayer(polylines: marketMap.polylines),
+                PolylineLayer(
+                  polylines: marketMap.polylines,
+                  simplificationTolerance: 0.8,
+                ),
               if (containerPolygons.isNotEmpty)
                 PolygonLayer(polygons: containerPolygons),
               if (mapMarkers.isNotEmpty) MarkerLayer(markers: mapMarkers),
@@ -629,6 +636,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       zoom: _zoom,
       center: _center,
       maxContainerFeatures: _mapMoving ? 0 : _maxRenderedPublishedContainers,
+      showLabels: !_mapMoving,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;

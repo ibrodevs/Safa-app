@@ -75,10 +75,9 @@ void main() {
       },
     });
 
-    final marker = MarketMapRenderData.fromFeatures(
-      [feature],
-      zoom: 16,
-    ).markers.single;
+    final marker = MarketMapRenderData.fromFeatures([
+      feature,
+    ], zoom: 16).markers.single;
 
     expect(marker.alignment, Alignment.center);
     expect(marker.child, isA<IgnorePointer>());
@@ -155,15 +154,27 @@ void main() {
       dataAt16.renderedContainerCount,
       MarketMapRenderData.containerRenderLimitForZoom(16),
     );
-    expect(dataAt16.polygons, hasLength(64));
-    expect(dataAt16.markers, hasLength(64));
+    expect(
+      dataAt16.polygons,
+      hasLength(MarketMapRenderData.containerRenderLimitForZoom(16)),
+    );
+    expect(
+      dataAt16.markers,
+      hasLength(MarketMapRenderData.containerRenderLimitForZoom(16)),
+    );
 
     expect(
       dataAt17.renderedContainerCount,
       MarketMapRenderData.containerRenderLimitForZoom(17),
     );
-    expect(dataAt17.polygons, hasLength(96));
-    expect(dataAt17.markers, hasLength(96));
+    expect(
+      dataAt17.polygons,
+      hasLength(MarketMapRenderData.containerRenderLimitForZoom(17)),
+    );
+    expect(
+      dataAt17.markers,
+      hasLength(MarketMapRenderData.containerRenderLimitForZoom(17)),
+    );
   });
 
   test('feature center is precomputed once while parsing GeoJSON', () {
@@ -226,5 +237,16 @@ void main() {
 
     expect(data.polygons, hasLength(1));
     expect(data.markers, hasLength(1));
+
+    final movingData = MarketMapRenderData.fromFeatures(
+      [bazar, container],
+      zoom: 16,
+      center: const LatLng(42.94, 74.62),
+      maxContainerFeatures: 0,
+      showLabels: false,
+    );
+
+    expect(movingData.polygons, hasLength(1));
+    expect(movingData.markers, isEmpty);
   });
 }

@@ -112,6 +112,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   List<MarketMapFeature> _marketMapFeatures = const [];
   MarketMapRenderData? _marketMapRenderCache;
   Timer? _marketMapViewportDebounce;
+  Timer? _mapIdleDebounce;
+  bool _mapMoving = false;
   LatLngBounds? _lastMarketMapViewportBounds;
   int? _lastMarketMapViewportZoomBucket;
   int _marketMapViewportRequestSerial = 0;
@@ -178,6 +180,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     _pollTimer?.cancel();
     _nearbyPollTimer?.cancel();
     _marketMapViewportDebounce?.cancel();
+    _mapIdleDebounce?.cancel();
     _posSub?.cancel();
     super.dispose();
   }
@@ -1185,7 +1188,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
           _marketMapFeatures,
           zoom: _zoom,
           center: LatLng(_centerLat, _centerLon),
-          maxContainerFeatures: 120,
+          maxContainerFeatures: _mapMoving ? 0 : 72,
+          showLabels: !_mapMoving,
         );
 
     Widget bottom;
@@ -1249,11 +1253,30 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                 _centerLon = pos.center.longitude;
                 final oldZoomBucket = _zoom.floor();
                 _zoom = pos.zoom;
+                if (hasGesture) {
+                  if (!_mapMoving) {
+                    _mapMoving = true;
+                    _marketMapRenderCache = null;
+                    if (mounted) setState(() {});
+                  }
+                  _mapIdleDebounce?.cancel();
+                  _mapIdleDebounce = Timer(
+                    const Duration(milliseconds: 200),
+                    () {
+                      if (!mounted) return;
+                      setState(() {
+                        _mapMoving = false;
+                        _marketMapRenderCache = null;
+                      });
+                      _scheduleMarketMapViewportRefresh(immediate: true);
+                    },
+                  );
+                }
                 if (oldZoomBucket != _zoom.floor()) {
                   _marketMapRenderCache = null;
                   if (mounted) setState(() {});
                 }
-                _scheduleMarketMapViewportRefresh();
+                if (!hasGesture) _scheduleMarketMapViewportRefresh();
               },
             ),
             children: [
@@ -1262,11 +1285,20 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
                     'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 userAgentPackageName: 'kg.genesis.dogo',
                 subdomains: const ['a', 'b', 'c', 'd'],
+                panBuffer: 0,
+                keepBuffer: 1,
+                tileDisplay: const TileDisplay.instantaneous(),
               ),
               if (marketMap.polygons.isNotEmpty)
-                PolygonLayer(polygons: marketMap.polygons),
+                PolygonLayer(
+                  polygons: marketMap.polygons,
+                  simplificationTolerance: 0.8,
+                ),
               if (marketMap.polylines.isNotEmpty)
-                PolylineLayer(polylines: marketMap.polylines),
+                PolylineLayer(
+                  polylines: marketMap.polylines,
+                  simplificationTolerance: 0.8,
+                ),
 
               if (_routePoints.isNotEmpty) ...[
                 PolylineLayer(
