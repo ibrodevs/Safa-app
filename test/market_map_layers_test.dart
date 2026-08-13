@@ -117,8 +117,8 @@ void main() {
     expect(data.markers, hasLength(5));
   });
 
-  test('mobile performance budget caps dense published containers', () {
-    final features = List.generate(180, (index) {
+  test('mobile performance budget caps thousands of published containers', () {
+    final features = List.generate(5000, (index) {
       return MarketMapFeature.fromJson({
         'type': 'Feature',
         'id': 'dense-container-$index',

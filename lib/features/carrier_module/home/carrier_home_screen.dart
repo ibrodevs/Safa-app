@@ -108,6 +108,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   bool _sendingPosition = false;
   bool _marketMapLoading = false;
   bool _marketMapViewportLoading = false;
+  bool _marketMapViewportRefreshPending = false;
   int? _marketMapPointsHash;
   List<MarketMapFeature> _marketMapFeatures = const [];
   MarketMapRenderData? _marketMapRenderCache;
@@ -820,7 +821,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<void> _refreshMarketMapForViewport() async {
-    if (!mounted || _marketMapViewportLoading) return;
+    if (!mounted) return;
+    if (_marketMapViewportLoading) {
+      _marketMapViewportRefreshPending = true;
+      return;
+    }
 
     late final LatLngBounds bounds;
     try {
@@ -866,6 +871,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       // Keep last map snapshot on transient network errors.
     } finally {
       _marketMapViewportLoading = false;
+      if (_marketMapViewportRefreshPending && mounted) {
+        _marketMapViewportRefreshPending = false;
+        _scheduleMarketMapViewportRefresh(immediate: true);
+      }
     }
   }
 

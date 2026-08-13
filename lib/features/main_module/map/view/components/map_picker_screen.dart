@@ -75,6 +75,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _mapMoving = false;
   bool _containersLoading = false;
   bool _marketMapLoading = false;
+  bool _containersRefreshPending = false;
+  bool _marketMapRefreshPending = false;
   int _containersRequestSerial = 0;
   int _marketMapRequestSerial = 0;
 
@@ -168,6 +170,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   Future<void> _refreshVisibleContainers() async {
     if (!mounted) return;
+    if (_containersLoading) {
+      _containersRefreshPending = true;
+      return;
+    }
 
     late final LatLngBounds bounds;
     try {
@@ -219,6 +225,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         _lastContainersBounds = bounds;
         _lastContainersZoomBucket = zoomBucket;
       });
+      _runPendingContainersRefresh();
     } catch (_) {
       // Keep the last successfully loaded markers on transient network errors.
       if (!mounted || serial != _containersRequestSerial) return;
@@ -227,12 +234,22 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       } else {
         _containersLoading = false;
       }
+      _runPendingContainersRefresh();
     }
+  }
+
+  void _runPendingContainersRefresh() {
+    if (!_containersRefreshPending || !mounted) return;
+    _containersRefreshPending = false;
+    _scheduleContainersRefresh(immediate: true);
   }
 
   Future<void> _refreshMarketMap() async {
     if (!mounted) return;
-    if (_marketMapLoading) return;
+    if (_marketMapLoading) {
+      _marketMapRefreshPending = true;
+      return;
+    }
 
     late final LatLngBounds bounds;
     try {
@@ -275,10 +292,18 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         _lastMarketMapBounds = bounds;
         _lastMarketMapZoomBucket = zoomBucket;
       });
+      _runPendingMarketMapRefresh();
     } catch (_) {
       if (!mounted || serial != _marketMapRequestSerial) return;
       setState(() => _marketMapLoading = false);
+      _runPendingMarketMapRefresh();
     }
+  }
+
+  void _runPendingMarketMapRefresh() {
+    if (!_marketMapRefreshPending || !mounted) return;
+    _marketMapRefreshPending = false;
+    _scheduleMarketMapRefresh(immediate: true);
   }
 
   void _moveTo(LatLng point, {double zoom = 16}) {

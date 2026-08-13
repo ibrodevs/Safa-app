@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 
 import '../../../../../data/network/api_service.dart';
 import '../model/market_map_feature.dart';
@@ -12,6 +13,7 @@ final class MarketMapRepository {
   static const Duration _cacheTtl = Duration(seconds: 8);
   static final Map<String, _MarketMapCacheEntry> _cache = {};
   static final Map<String, Future<MarketMapCollection>> _inFlight = {};
+  static final Map<String, String> _etags = {};
 
   Future<MarketMapCollection> loadPublished({
     int? bazarId,
@@ -44,7 +46,6 @@ final class MarketMapRepository {
     final cached = _cache[key];
     if (cached != null) {
       if (cached.expiresAt.isAfter(now)) return cached.collection;
-      _cache.remove(key);
     }
 
     // initState и onMapReady могут сработать почти одновременно. Коалесим
@@ -53,6 +54,8 @@ final class MarketMapRepository {
     if (pending != null) return pending;
 
     final request = _loadPublishedUncached(
+      cacheKey: key,
+      staleCollection: cached?.collection,
       bazarId: bazarId,
       zoom: zoom,
       minLat: minLat,
@@ -77,6 +80,8 @@ final class MarketMapRepository {
   }
 
   Future<MarketMapCollection> _loadPublishedUncached({
+    required String cacheKey,
+    required MarketMapCollection? staleCollection,
     required int? bazarId,
     required int? zoom,
     required double? minLat,
@@ -100,7 +105,19 @@ final class MarketMapRepository {
         if (centerLon != null) 'center_lon': centerLon,
         'max_containers': maxContainers,
       },
+      options: Options(
+        headers: {if (_etags[cacheKey] case final etag?) 'If-None-Match': etag},
+        validateStatus: (status) =>
+            status != null &&
+            ((status >= 200 && status < 300) || status == 304),
+      ),
     );
+
+    if (response.statusCode == 304 && staleCollection != null) {
+      return staleCollection;
+    }
+    final etag = response.headers.value('etag');
+    if (etag != null && etag.isNotEmpty) _etags[cacheKey] = etag;
 
     final data = response.data;
     late final Map<String, dynamic> normalized;
@@ -127,7 +144,10 @@ final class MarketMapRepository {
     return MarketMapCollection.fromJson(normalized);
   }
 
-  static int _effectiveMaxContainers({required int? zoom, required int? requested}) {
+  static int _effectiveMaxContainers({
+    required int? zoom,
+    required int? requested,
+  }) {
     final z = zoom ?? 17;
     final hardLimit = z <= 15
         ? 48
@@ -140,7 +160,9 @@ final class MarketMapRepository {
 
   static void _remember(String key, MarketMapCollection collection) {
     if (_cache.length >= _maxCacheEntries && !_cache.containsKey(key)) {
-      _cache.remove(_cache.keys.first);
+      final oldestKey = _cache.keys.first;
+      _cache.remove(oldestKey);
+      _etags.remove(oldestKey);
     }
     _cache[key] = _MarketMapCacheEntry(
       collection: collection,

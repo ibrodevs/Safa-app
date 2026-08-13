@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../features/auth_module/register/data/models/register_request_model.dart';
 import '../../features/auth_module/register/data/models/register_response_model.dart';
 import '../../features/carrier_module/home/data/model/nearby_shipments_page.dart';
@@ -52,22 +52,16 @@ final class ApiService {
         headers: const {'Accept': 'application/json'},
       ),
     );
-    _dio.interceptors.add(HttpLoggerInterceptor());
-    _authDio.interceptors.add(HttpLoggerInterceptor());
+    // Formatting large GeoJSON bodies just for logs is expensive and may leak
+    // credentials. The logger is useful in development, but must not execute in
+    // profile/release builds.
+    if (kDebugMode) {
+      _dio.interceptors.add(HttpLoggerInterceptor());
+      _authDio.interceptors.add(HttpLoggerInterceptor());
+    }
     _dio.interceptors.add(
       QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
-          final connected = await _hasInternet();
-          if (!connected) {
-            return handler.reject(
-              DioException(
-                requestOptions: options,
-                type: DioExceptionType.unknown,
-                error: 'Нет подключения к интернету',
-              ),
-            );
-          }
-
           if (_isAuthEndpoint(options)) {
             options.headers.remove('Authorization');
           } else {
@@ -137,11 +131,6 @@ final class ApiService {
         p.startsWith('users/register/') ||
         p.startsWith('users/verify/') ||
         p.startsWith('users/whatsapp-code/');
-  }
-
-  Future<bool> _hasInternet() async {
-    final r = await Connectivity().checkConnectivity();
-    return !r.contains(ConnectivityResult.none);
   }
 
   Future<void> setBearer(String? accessToken) async {

@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 class HttpLoggerInterceptor extends Interceptor {
   HttpLoggerInterceptor({
     this.tag = 'HTTP',
-    this.maxBody = 400000,
+    this.maxBody = 12000,
     this.alsoPrint = true,
   });
 
@@ -48,9 +48,13 @@ class HttpLoggerInterceptor extends Interceptor {
   }
 
   String _fmtRequest(RequestOptions o) {
+    final safeHeaders = Map<String, dynamic>.from(o.headers);
+    if (safeHeaders.containsKey('Authorization')) {
+      safeHeaders['Authorization'] = 'Bearer ***';
+    }
     final b = StringBuffer()
       ..writeln('→ ${o.method} ${o.uri}')
-      ..writeln('headers: ${_short(_pretty(o.headers))}');
+      ..writeln('headers: ${_short(_pretty(safeHeaders))}');
     if (o.queryParameters.isNotEmpty) {
       b.writeln('query: ${_short(_pretty(o.queryParameters))}');
     }
@@ -72,11 +76,8 @@ class HttpLoggerInterceptor extends Interceptor {
   }
 
   String _short(String s) {
-    if (kReleaseMode) {
-      if (s.length <= maxBody) return s;
-      return '${s.substring(0, maxBody)}…(truncated ${s.length - maxBody})';
-    }
-    return s;
+    if (s.length <= maxBody) return s;
+    return '${s.substring(0, maxBody)}…(truncated ${s.length - maxBody})';
   }
 
   String _pretty(dynamic v) {

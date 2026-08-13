@@ -109,6 +109,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   ContainerRef? _selectedContainer;
   bool _mapMoving = false;
   bool _containersLoading = false;
+  bool _containersRefreshPending = false;
   int _containersRequestSerial = 0;
   LatLngBounds? _lastContainersBounds;
   int? _lastContainersZoomBucket;
@@ -124,6 +125,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   Set<int> _publishedContainerIdsCache = const {};
   int? _publishedContainerHash;
   bool _marketMapLoading = false;
+  bool _marketMapRefreshPending = false;
   int _marketMapRequestSerial = 0;
   LatLngBounds? _lastMarketMapBounds;
   int? _lastMarketMapZoomBucket;
@@ -369,7 +371,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   Future<void> _refreshVisibleContainers() async {
-    if (!mounted || _containersLoading) return;
+    if (!mounted) return;
+    if (_containersLoading) {
+      _containersRefreshPending = true;
+      return;
+    }
 
     late final LatLngBounds bounds;
     try {
@@ -423,6 +429,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _lastContainersBounds = bounds;
         _lastContainersZoomBucket = zoomBucket;
       });
+      _runPendingContainersRefresh();
     } catch (_) {
       // При кратковременной сетевой ошибке сохраняем последние успешно
       // загруженные маркеры — раньше они пропадали с карты.
@@ -432,7 +439,14 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       } else {
         _containersLoading = false;
       }
+      _runPendingContainersRefresh();
     }
+  }
+
+  void _runPendingContainersRefresh() {
+    if (!_containersRefreshPending || !mounted) return;
+    _containersRefreshPending = false;
+    _scheduleContainersRefresh(immediate: true);
   }
 
   Future<void> _focusContainers() async {
@@ -497,7 +511,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   Future<void> _loadMarketMap() async {
-    if (_marketMapLoading) return;
+    if (_marketMapLoading) {
+      _marketMapRefreshPending = true;
+      return;
+    }
 
     late final LatLngBounds bounds;
     try {
@@ -542,11 +559,19 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _lastMarketMapBounds = bounds;
         _lastMarketMapZoomBucket = zoomBucket;
       });
+      _runPendingMarketMapRefresh();
       unawaited(_syncRouteAndCamera());
     } catch (_) {
       if (!mounted || serial != _marketMapRequestSerial) return;
       setState(() => _marketMapLoading = false);
+      _runPendingMarketMapRefresh();
     }
+  }
+
+  void _runPendingMarketMapRefresh() {
+    if (!_marketMapRefreshPending || !mounted) return;
+    _marketMapRefreshPending = false;
+    _scheduleMarketMapRefresh(immediate: true);
   }
 
   void _fitToPoints(List<LatLng> pts) {
