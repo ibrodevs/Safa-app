@@ -6,6 +6,7 @@ class RegisterResponse {
   final String lastName;
   final String? avatar;
   final UserRole role;
+  final String? kycToken;
 
   RegisterResponse({
     required this.phoneNumber,
@@ -13,6 +14,7 @@ class RegisterResponse {
     required this.lastName,
     this.avatar,
     required this.role,
+    this.kycToken,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,7 @@ class RegisterResponse {
       lastName: json['last_name'] as String? ?? '',
       avatar: json['avatar'] as String?,
       role: userRoleFromApi(json['role'] as String? ?? 'client'),
+      kycToken: json['kyc_token']?.toString(),
     );
   }
 }

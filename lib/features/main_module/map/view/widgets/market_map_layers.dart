@@ -17,6 +17,13 @@ final class MarketMapRenderData {
   final List<Marker> markers;
   final int renderedContainerCount;
 
+  static const empty = MarketMapRenderData(
+    polygons: <Polygon>[],
+    polylines: <Polyline>[],
+    markers: <Marker>[],
+    renderedContainerCount: 0,
+  );
+
   bool get hasRenderedContainers => renderedContainerCount > 0;
 
   /// Безопасный бюджет контейнеров для мобильного GPU.
@@ -26,9 +33,16 @@ final class MarketMapRenderData {
   /// растёт. Порог применяется даже если экран запросил больше объектов.
   static int containerRenderLimitForZoom(double zoom) {
     if (zoom < 15) return 0;
-    if (zoom < 16) return 24;
-    if (zoom < 17) return 48;
-    return 72;
+    if (zoom < 16) return 16;
+    if (zoom < 17) return 32;
+    return 48;
+  }
+
+  static int containerLabelLimitForZoom(double zoom) {
+    if (zoom < 16) return 0;
+    if (zoom < 17) return 12;
+    if (zoom < 18) return 24;
+    return 36;
   }
 
   factory MarketMapRenderData.fromFeatures(
@@ -42,6 +56,8 @@ final class MarketMapRenderData {
     final polylines = <Polyline>[];
     final markers = <Marker>[];
     var renderedContainerCount = 0;
+    var renderedContainerLabelCount = 0;
+    final containerLabelLimit = containerLabelLimitForZoom(zoom);
 
     final performanceLimit = containerRenderLimitForZoom(zoom);
     final requestedLimit = maxContainerFeatures;
@@ -78,7 +94,9 @@ final class MarketMapRenderData {
           );
           if (feature.kind == 'container' && zoom >= 16) {
             renderedContainerCount++;
-            if (showLabels) {
+            if (showLabels &&
+                renderedContainerLabelCount < containerLabelLimit) {
+              renderedContainerLabelCount++;
               markers.add(
                 _labelMarker(
                   _boundsCenter(points),
@@ -127,7 +145,9 @@ final class MarketMapRenderData {
           );
           if (feature.kind == 'container' && zoom >= 16) {
             renderedContainerCount++;
-            if (showLabels) {
+            if (showLabels &&
+                renderedContainerLabelCount < containerLabelLimit) {
+              renderedContainerLabelCount++;
               markers.add(
                 _labelMarker(
                   _boundsCenter(points),
@@ -165,7 +185,9 @@ final class MarketMapRenderData {
             );
             if (feature.kind == 'container' && zoom >= 16) {
               renderedContainerCount++;
-              if (showLabels) {
+              if (showLabels &&
+                  renderedContainerLabelCount < containerLabelLimit) {
+                renderedContainerLabelCount++;
                 markers.add(
                   _labelMarker(
                     _boundsCenter(points),

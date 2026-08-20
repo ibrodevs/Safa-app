@@ -39,7 +39,7 @@ class MapPickerScreen extends StatefulWidget {
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
   /// Ниже этого масштаба подписи контейнеров скрываются.
-  static const double _containerLabelMinZoom = 16;
+  static const double _containerLabelMinZoom = 17;
   static const double _containerShapeMinZoom = 15;
   static const int _maxRenderedContainerShapes = 72;
   static const int _maxRenderedContainerMarkers = 96;
@@ -486,6 +486,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 15,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
               onMapReady: () {
                 _scheduleContainersRefresh(immediate: true);
                 _scheduleMarketMapRefresh(immediate: true);
@@ -533,12 +536,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               if (marketMap.polygons.isNotEmpty)
                 PolygonLayer(
                   polygons: marketMap.polygons,
-                  simplificationTolerance: 0.8,
+                  simplificationTolerance: 1.2,
                 ),
               if (marketMap.polylines.isNotEmpty)
                 PolylineLayer(
                   polylines: marketMap.polylines,
-                  simplificationTolerance: 0.8,
+                  simplificationTolerance: 1.2,
                 ),
               if (containerPolygons.isNotEmpty)
                 PolygonLayer(polygons: containerPolygons),
@@ -641,6 +644,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   MarketMapRenderData _marketMapRenderData() {
+    if (_mapMoving) return MarketMapRenderData.empty;
     final zoomBucket = _zoom.floor();
     final centerLatBucket = (_center.latitude * 10000).round();
     final centerLonBucket = (_center.longitude * 10000).round();
@@ -660,8 +664,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       _marketMapFeatures,
       zoom: _zoom,
       center: _center,
-      maxContainerFeatures: _mapMoving ? 0 : _maxRenderedPublishedContainers,
-      showLabels: !_mapMoving,
+      maxContainerFeatures: _maxRenderedPublishedContainers,
+      showLabels: true,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;

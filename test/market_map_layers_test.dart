@@ -160,7 +160,7 @@ void main() {
     );
     expect(
       dataAt16.markers,
-      hasLength(MarketMapRenderData.containerRenderLimitForZoom(16)),
+      hasLength(MarketMapRenderData.containerLabelLimitForZoom(16)),
     );
 
     expect(
@@ -173,7 +173,7 @@ void main() {
     );
     expect(
       dataAt17.markers,
-      hasLength(MarketMapRenderData.containerRenderLimitForZoom(17)),
+      hasLength(MarketMapRenderData.containerLabelLimitForZoom(17)),
     );
   });
 

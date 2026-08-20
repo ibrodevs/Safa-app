@@ -10,7 +10,7 @@ final class MarketMapRepository {
   final ApiService _api;
 
   static const int _maxCacheEntries = 20;
-  static const Duration _cacheTtl = Duration(seconds: 8);
+  static const Duration _cacheTtl = Duration(seconds: 60);
   static final Map<String, _MarketMapCacheEntry> _cache = {};
   static final Map<String, Future<MarketMapCollection>> _inFlight = {};
   static final Map<String, String> _etags = {};
@@ -149,11 +149,13 @@ final class MarketMapRepository {
     required int? requested,
   }) {
     final z = zoom ?? 17;
-    final hardLimit = z <= 15
-        ? 48
+    final hardLimit = z < 15
+        ? 0
+        : z == 15
+        ? 24
         : z == 16
-        ? 72
-        : 96;
+        ? 48
+        : 72;
     if (requested == null) return hardLimit;
     return requested.clamp(0, hardLimit).toInt();
   }

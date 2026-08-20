@@ -56,6 +56,8 @@ if config.get("configured") is not True:
     problems.append("Finik is not configured on backend")
 if config.get("beta") is not expected_beta:
     problems.append("FINIK_BETA differs between APK and backend")
+if not expected_beta and config.get("testAmount") is not None:
+    problems.append("production backend still uses FINIK_TEST_AMOUNT")
 if config.get("keyFingerprint") != expected_fingerprint:
     problems.append("FINIK_API_KEY differs between APK and backend")
 if not str(config.get("callbackUrl") or "").startswith("https://"):

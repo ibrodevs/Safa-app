@@ -53,7 +53,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     with WidgetsBindingObserver {
   /// Ниже этого масштаба подписи контейнеров скрываются, чтобы карта
   /// не превращалась в визуальный хаос.
-  static const double _containerLabelMinZoom = 16;
+  static const double _containerLabelMinZoom = 17;
   static const double _containerShapeMinZoom = 15;
   static const int _maxRenderedLooseContainers = 180;
   static const int _maxRenderedContainerMarkers = 96;
@@ -96,6 +96,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   String _currentStatusCode = 'pending';
   bool _isPaid = true;
   int _fare = 0;
+  String? _shipmentUiSignature;
 
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
@@ -847,6 +848,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   MarketMapRenderData _marketMapRenderData() {
+    if (_mapMoving) return MarketMapRenderData.empty;
     final zoomBucket = _zoom.floor();
     final centerLatBucket = (_centerLat * 10000).round();
     final centerLonBucket = (_centerLon * 10000).round();
@@ -866,8 +868,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _marketMapFeatures,
       zoom: _zoom,
       center: LatLng(_centerLat, _centerLon),
-      maxContainerFeatures: _mapMoving ? 0 : _maxRenderedPublishedContainers,
-      showLabels: !_mapMoving,
+      maxContainerFeatures: _maxRenderedPublishedContainers,
+      showLabels: true,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;
@@ -946,6 +948,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _activeStops = const [];
       _currentStatus = ShipmentStatus.unknown;
       _currentStatusCode = 'pending';
+      _shipmentUiSignature = null;
       _bootstrappedActive = false;
       _didFitOnFulfillment = false;
       _routePoints = const [];
@@ -965,9 +968,6 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       if (!mounted) return;
 
       final status = parseShipmentStatus(dto.status);
-      _currentStatus = status;
-      _currentStatusCode = dto.status;
-
       if (status == ShipmentStatus.completed ||
           status == ShipmentStatus.canceled) {
         _stopShipmentPolling();
@@ -986,11 +986,28 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           status == ShipmentStatus.assigned ||
           status == ShipmentStatus.inTransit;
 
+      final nextSignature = Object.hash(
+        dto.status,
+        dto.isPaid,
+        dto.fare,
+        shouldShowFulfillment,
+        Object.hashAll(
+          dto.stops.map(
+            (stop) =>
+                Object.hash(stop.title, stop.lat, stop.lon, stop.container),
+          ),
+        ),
+      ).toString();
+      if (_shipmentUiSignature == nextSignature) return;
+
       setState(() {
+        _currentStatus = status;
+        _currentStatusCode = dto.status;
         _activeStops = dto.stops;
         _showFulfillmentSheet = shouldShowFulfillment;
         _isPaid = dto.isPaid;
         _fare = dto.fare;
+        _shipmentUiSignature = nextSignature;
       });
 
       _syncRouteAndCamera();
@@ -1666,6 +1683,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       options: MapOptions(
         initialCenter: LatLng(_centerLat, _centerLon),
         initialZoom: 15,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
         onMapReady: () {
           _scheduleContainersRefresh(immediate: true);
           _scheduleMarketMapRefresh(immediate: true);
@@ -1711,12 +1731,12 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         if (marketMap.polygons.isNotEmpty)
           PolygonLayer(
             polygons: marketMap.polygons,
-            simplificationTolerance: 0.8,
+            simplificationTolerance: 1.2,
           ),
         if (marketMap.polylines.isNotEmpty)
           PolylineLayer(
             polylines: marketMap.polylines,
-            simplificationTolerance: 0.8,
+            simplificationTolerance: 1.2,
           ),
         if (containerPolygons.isNotEmpty)
           PolygonLayer(polygons: containerPolygons),

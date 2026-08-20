@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
@@ -79,6 +78,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   List<NearbyShipment> _nearby = const [];
   int _nearbyIndex = 0;
+  int? _nearbyUiHash;
 
   NearbyShipment? get _currentNearby =>
       (_nearby.isNotEmpty && _nearbyIndex >= 0 && _nearbyIndex < _nearby.length)
@@ -93,6 +93,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   List<_StopUi> _activeStops = const [];
   int _activeFare = 0;
   int _activeIncome = 0;
+  int? _activeUiHash;
 
   Timer? _pollTimer;
 
@@ -100,6 +101,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   bool _didFitOnce = false;
   String? _routeSignature;
   List<LatLng> _routePoints = const [];
+  LatLng? _lastRouteOrigin;
 
   bool get _hasActive => _activeId != null;
   bool _showEmptyOrders = false;
@@ -210,7 +212,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.medium,
         ),
       );
       if (!mounted) return;
@@ -228,13 +230,26 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _posSub =
           Geolocator.getPositionStream(
             locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              distanceFilter: 10,
+              accuracy: LocationAccuracy.medium,
+              distanceFilter: 20,
             ),
           ).listen((p) {
             _myLat = p.latitude;
             _myLon = p.longitude;
             unawaited(_sendPositionToServer());
+            final origin = _lastRouteOrigin;
+            if (_hasActive &&
+                (origin == null ||
+                    Geolocator.distanceBetween(
+                          origin.latitude,
+                          origin.longitude,
+                          p.latitude,
+                          p.longitude,
+                        ) >=
+                        50)) {
+              _lastRouteOrigin = LatLng(p.latitude, p.longitude);
+              unawaited(_syncRouteAndCameraForActive());
+            }
             if (mounted) setState(() {});
           });
     } catch (_) {
@@ -390,17 +405,39 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       if (!mounted) return;
 
       if (filteredResults.isEmpty) {
+        if (_nearby.isEmpty && _showEmptyOrders) return;
         setState(() {
           _nearby = const [];
           _nearbyIndex = 0;
+          _nearbyUiHash = 0;
           _showEmptyOrders = true;
           _didFitOnce = false;
           _routePoints = const [];
           _routeSignature = null;
         });
-        _startNearbyPolling();
         return;
       }
+
+      final nextUiHash = Object.hashAll(
+        filteredResults.map(
+          (shipment) => Object.hash(
+            shipment.id,
+            shipment.publicCode,
+            shipment.status,
+            shipment.title,
+            shipment.serviceType,
+            shipment.displayFare,
+            shipment.distanceM,
+            Object.hashAll(
+              shipment.stops.map(
+                (stop) =>
+                    Object.hash(stop.title, stop.lat, stop.lon, stop.container),
+              ),
+            ),
+          ),
+        ),
+      );
+      if (_nearbyUiHash == nextUiHash && !_showEmptyOrders) return;
 
       setState(() {
         _showEmptyOrders = false;
@@ -408,6 +445,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
         _nearby = filteredResults;
         _nearbyIndex = 0;
+        _nearbyUiHash = nextUiHash;
 
         _myLat = pos.latitude;
         _myLon = pos.longitude;
@@ -550,7 +588,23 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
       final parsed = _parseActive(raw, fallbackIndex: _activeCurrentStopIndex);
 
+      final nextUiHash = Object.hash(
+        parsed.status,
+        parsed.currentStopIndex,
+        parsed.publicCode,
+        parsed.fare,
+        parsed.income,
+        Object.hashAll(
+          parsed.stops.map(
+            (stop) =>
+                Object.hash(stop.title, stop.lat, stop.lon, stop.container),
+          ),
+        ),
+      );
+      if (_activeUiHash == nextUiHash) return;
+
       setState(() {
+        _activeUiHash = nextUiHash;
         _activeStatus = parsed.status;
         _activeCurrentStopIndex = parsed.currentStopIndex;
         _activeStops = parsed.stops;
@@ -592,12 +646,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _activeStops = const [];
       _activeFare = 0;
       _activeIncome = 0;
+      _activeUiHash = null;
 
       _showWelcome = true;
 
       _didFitOnce = false;
       _routeSignature = null;
       _routePoints = const [];
+      _lastRouteOrigin = null;
     });
 
     if (message != null) {
@@ -1088,6 +1144,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<void> _syncRouteAndCameraForActive() async {
+    _lastRouteOrigin = LatLng(_myLat, _myLon);
     final pts = _pointsFromStops(_activeStops);
     await _syncRouteAndCameraCommon(pts);
   }
@@ -1192,14 +1249,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       );
     }
 
-    final marketMap = _marketMapRenderCache ??=
-        MarketMapRenderData.fromFeatures(
-          _marketMapFeatures,
-          zoom: _zoom,
-          center: LatLng(_centerLat, _centerLon),
-          maxContainerFeatures: _mapMoving ? 0 : 72,
-          showLabels: !_mapMoving,
-        );
+    final marketMap = _mapMoving
+        ? MarketMapRenderData.empty
+        : _marketMapRenderCache ??= MarketMapRenderData.fromFeatures(
+            _marketMapFeatures,
+            zoom: _zoom,
+            center: LatLng(_centerLat, _centerLon),
+            maxContainerFeatures: 48,
+            showLabels: true,
+          );
 
     Widget bottom;
     if (_showWelcome) {
@@ -1255,6 +1313,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
             options: MapOptions(
               initialCenter: LatLng(_centerLat, _centerLon),
               initialZoom: 15,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
               onMapReady: () =>
                   _scheduleMarketMapViewportRefresh(immediate: true),
               onPositionChanged: (pos, hasGesture) {
@@ -1301,12 +1362,12 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
               if (marketMap.polygons.isNotEmpty)
                 PolygonLayer(
                   polygons: marketMap.polygons,
-                  simplificationTolerance: 0.8,
+                  simplificationTolerance: 1.2,
                 ),
               if (marketMap.polylines.isNotEmpty)
                 PolylineLayer(
                   polylines: marketMap.polylines,
-                  simplificationTolerance: 0.8,
+                  simplificationTolerance: 1.2,
                 ),
 
               if (_routePoints.isNotEmpty) ...[
@@ -1426,78 +1487,72 @@ class _WelcomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.7),
-              width: 1,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Рады вас видеть',
-                style: TextStyle(
-                  fontSize: 26,
-                  height: 1.1,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ожидайте новых заказов /\nКогда клиенту потребуется \nтачкист придет уведомление',
-                style: TextStyle(
-                  fontSize: 16,
-                  letterSpacing: -0.4,
-                  height: 1.3,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.grey,
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                height: 54,
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: loading ? null : onTap,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  child: Text(
-                    loading ? 'Загружаем…' : 'На линию',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.7),
+          width: 1,
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Рады вас видеть',
+            style: TextStyle(
+              fontSize: 26,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ожидайте новых заказов /\nКогда клиенту потребуется \nтачкист придет уведомление',
+            style: TextStyle(
+              fontSize: 16,
+              letterSpacing: -0.4,
+              height: 1.3,
+              fontWeight: FontWeight.w800,
+              color: AppColors.grey,
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            height: 54,
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: loading ? null : onTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              child: Text(
+                loading ? 'Загружаем…' : 'На линию',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

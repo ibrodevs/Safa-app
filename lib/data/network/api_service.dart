@@ -265,7 +265,7 @@ final class ApiService {
 
   Future<void> deleteAccount() async {
     try {
-      await _dio.delete('users/delete-account/');
+      await _dio.post('users/delete-account/');
     } on DioException catch (e) {
       throw _mapDioError(e, fallback: 'Не удалось удалить аккаунт');
     } catch (_) {
@@ -384,7 +384,17 @@ final class ApiService {
         throw ApiException('Номер телефона не задан');
       }
 
-      final formData = FormData.fromMap({'phone': phone});
+      final kycToken = await _storage.getKycEnrollmentToken();
+      if (kycToken == null || kycToken.isEmpty) {
+        throw ApiException(
+          'Сессия регистрации истекла. Зарегистрируйтесь повторно.',
+        );
+      }
+
+      final formData = FormData.fromMap({
+        'phone': phone,
+        'kyc_token': kycToken,
+      });
 
       formData.files.add(
         MapEntry(
@@ -411,9 +421,14 @@ final class ApiService {
         throw ApiException('Номер телефона не задан');
       }
 
+      final kycToken = await _storage.getKycEnrollmentToken();
+      if (kycToken == null || kycToken.isEmpty) {
+        throw ApiException('Сессия регистрации истекла. Войдите с паролем.');
+      }
+
       final resp = await _dio.post(
         'users/carrier-wait/',
-        data: {'phone': phone},
+        data: {'phone': phone, 'kyc_token': kycToken},
         options: Options(
           validateStatus: (code) => code != null && code >= 200 && code < 500,
         ),
@@ -431,6 +446,7 @@ final class ApiService {
 
         if (access.isNotEmpty && refresh.isNotEmpty) {
           await _storage.saveTokens(access: access, refresh: refresh);
+          await _storage.clearKycEnrollmentToken();
           await setBearer(access);
         }
       }

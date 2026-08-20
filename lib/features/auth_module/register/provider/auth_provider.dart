@@ -111,6 +111,13 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       _user = await _repo.register(request);
+      final kycToken = _user?.kycToken;
+      if ((_role ?? UserRole.client) == UserRole.carrier) {
+        if (kycToken == null || kycToken.isEmpty) {
+          throw ApiException('Backend не вернул безопасную KYC-сессию');
+        }
+        await SecureStorageService().saveKycEnrollmentToken(kycToken);
+      }
       _pendingPhone = phoneNumber;
       _loggedIn = false;
 
