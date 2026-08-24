@@ -32,6 +32,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   int? amanatCampaignId;
   int? amanatDonationId;
   FinikPayInitResponse? init;
+  String? finikItemId;
+  String? finikTransactionId;
 
   bool get hasPaymentTarget => shipmentId != null || amanatDonationId != null;
   String get paymentDescription =>
@@ -55,6 +57,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     amanatCampaignId = null;
     amanatDonationId = null;
     init = null;
+    finikItemId = null;
+    finikTransactionId = null;
     notifyListeners();
   }
 
@@ -122,9 +126,34 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     }
   }
 
+  void recordCreatedItem(Map<String, dynamic>? data) {
+    if (data == null) return;
+    final id = data['id']?.toString();
+    if (id != null && id.isNotEmpty) finikItemId = id;
+  }
+
+  void handlePaymentResult(Map<String, dynamic>? data) {
+    if (data == null) return;
+    final item = data['item'];
+    if (item is Map) {
+      final id = item['id']?.toString();
+      if (id != null && id.isNotEmpty) finikItemId = id;
+    }
+    final transactionId = data['transactionId']?.toString();
+    if (transactionId != null && transactionId.isNotEmpty) {
+      finikTransactionId = transactionId;
+    }
+    final result = (data['status'] ?? '').toString().toUpperCase();
+    if (result == 'SUCCEEDED') {
+      startPollingPaid();
+    } else if (result == 'FAILED') {
+      markFailed('Платёж отклонён');
+    }
+  }
+
   void startPollingPaid({
     Duration interval = const Duration(seconds: 2),
-    int maxSeconds = 40,
+    int maxSeconds = 90,
   }) {
     if (!hasPaymentTarget) return;
 
@@ -136,46 +165,57 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
 
     final maxTicks = (maxSeconds * 1000) ~/ interval.inMilliseconds;
 
-    _pollTimer = Timer.periodic(interval, (t) async {
-      if (_pollInFlight) return;
-      _pollInFlight = true;
-      _pollTicks++;
+    unawaited(_pollPaidOnce(maxTicks));
+    _pollTimer = Timer.periodic(interval, (_) => _pollPaidOnce(maxTicks));
+  }
 
-      try {
-        final paid = shipmentId != null
-            ? await _shipmentsRepo.isShipmentPaid(shipmentId!)
-            : await _paymentsRepo.isAmanatDonationPaid(
-                campaignId: amanatCampaignId!,
-                donationId: amanatDonationId!,
-              );
-        if (paid) {
-          t.cancel();
-          status = FinikFlowStatus.succeeded;
-          notifyListeners();
-          return;
-        }
-
-        if (_pollTicks >= maxTicks) {
-          t.cancel();
-          status = FinikFlowStatus.failed;
-          errorText =
-              'Оплата не подтвердилась. Попробуйте обновить статус позже.';
-          notifyListeners();
-        }
-      } catch (e) {
-        if (_pollTicks >= maxTicks) {
-          t.cancel();
-          status = FinikFlowStatus.failed;
-          errorText = friendlyErrorMessage(
-            e,
-            fallback: 'Не удалось проверить статус оплаты',
+  Future<void> _pollPaidOnce(int maxTicks) async {
+    if (_pollInFlight || status != FinikFlowStatus.polling) return;
+    _pollInFlight = true;
+    _pollTicks++;
+    try {
+      var paid = false;
+      if (shipmentId != null) {
+        final payment = init;
+        if (payment != null &&
+            ((finikItemId?.isNotEmpty ?? false) ||
+                (finikTransactionId?.isNotEmpty ?? false))) {
+          paid = await _paymentsRepo.reconcileShipmentPayment(
+            paymentId: payment.paymentId,
+            itemId: finikItemId,
+            transactionId: finikTransactionId,
           );
-          notifyListeners();
         }
-      } finally {
-        _pollInFlight = false;
+        paid = paid || await _shipmentsRepo.isShipmentPaid(shipmentId!);
+      } else {
+        paid = await _paymentsRepo.isAmanatDonationPaid(
+          campaignId: amanatCampaignId!,
+          donationId: amanatDonationId!,
+        );
       }
-    });
+      if (paid) {
+        _pollTimer?.cancel();
+        status = FinikFlowStatus.succeeded;
+        notifyListeners();
+      } else if (_pollTicks >= maxTicks) {
+        _pollTimer?.cancel();
+        status = FinikFlowStatus.failed;
+        errorText = 'Оплата пока не подтверждена. Проверьте статус ещё раз.';
+        notifyListeners();
+      }
+    } catch (e) {
+      if (_pollTicks >= maxTicks) {
+        _pollTimer?.cancel();
+        status = FinikFlowStatus.failed;
+        errorText = friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось проверить статус оплаты',
+        );
+        notifyListeners();
+      }
+    } finally {
+      _pollInFlight = false;
+    }
   }
 
   void markFailed(String message) {

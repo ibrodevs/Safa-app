@@ -11,6 +11,10 @@ class DeliveryGeoRepository {
 
   DeliveryGeoRepository(this._api) : _osm = OsmGeoApi(Dio());
 
+  static final RegExp _coordinateOnlyAddress = RegExp(
+    r'^\s*-?\d{1,3}(?:\.\d+)?\s*[,;]\s*-?\d{1,3}(?:\.\d+)?\s*$',
+  );
+
   Future<DeliveryReverseGeo> getAddress({
     required double lat,
     required double lon,
@@ -27,7 +31,10 @@ class DeliveryGeoRepository {
       if (response.statusCode == 200 && data is Map) {
         final json = Map<String, dynamic>.from(data);
         final address = json['address']?.toString().trim() ?? '';
-        if (address.isNotEmpty) {
+        final source = json['source']?.toString().trim() ?? '';
+        if (address.isNotEmpty &&
+            source != 'coordinates' &&
+            !_coordinateOnlyAddress.hasMatch(address)) {
           return DeliveryReverseGeo.fromJson(json);
         }
       }

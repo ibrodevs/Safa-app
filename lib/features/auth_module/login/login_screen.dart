@@ -84,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return AppScreenScaffold(
       backgroundColor: AppColors.surface,
       showBackButton: true,
+      hideFooterWhenKeyboardVisible: true,
       onBack: () =>
           context.canPop() ? context.pop() : context.go('/select_role'),
       footer: Column(

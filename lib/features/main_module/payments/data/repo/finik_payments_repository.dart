@@ -146,6 +146,38 @@ final class FinikPaymentsRepository {
     }
   }
 
+  Future<bool> reconcileShipmentPayment({
+    required String paymentId,
+    String? itemId,
+    String? transactionId,
+  }) async {
+    if ((itemId == null || itemId.isEmpty) &&
+        (transactionId == null || transactionId.isEmpty)) {
+      return false;
+    }
+    try {
+      final resp = await _api.dio.post(
+        'payments/finik/reconcile/',
+        data: {
+          'paymentId': paymentId,
+          if (itemId != null && itemId.isNotEmpty) 'itemId': itemId,
+          if (transactionId != null && transactionId.isNotEmpty)
+            'transactionId': transactionId,
+        },
+      );
+      return _asMap(resp.data)['paid'] == true;
+    } on DioException catch (e) {
+      // 202 means Finik has created the item but has not registered payment yet;
+      // 409 can occur while the order is still moving to payment state.
+      if (e.response?.statusCode == 202 || e.response?.statusCode == 409) {
+        return false;
+      }
+      throw ApiException(
+        e.response?.data?.toString() ?? 'Не удалось подтвердить оплату Finik',
+      );
+    }
+  }
+
   void _validateInit(FinikPayInitResponse parsed) {
     if (parsed.paymentId.isEmpty ||
         parsed.finikRequestId.isEmpty ||

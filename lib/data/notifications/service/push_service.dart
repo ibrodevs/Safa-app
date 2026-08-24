@@ -17,6 +17,10 @@ class PushService {
   bool _inited = false;
   String? _lastToken;
   String? _activeKind;
+  final StreamController<Map<String, dynamic>> _events =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  Stream<Map<String, dynamic>> get events => _events.stream;
 
   Future<void> init() async {
     if (_inited) return;
@@ -40,11 +44,13 @@ class PushService {
     _lastToken = await _fm.getToken();
 
     FirebaseMessaging.onMessage.listen((msg) async {
+      _events.add(Map<String, dynamic>.from(msg.data));
       if (msg.data['silent']?.toString() == '1') return;
       await NotificationService.instance.showFromMessage(msg);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      _events.add(Map<String, dynamic>.from(msg.data));
       NotificationRouter.routeFromData(msg.data);
     });
     final initial = await _fm.getInitialMessage();
@@ -119,7 +125,9 @@ class PushService {
     // Unregister while the access token still exists. The backend then stops
     // sending to this account immediately instead of waiting for FCM to reject
     // a stale registration token.
-    if (token != null && token.isNotEmpty && api.currentAccessToken?.isNotEmpty == true) {
+    if (token != null &&
+        token.isNotEmpty &&
+        api.currentAccessToken?.isNotEmpty == true) {
       try {
         await api.dio.delete<dynamic>(
           'fcm/unregister/',

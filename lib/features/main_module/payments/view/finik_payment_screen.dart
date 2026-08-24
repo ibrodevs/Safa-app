@@ -126,11 +126,8 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
             },
             onPayment: (data) {
               final status = (data?['status'] ?? '').toString().toUpperCase();
-
-              if (status == 'SUCCEEDED') {
-                flow.startPollingPaid();
-              } else if (status == 'FAILED') {
-                flow.markFailed('Платёж отклонён');
+              flow.handlePaymentResult(data);
+              if (status == 'FAILED') {
                 if (Navigator.of(context).canPop()) {
                   Navigator.of(context).pop(false);
                 }
@@ -146,6 +143,7 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               maxAvailableQuantity: 1,
               requiredFields: requiredFields,
               visibilityType: VisibilityType.PRIVATE,
+              onCreated: flow.recordCreatedItem,
             ),
           ),
           const Positioned.fill(child: _FinikStatusOverlay()),

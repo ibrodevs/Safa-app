@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                     width: 110,
                     height: 110,
                     child: Image.asset(
-                      'assets/icons/app_icon.png',
+                      'assets/images/safa.png',
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -120,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen>
                 FadeTransition(
                   opacity: _textOpacity,
                   child: const Text(
-                    'SafaApp',
+                    'Safa',
                     style: TextStyle(
                       fontFamily: 'SFProText',
                       fontWeight: FontWeight.w600,

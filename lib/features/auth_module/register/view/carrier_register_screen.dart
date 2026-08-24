@@ -171,6 +171,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
     return AppScreenScaffold(
       backgroundColor: AppColors.surface,
       showBackButton: true,
+      hideFooterWhenKeyboardVisible: true,
       footer: Column(
         children: [
           AppFormError(message: _formError),

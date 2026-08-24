@@ -15,6 +15,8 @@ import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../data/network/api_service.dart';
+import '../../../../data/notifications/service/push_service.dart';
+import '../../../../data/realtime/shipment_realtime_service.dart';
 import '../../payments/data/repo/shipments_repository.dart';
 import '../../services/service_config.dart';
 import '../data/model/delivery_point_model.dart';
@@ -92,11 +94,17 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   bool _didFitOnFulfillment = false;
 
   Timer? _shipmentPollTimer;
+  StreamSubscription<Map<String, dynamic>>? _pushSub;
+  late final ShipmentRealtimeService _shipmentRealtime;
+  bool _shipmentPollInFlight = false;
   ShipmentStatus _currentStatus = ShipmentStatus.unknown;
   String _currentStatusCode = 'pending';
   bool _isPaid = true;
   int _fare = 0;
   String? _shipmentUiSignature;
+  LatLng? _courierPosition;
+  DateTime? _courierPositionUpdatedAt;
+  bool _didFitCourierOnce = false;
 
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
@@ -638,6 +646,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _shipmentRealtime = ShipmentRealtimeService(
+      onEvent: _handleShipmentRealtimeEvent,
+    );
+    _pushSub = PushService.instance.events.listen(_handlePushEvent);
 
     _serviceStatusStream = Geolocator.getServiceStatusStream().listen((status) {
       if (status == ServiceStatus.enabled) {
@@ -706,13 +718,62 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _initLocation();
+      final id = _activeShipmentId;
+      if (id != null) {
+        _shipmentRealtime.reconnect();
+        unawaited(_pollShipment(id));
+      }
     }
+  }
+
+  void _handlePushEvent(Map<String, dynamic> data) {
+    if (data['type']?.toString() != 'shipment_status') return;
+    final id = int.tryParse(data['shipment_id']?.toString() ?? '');
+    if (id != null && id == _activeShipmentId) {
+      unawaited(_pollShipment(id));
+    }
+  }
+
+  void _handleShipmentRealtimeEvent(Map<String, dynamic> event) {
+    if (!mounted) return;
+    final activeId = _activeShipmentId;
+    if (activeId == null) return;
+    final eventShipmentId = int.tryParse(
+      event['shipment_id']?.toString() ?? '',
+    );
+    if (eventShipmentId != null && eventShipmentId != activeId) return;
+
+    final telemetry = ShipmentCourierTelemetry.tryParse(event);
+    if (telemetry != null) {
+      if (telemetry.shipmentId != activeId) return;
+      final firstPosition = _courierPosition == null;
+      setState(() {
+        _courierPosition = LatLng(telemetry.lat, telemetry.lon);
+        _courierPositionUpdatedAt = telemetry.updatedAt;
+      });
+
+      if (firstPosition && !_didFitCourierOnce) {
+        _didFitCourierOnce = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _courierPosition == null) return;
+          _fitToPoints([
+            _courierPosition!,
+            ..._extractStopPoints(_activeStops),
+          ]);
+        });
+      }
+      return;
+    }
+
+    unawaited(_pollShipment(activeId));
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _serviceStatusStream?.cancel();
+    _pushSub?.cancel();
+    _shipmentRealtime.dispose();
     _containersDebounce?.cancel();
     _marketMapDebounce?.cancel();
     _mapIdleDebounce?.cancel();
@@ -937,6 +998,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   // --- Состояние заказа -------------------------------------------------
 
   void _stopShipmentPolling() {
+    _shipmentRealtime.disconnect();
     _shipmentPollTimer?.cancel();
     _shipmentPollTimer = null;
   }
@@ -955,12 +1017,17 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _routeSignature = null;
       _isPaid = true;
       _fare = 0;
+      _courierPosition = null;
+      _courierPositionUpdatedAt = null;
+      _didFitCourierOnce = false;
     });
 
     context.read<ActiveShipmentProvider>().clear();
   }
 
   Future<void> _pollShipment(int shipmentId) async {
+    if (_shipmentPollInFlight) return;
+    _shipmentPollInFlight = true;
     try {
       final dto = await context.read<ActiveShipmentProvider>().getById(
         shipmentId,
@@ -1013,6 +1080,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _syncRouteAndCamera();
     } catch (_) {
       // Поллинг переживает единичные сетевые ошибки без вмешательства в UI.
+    } finally {
+      _shipmentPollInFlight = false;
     }
   }
 
@@ -1025,9 +1094,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   void _startShipmentPolling(int shipmentId) {
+    _shipmentRealtime.connect(shipmentId);
     _shipmentPollTimer?.cancel();
     _shipmentPollTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 10),
       (_) => _pollShipment(shipmentId),
     );
     _pollShipment(shipmentId);
@@ -1676,6 +1746,24 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           ),
         );
       }
+
+      final courierPosition = _courierPosition;
+      if (courierPosition != null) {
+        final updatedAt = _courierPositionUpdatedAt;
+        final isStale =
+            updatedAt != null &&
+            DateTime.now().toUtc().difference(updatedAt.toUtc()) >
+                const Duration(minutes: 2);
+        markers.add(
+          Marker(
+            point: courierPosition,
+            width: 112,
+            height: 68,
+            alignment: Alignment.bottomCenter,
+            child: _CourierTrackingMarker(isStale: isStale),
+          ),
+        );
+      }
     }
 
     return FlutterMap(
@@ -2031,6 +2119,62 @@ class _StopDotMarker extends StatelessWidget {
             color: AppColors.white,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CourierTrackingMarker extends StatelessWidget {
+  const _CourierTrackingMarker({required this.isStale});
+
+  final bool isStale;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isStale ? AppColors.textSecondary : AppColors.primary;
+    return Semantics(
+      label: isStale
+          ? 'Последняя известная позиция специалиста'
+          : 'Специалист движется к заказу',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: AppShadows.raised,
+            ),
+            child: Text(
+              isStale ? 'Последняя позиция' : 'Специалист',
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: AppTypography.fontFamily,
+                fontSize: 10,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.white, width: 3),
+              boxShadow: AppShadows.raised,
+            ),
+            child: const Icon(
+              Icons.delivery_dining_rounded,
+              size: 20,
+              color: AppColors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

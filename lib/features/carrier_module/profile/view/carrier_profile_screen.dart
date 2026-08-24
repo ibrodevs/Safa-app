@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/repo/carrier_profile_repository.dart';
 import '../provider/carrier_profile_provider.dart';
@@ -28,8 +33,133 @@ class CarrierProfileScreen extends StatelessWidget {
   }
 }
 
-class _CarrierProfileBody extends StatelessWidget {
+class _CarrierProfileBody extends StatefulWidget {
   const _CarrierProfileBody();
+
+  @override
+  State<_CarrierProfileBody> createState() => _CarrierProfileBodyState();
+}
+
+class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
+  static const _avatarPreferenceKey = 'carrier_local_avatar_path_v1';
+  String? _localAvatarPath;
+  bool _pickingAvatar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalAvatar();
+  }
+
+  Future<void> _loadLocalAvatar() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString(_avatarPreferenceKey);
+    if (path == null || path.isEmpty) return;
+    if (!await File(path).exists()) {
+      await prefs.remove(_avatarPreferenceKey);
+      return;
+    }
+    if (mounted) setState(() => _localAvatarPath = path);
+  }
+
+  Future<void> _pickAvatar() async {
+    if (_pickingAvatar) return;
+    _pickingAvatar = true;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+
+      final directory = await getApplicationDocumentsDirectory();
+      final suffix = picked.name.contains('.')
+          ? '.${picked.name.split('.').last.toLowerCase()}'
+          : '.jpg';
+      final saved = await File(
+        picked.path,
+      ).copy('${directory.path}/safa_carrier_avatar$suffix');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_avatarPreferenceKey, saved.path);
+      if (mounted) setState(() => _localAvatarPath = saved.path);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось выбрать фотографию')),
+      );
+    } finally {
+      _pickingAvatar = false;
+    }
+  }
+
+  Widget _buildAvatar(String? remoteAvatar) {
+    final localPath = _localAvatarPath;
+    Widget image;
+    if (localPath != null && localPath.isNotEmpty) {
+      image = Image.file(
+        File(localPath),
+        width: 80,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _AvatarPlaceholder(),
+      );
+    } else if (remoteAvatar != null && remoteAvatar.isNotEmpty) {
+      image = Image.network(
+        remoteAvatar,
+        width: 80,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _AvatarPlaceholder(),
+      );
+    } else {
+      image = const _AvatarPlaceholder();
+    }
+
+    return Semantics(
+      button: true,
+      label: 'Выбрать фотографию профиля',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _pickAvatar,
+        child: SizedBox(
+          width: 88,
+          height: 88,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: image,
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   String formatKgPhone(String? input) {
     if (input == null) return '—';
@@ -112,26 +242,7 @@ class _CarrierProfileBody extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: avatar != null && avatar.isNotEmpty
-                          ? Image.network(
-                              avatar,
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              width: 80,
-                              height: 80,
-                              color: const Color(0xFFE5E7EB),
-                              child: const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
+                    _buildAvatar(avatar),
                     const SizedBox(width: 14),
                     Expanded(
                       child: _HeaderInfo(
@@ -270,6 +381,20 @@ class _CarrierProfileBody extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AvatarPlaceholder extends StatelessWidget {
+  const _AvatarPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80,
+      height: 80,
+      color: const Color(0xFFE5E7EB),
+      child: const Icon(Icons.person, size: 40, color: Colors.white),
     );
   }
 }

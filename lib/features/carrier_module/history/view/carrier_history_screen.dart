@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:dogo/core/design/app_colors.dart';
+import 'package:dogo/core/utils/order_status_view.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -53,24 +54,6 @@ class _HistoryBodyState extends State<_HistoryBody> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
-  }
-
-  String _mapStatus(String code) {
-    switch (code) {
-      case 'pending':
-        return 'В обработке';
-      case 'accepted':
-        return 'Принято';
-      case 'in_progress':
-        return 'В пути';
-      case 'completed':
-      case 'delivered':
-        return 'Завершено';
-      case 'canceled':
-        return 'Отменено';
-      default:
-        return code;
-    }
   }
 
   @override
@@ -181,7 +164,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
                     ? 'Посылка №${item.publicCode}'
                     : 'Посылка #${item.id}';
 
-                final statusText = _mapStatus(item.status);
+                final statusText = OrderStatusView.of(item.status).label;
 
                 final chips = <_HistoryChip>[
                   _HistoryChip(

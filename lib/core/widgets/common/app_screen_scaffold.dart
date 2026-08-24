@@ -20,6 +20,7 @@ class AppScreenScaffold extends StatelessWidget {
     this.onBack,
     this.actions,
     this.footer,
+    this.hideFooterWhenKeyboardVisible = false,
     this.scrollable = true,
     this.backgroundColor = AppColors.background,
     this.dismissKeyboardOnTap = true,
@@ -37,6 +38,12 @@ class AppScreenScaffold extends StatelessWidget {
 
   /// Закреплённая нижняя область (основная кнопка экрана).
   final Widget? footer;
+
+  /// Освобождает место для полей ввода, пока открыта клавиатура.
+  ///
+  /// Подходит для длинных форм: действие остаётся доступно через `done` на
+  /// клавиатуре, а после её закрытия footer снова появляется.
+  final bool hideFooterWhenKeyboardVisible;
   final bool scrollable;
   final Color backgroundColor;
   final bool dismissKeyboardOnTap;
@@ -48,6 +55,10 @@ class AppScreenScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final horizontal = AppResponsive.horizontalPadding(context);
     final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final effectiveFooter = hideFooterWhenKeyboardVisible && keyboardVisible
+        ? null
+        : footer;
 
     final header = (title == null && !showBackButton && actions == null)
         ? null
@@ -64,6 +75,7 @@ class AppScreenScaffold extends StatelessWidget {
 
     if (scrollable) {
       content = SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
@@ -71,7 +83,7 @@ class AppScreenScaffold extends StatelessWidget {
           horizontal,
           header == null ? topPadding : 0,
           horizontal,
-          bottomPadding + (footer == null ? safeBottom : 0),
+          bottomPadding + (effectiveFooter == null ? safeBottom : 0),
         ),
         child: content,
       );
@@ -88,7 +100,7 @@ class AppScreenScaffold extends StatelessWidget {
       children: [
         if (header != null) header,
         Expanded(child: content),
-        if (footer != null)
+        if (effectiveFooter != null)
           Padding(
             padding: EdgeInsets.fromLTRB(
               horizontal,
@@ -99,7 +111,7 @@ class AppScreenScaffold extends StatelessWidget {
             child: AppContentWidth(
               maxWidth: maxContentWidth,
               alignment: Alignment.center,
-              child: footer!,
+              child: effectiveFooter,
             ),
           ),
       ],

@@ -40,7 +40,17 @@ import urllib.request
 url, expected_beta_raw, api_key = sys.argv[1:]
 expected_beta = expected_beta_raw == "true"
 try:
-    with urllib.request.urlopen(url, timeout=15) as response:
+    # Cloudflare rejects Python urllib's default User-Agent with error 1010.
+    # Identify this as the Safa build preflight while keeping the request
+    # read-only and explicitly asking for the JSON configuration endpoint.
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 SafaBuild/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
         config = json.load(response)
 except Exception as exc:
     raise SystemExit(f"Finik backend preflight failed ({url}): {exc}")

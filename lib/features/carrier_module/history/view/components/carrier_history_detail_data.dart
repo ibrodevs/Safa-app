@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:dogo/core/design/app_colors.dart';
+import 'package:dogo/core/utils/order_status_view.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +30,6 @@ class _HistoryDetailsBody extends StatelessWidget {
   const _HistoryDetailsBody();
 
   static const _accent = AppColors.primary;
-  static const _statusGreen = Color(0xFF2E7D32);
 
   String _fmtDate(DateTime d) {
     try {
@@ -42,24 +42,6 @@ class _HistoryDetailsBody extends StatelessWidget {
       final min = d.minute.toString().padLeft(2, '0');
       final ss = d.second.toString().padLeft(2, '0');
       return '$dd.$mm.$yyyy -$hh:$min:$ss';
-    }
-  }
-
-  String _mapStatus(String code) {
-    switch (code) {
-      case 'pending':
-        return 'В обработке';
-      case 'accepted':
-        return 'Принято';
-      case 'in_progress':
-        return 'В пути';
-      case 'completed':
-      case 'delivered':
-        return 'Завершено';
-      case 'canceled':
-        return 'Отменено';
-      default:
-        return code;
     }
   }
 
@@ -110,7 +92,7 @@ class _HistoryDetailsBody extends StatelessWidget {
         final titleNumber = d.publicCode.isNotEmpty
             ? 'Посылка №${d.publicCode}'
             : 'Посылка #${d.id}';
-        final statusText = _mapStatus(d.status);
+        final statusView = OrderStatusView.of(d.status);
         final chips = <_DetailChip>[
           _DetailChip(
             'assets/icons/ic_box.svg',
@@ -147,9 +129,7 @@ class _HistoryDetailsBody extends StatelessWidget {
 
         final routeText = d.stops.isEmpty
             ? 'Маршрут не указан'
-            : d.stops
-                  .map((s) => '${s.position}. ${s.displayTitle}')
-                  .join('\n');
+            : d.stops.map((s) => '${s.position}. ${s.displayTitle}').join('\n');
 
         final compositionBuffer = StringBuffer();
         if (d.description.isNotEmpty) {
@@ -207,15 +187,7 @@ class _HistoryDetailsBody extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        statusText,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.2,
-                          fontWeight: FontWeight.w600,
-                          color: _statusGreen,
-                        ),
-                      ),
+                      statusView.toBadge(dense: true),
                     ],
                   ),
                 ),
@@ -345,7 +317,7 @@ class _HistoryDetailsBody extends StatelessWidget {
                           height: 1.2,
                         ),
                       ),
-                      child: const Text('Техподдержка'),
+                      child: const Text('Связаться с поддержкой'),
                     ),
                   ),
                 ),

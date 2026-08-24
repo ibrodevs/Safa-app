@@ -112,6 +112,7 @@ class _ClientRegisterScreenState extends State<ClientRegisterScreen> {
     return AppScreenScaffold(
       backgroundColor: AppColors.surface,
       showBackButton: true,
+      hideFooterWhenKeyboardVisible: true,
       footer: Column(
         children: [
           AppFormError(message: _formError),

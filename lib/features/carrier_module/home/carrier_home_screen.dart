@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/carrier_module/home/view/comp/empty_orders_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,6 +15,7 @@ import '../../../core/utils/snackbar_utils.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
+import '../../../data/realtime/shipment_realtime_service.dart';
 import '../../main_module/map/data/model/market_map_feature.dart';
 import '../../main_module/map/data/repo/market_map_repository.dart';
 import '../../main_module/map/view/widgets/market_map_layers.dart';
@@ -58,7 +60,8 @@ class CarrierHomeScreen extends StatefulWidget {
   State<CarrierHomeScreen> createState() => _CarrierHomeScreenState();
 }
 
-class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
+class _CarrierHomeScreenState extends State<CarrierHomeScreen>
+    with WidgetsBindingObserver {
   static const _accent = AppColors.primary;
 
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
@@ -72,6 +75,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   double _zoom = 15;
 
   StreamSubscription<Position>? _posSub;
+  StreamSubscription<Map<String, dynamic>>? _pushSub;
+  late final ShipmentRealtimeService _shipmentRealtime;
 
   bool _loadingOnline = false;
   bool _showWelcome = true;
@@ -106,6 +111,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   bool get _hasActive => _activeId != null;
   bool _showEmptyOrders = false;
   Timer? _nearbyPollTimer;
+  bool _nearbyRefreshInFlight = false;
+  bool _activePollInFlight = false;
   DateTime? _lastPositionSentAt;
   bool _sendingPosition = false;
   bool _marketMapLoading = false;
@@ -124,10 +131,41 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _shipmentRealtime = ShipmentRealtimeService(
+      onEvent: (_) {
+        final id = _activeId;
+        if (id != null) unawaited(_poll(id));
+      },
+    );
+    _pushSub = PushService.instance.events.listen(_handlePushEvent);
     Future.microtask(() {
       PushService.instance.registerOnServerOnce(kind: 'carrier');
     });
     Future.microtask(_bootstrapCarrier);
+  }
+
+  void _handlePushEvent(Map<String, dynamic> data) {
+    final type = data['type']?.toString();
+    final eventShipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
+    if (type == 'shipment_offer' && !_hasActive) {
+      unawaited(_refreshNearbySilently());
+    } else if (type == 'shipment_status' && eventShipmentId == _activeId) {
+      unawaited(_poll(eventShipmentId!));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    unawaited(_initLocation());
+    final id = _activeId;
+    if (id != null) {
+      _shipmentRealtime.reconnect();
+      unawaited(_poll(id));
+    } else if (_nearbyPollTimer != null) {
+      unawaited(_refreshNearbySilently());
+    }
   }
 
   Future<void> _bootstrapCarrier() async {
@@ -180,11 +218,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _nearbyPollTimer?.cancel();
     _marketMapViewportDebounce?.cancel();
     _mapIdleDebounce?.cancel();
     _posSub?.cancel();
+    _pushSub?.cancel();
+    _shipmentRealtime.dispose();
     super.dispose();
   }
 
@@ -229,10 +270,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       _posSub?.cancel();
       _posSub =
           Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.medium,
-              distanceFilter: 20,
-            ),
+            locationSettings: _carrierLocationSettings(),
           ).listen((p) {
             _myLat = p.latitude;
             _myLon = p.longitude;
@@ -258,6 +296,46 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     }
   }
 
+  LocationSettings _carrierLocationSettings() {
+    if (!_hasActive) {
+      return const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 10,
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 10,
+        intervalDuration: Duration(seconds: 5),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'SAFA — заказ выполняется',
+          notificationText:
+              'Местоположение передаётся клиенту во время активного заказа',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.medium,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: 10,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    }
+
+    return const LocationSettings(
+      accuracy: LocationAccuracy.medium,
+      distanceFilter: 10,
+    );
+  }
+
   void _moveMap(LatLng center, {double zoom = 15}) {
     try {
       _mapController.move(center, zoom);
@@ -281,7 +359,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     if (_sendingPosition) return;
     final now = DateTime.now();
     final last = _lastPositionSentAt;
-    if (!force && last != null && now.difference(last).inSeconds < 20) {
+    if (!force && last != null && now.difference(last).inSeconds < 5) {
       return;
     }
 
@@ -380,7 +458,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   Future<void> _refreshNearbySilently() async {
-    if (_hasActive) return;
+    if (_hasActive || _nearbyRefreshInFlight) return;
+    _nearbyRefreshInFlight = true;
     try {
       final ok = await _ensureLocationPermission();
       if (!ok) return;
@@ -458,7 +537,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
       });
 
       await _syncRouteAndCameraForNearby();
-    } catch (_) {}
+    } catch (_) {
+      // Следующий push или короткий polling повторит запрос.
+    } finally {
+      _nearbyRefreshInFlight = false;
+    }
   }
 
   Future<void> _goOnline() async {
@@ -506,12 +589,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _myLon = pos.longitude;
         _centerLat = _myLat;
         _centerLon = _myLon;
-        _stopNearbyPolling();
-
         _didFitOnce = false;
         _routeSignature = null;
         _routePoints = const [];
       });
+
+      // Остаёмся подписанными и при наличии карточек: новые заказы должны
+      // появляться без перезапуска приложения.
+      _startNearbyPolling();
 
       await _syncRouteAndCameraForNearby();
     } catch (e) {
@@ -568,6 +653,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         _routePoints = const [];
       });
       _startPolling(parsed.id);
+      await _initLocation();
       await _syncRouteAndCameraForActive();
     } catch (e) {
       if (!mounted) return;
@@ -576,12 +662,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   void _startPolling(int id) {
+    _shipmentRealtime.connect(id);
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll(id));
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _poll(id));
     _poll(id);
   }
 
   Future<void> _poll(int id) async {
+    if (_activePollInFlight) return;
+    _activePollInFlight = true;
     try {
       final raw = await _getShipmentByIdRaw(id);
       if (!mounted) return;
@@ -617,13 +706,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
         return;
       }
       await _syncRouteAndCameraForActive();
-    } catch (_) {}
+    } catch (_) {
+      // Push/polling повторят временно неудачный запрос.
+    } finally {
+      _activePollInFlight = false;
+    }
   }
 
   void _startNearbyPolling() {
     _nearbyPollTimer?.cancel();
     _nearbyPollTimer = Timer.periodic(
-      const Duration(seconds: 7),
+      const Duration(seconds: 3),
       (_) => _refreshNearbySilently(),
     );
     _refreshNearbySilently();
@@ -635,6 +728,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
   }
 
   void _stopActiveAndBackToWelcome({String? message}) {
+    _shipmentRealtime.disconnect();
     _pollTimer?.cancel();
     _pollTimer = null;
 
@@ -659,6 +753,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
     if (message != null) {
       AppSnackBar.showError(context, message: message);
     }
+    unawaited(_initLocation());
   }
 
   Future<void> _advance() async {
@@ -1145,7 +1240,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen> {
 
   Future<void> _syncRouteAndCameraForActive() async {
     _lastRouteOrigin = LatLng(_myLat, _myLon);
-    final pts = _pointsFromStops(_activeStops);
+    if (_activeStatus == ShipmentStatus.awaitingPayment ||
+        _activeStatus == ShipmentStatus.completed) {
+      if (_routePoints.isNotEmpty && mounted) {
+        setState(() => _routePoints = const []);
+      }
+      return;
+    }
+    final stopPoints = _pointsFromStops(_activeStops);
+    if (stopPoints.isEmpty) return;
+    final targetIndex = _activeCurrentStopIndex.clamp(0, stopPoints.length - 1);
+    final pts = <LatLng>[LatLng(_myLat, _myLon), stopPoints[targetIndex]];
     await _syncRouteAndCameraCommon(pts);
   }
 
@@ -2578,7 +2683,6 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 14, 16, 14),
       decoration: BoxDecoration(
         color: Colors.white,

@@ -102,7 +102,9 @@ void main() {
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         builder: (context, child) => MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
           child: child ?? const SizedBox.shrink(),
         ),
       ),
@@ -288,7 +290,7 @@ void main() {
       expect(find.text('Войти'), findsOneWidget);
     });
 
-    testWidgets('кнопка остаётся доступной при открытой клавиатуре', (
+    testWidgets('форма освобождает место при открытой клавиатуре', (
       tester,
     ) async {
       setScreenSize(tester, const Size(320, 568));
@@ -301,6 +303,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(find.text('Войти'), findsNothing);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+
       expect(find.text('Войти'), findsOneWidget);
     });
 
