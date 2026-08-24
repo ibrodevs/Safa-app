@@ -151,10 +151,6 @@ final class FinikPaymentsRepository {
     String? itemId,
     String? transactionId,
   }) async {
-    if ((itemId == null || itemId.isEmpty) &&
-        (transactionId == null || transactionId.isEmpty)) {
-      return false;
-    }
     try {
       final resp = await _api.dio.post(
         'payments/finik/reconcile/',

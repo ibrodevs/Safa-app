@@ -129,7 +129,19 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   void recordCreatedItem(Map<String, dynamic>? data) {
     if (data == null) return;
     final id = data['id']?.toString();
-    if (id != null && id.isNotEmpty) finikItemId = id;
+    if (id == null || id.isEmpty) return;
+    finikItemId = id;
+    final payment = init;
+    if (shipmentId != null && payment != null) {
+      // Persist the Finik item ID immediately. The backend can then verify a
+      // completed payment even if the callback is delayed or the app closes.
+      unawaited(
+        _paymentsRepo.reconcileShipmentPayment(
+          paymentId: payment.paymentId,
+          itemId: id,
+        ),
+      );
+    }
   }
 
   void handlePaymentResult(Map<String, dynamic>? data) {
@@ -177,9 +189,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
       var paid = false;
       if (shipmentId != null) {
         final payment = init;
-        if (payment != null &&
-            ((finikItemId?.isNotEmpty ?? false) ||
-                (finikTransactionId?.isNotEmpty ?? false))) {
+        if (payment != null) {
           paid = await _paymentsRepo.reconcileShipmentPayment(
             paymentId: payment.paymentId,
             itemId: finikItemId,
