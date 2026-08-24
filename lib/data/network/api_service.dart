@@ -740,6 +740,28 @@ final class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> postPendingKycFcmRegister({
+    required String token,
+    required String platform,
+  }) async {
+    final kycToken = await _storage.getKycEnrollmentToken();
+    if (kycToken == null || kycToken.isEmpty) {
+      throw ApiException('Сессия регистрации специалиста истекла');
+    }
+    try {
+      final resp = await _dio.post(
+        'fcm/register-kyc/',
+        data: {'token': token, 'platform': platform, 'kyc_token': kycToken},
+      );
+      return _asMap(resp.data);
+    } on DioException catch (e) {
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось включить уведомления о проверке профиля',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> getShipments({
     int page = 1,
     int pageSize = 20,

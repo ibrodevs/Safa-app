@@ -68,7 +68,11 @@ class PushService {
       // login/navigation cycle.
       final kind = _activeKind;
       if (kind != null && kind.isNotEmpty) {
-        unawaited(_registerTokenOnServer(token: token, kind: kind));
+        if (kind == 'carrier_pending') {
+          unawaited(_registerPendingCarrierToken(token));
+        } else {
+          unawaited(_registerTokenOnServer(token: token, kind: kind));
+        }
       }
     });
     _inited = true;
@@ -89,6 +93,37 @@ class PushService {
     if (token == null || token.isEmpty) return;
     _lastToken = token;
     await _registerTokenOnServer(token: token, kind: kind);
+  }
+
+  Future<void> registerPendingCarrier() async {
+    _activeKind = 'carrier_pending';
+    String? token = _lastToken;
+    try {
+      token ??= await _fm.getToken();
+    } catch (_) {
+      return;
+    }
+    if (token == null || token.isEmpty) return;
+    _lastToken = token;
+    await _registerPendingCarrierToken(token);
+  }
+
+  Future<void> _registerPendingCarrierToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'fcm_registered_token_carrier_pending';
+    if (prefs.getString(key) == token) return;
+    final platform = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : 'android';
+    try {
+      await ApiService().postPendingKycFcmRegister(
+        token: token,
+        platform: platform,
+      );
+      await prefs.setString(key, token);
+    } catch (_) {
+      // Экран ожидания или обновление FCM-токена повторит регистрацию.
+    }
   }
 
   Future<void> _registerTokenOnServer({
@@ -149,5 +184,6 @@ class PushService {
   Future<void> _clearRegistrationCache(SharedPreferences prefs) async {
     await prefs.remove('fcm_registered_token_client');
     await prefs.remove('fcm_registered_token_carrier');
+    await prefs.remove('fcm_registered_token_carrier_pending');
   }
 }

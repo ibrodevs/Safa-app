@@ -21,10 +21,6 @@ class CarrierRegisterScreen extends StatefulWidget {
 }
 
 class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
-  /// Тестовый номер, для которого проверка документов пропускается.
-  /// Поведение сохранено из прежней реализации.
-  static const String _bypassDocumentsPhone = '996555555555';
-
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _pass = TextEditingController();
@@ -104,9 +100,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
         : null;
     final pass2Error = pass2 != pass ? 'Пароли не совпадают' : null;
 
-    final needsDocuments = phone != _bypassDocumentsPhone;
-    final documentsError =
-        needsDocuments && (_idFrontPath == null || _idBackPath == null)
+    final documentsError = (_idFrontPath == null || _idBackPath == null)
         ? 'Загрузите обе стороны документа'
         : null;
 
@@ -145,11 +139,7 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
     if (!mounted) return;
 
     if (ok) {
-      if (phone == _bypassDocumentsPhone) {
-        context.go('/selfie-waiting');
-      } else {
-        context.push('/register/confirm');
-      }
+      context.push('/register/confirm');
       return;
     }
 

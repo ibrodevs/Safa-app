@@ -5,6 +5,7 @@ final class NotificationRouter {
 
   static void routeFromData(Map<String, dynamic> data) {
     final app = data['app']?.toString().toLowerCase();
+    final type = data['type']?.toString().toLowerCase();
     final shipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
 
     if (app == 'client' && shipmentId != null) {
@@ -12,6 +13,10 @@ final class NotificationRouter {
       return;
     }
     if (app == 'carrier') {
+      if (type == 'kyc_status') {
+        AppRouter.router.go('/selfie-waiting');
+        return;
+      }
       AppRouter.router.go('/home-carrier');
       return;
     }

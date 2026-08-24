@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../../data/notifications/service/push_service.dart';
+
 class SelfieWaitingScreen extends StatefulWidget {
   const SelfieWaitingScreen({super.key});
 
@@ -27,7 +29,13 @@ class _SelfieWaitingScreenState extends State<SelfieWaitingScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(_enableApprovalNotifications());
     _startPolling();
+  }
+
+  Future<void> _enableApprovalNotifications() async {
+    await PushService.instance.init();
+    await PushService.instance.registerPendingCarrier();
   }
 
   void _startPolling() {
