@@ -301,6 +301,39 @@ final class ApiService {
     }
   }
 
+  /// Загружает фото профиля на сервер.
+  ///
+  /// Backend хранит аватар как ImageField, поэтому запрос уходит multipart —
+  /// PATCH с JSON-строкой файл не сохранит. [onProgress] отдаёт долю
+  /// отправленных байт (0..1) для индикатора загрузки.
+  Future<ProfileModel> uploadAvatar({
+    required File file,
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      final name = file.path.split(Platform.pathSeparator).last;
+      final form = FormData.fromMap({
+        'avatar': await MultipartFile.fromFile(file.path, filename: name),
+      });
+
+      final resp = await _dio.patch(
+        'users/profile/',
+        data: form,
+        options: Options(contentType: 'multipart/form-data'),
+        onSendProgress: (sent, total) {
+          if (total <= 0) return;
+          onProgress?.call((sent / total).clamp(0.0, 1.0));
+        },
+      );
+      final map = _asMap(resp.data);
+      return ProfileModel.fromJson(map);
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось загрузить фотографию');
+    } catch (_) {
+      throw ApiException('Не удалось загрузить фотографию');
+    }
+  }
+
   Future<void> postVerifyCode({
     required String phone,
     required String code,

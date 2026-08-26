@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 
+import '../../../../../core/utils/address_format.dart';
 import '../../../../../core/utils/app_logger.dart';
 
 class OsmGeoApi {
@@ -57,11 +58,7 @@ class OsmGeoApi {
       final street = (propsMap['street'] ?? '').toString();
       final housenumber = (propsMap['housenumber'] ?? '').toString();
 
-      final address = [
-        if (city.isNotEmpty) city,
-        if (street.isNotEmpty) street,
-        if (housenumber.isNotEmpty) housenumber,
-      ].join(', ');
+      final address = joinAddressParts([city, street, housenumber]);
 
       return {
         'title': name.isNotEmpty ? name : address,
@@ -96,6 +93,9 @@ class OsmGeoApi {
           'format': 'jsonv2',
           'accept-language': 'ru',
           'zoom': 18,
+          // Без addressdetails остаётся только display_name — строка со
+          // страной и почтовым индексом.
+          'addressdetails': 1,
           'email': 'senya.kalchoroev@gmail.com',
         },
         options: Options(
@@ -115,8 +115,7 @@ class OsmGeoApi {
       if (sc != 200) return '';
 
       if (r.data is Map<String, dynamic>) {
-        final data = r.data as Map<String, dynamic>;
-        return (data['display_name'] ?? '').toString().trim();
+        return _composeNominatimAddress(r.data as Map<String, dynamic>);
       }
 
       return '';
@@ -124,6 +123,43 @@ class OsmGeoApi {
       AppLogger.d('NOMINATIM EX: $e\n$st');
       return '';
     }
+  }
+
+  /// Собирает адрес из структурированных полей Nominatim.
+  ///
+  /// `display_name` использовать нельзя: он всегда заканчивается почтовым
+  /// индексом и страной.
+  String _composeNominatimAddress(Map<String, dynamic> data) {
+    final raw = data['address'];
+    final address = raw is Map
+        ? raw.cast<String, dynamic>()
+        : const <String, dynamic>{};
+
+    String field(List<String> keys) {
+      for (final key in keys) {
+        final value = (address[key] ?? '').toString().trim();
+        if (value.isNotEmpty) return value;
+      }
+      return '';
+    }
+
+    final city = field(['city', 'town', 'village', 'municipality']);
+    final street = field(['road', 'pedestrian']);
+    final house = field(['house_number']);
+    final place = field([
+      'shop',
+      'amenity',
+      'marketplace',
+      'neighbourhood',
+      'suburb',
+    ]);
+
+    final composed = street.isNotEmpty
+        ? joinAddressParts([city, street, house])
+        : joinAddressParts([city, place]);
+    if (composed.isNotEmpty) return composed;
+
+    return formatReadableAddress((data['display_name'] ?? '').toString());
   }
 
   Future<String> _reversePhotonDebug({
@@ -173,12 +209,12 @@ class OsmGeoApi {
       final street = (propsMap['street'] ?? '').toString();
       final housenumber = (propsMap['housenumber'] ?? '').toString();
 
-      final address = [
-        if (city.isNotEmpty) city,
-        if (street.isNotEmpty) street,
-        if (housenumber.isNotEmpty) housenumber,
-        if (name.isNotEmpty && name != street) name,
-      ].where((e) => e.trim().isNotEmpty).join(', ');
+      final address = joinAddressParts([
+        city,
+        street,
+        housenumber,
+        if (name != street) name,
+      ]);
 
       return address.trim();
     } catch (e, st) {

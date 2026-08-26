@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dogo/features/main_module/map/data/model/delivery_point_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +47,19 @@ void main() {
       );
       expect(payload.every((point) => point['lat'] != null), isTrue);
       expect(payload.every((point) => point['lon'] != null), isTrue);
+    });
+
+    test('весь порядок A-B-C уходит в один дорожный запрос', () {
+      final source = File(
+        'lib/features/main_module/map/view/map_screen.dart',
+      ).readAsStringSync();
+
+      expect(source, contains(".join(';')"));
+      expect(source, contains('route/v1/driving/'));
+      expect(source, contains("List.filled(stops.length, 'unlimited')"));
+      expect(source, contains('return _buildOsrmRoute(pts);'));
+      expect(source, isNot(contains("['foot', 'walking', 'driving']")));
+      expect(source, isNot(contains('route.isNotEmpty ? route : pts')));
     });
 
     test('передают данные выбранного контейнера в заказ', () {

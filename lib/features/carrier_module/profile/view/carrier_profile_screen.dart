@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/utils/friendly_error.dart';
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -45,6 +46,12 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
   String? _localAvatarPath;
   bool _pickingAvatar = false;
 
+  /// Идёт отправка выбранного фото на сервер.
+  bool _uploadingAvatar = false;
+
+  /// Доля отправленных байт (0..1) для кольца прогресса.
+  double _avatarUploadProgress = 0;
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +70,7 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
   }
 
   Future<void> _pickAvatar() async {
-    if (_pickingAvatar) return;
+    if (_pickingAvatar || _uploadingAvatar) return;
     _pickingAvatar = true;
     try {
       final picked = await ImagePicker().pickImage(
@@ -73,6 +80,14 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
         imageQuality: 88,
       );
       if (picked == null) return;
+      if (!mounted) return;
+
+      // Показываем загрузку сразу после выбора, включая подготовку и
+      // копирование файла, а не только после начала сетевого PATCH.
+      setState(() {
+        _uploadingAvatar = true;
+        _avatarUploadProgress = 0;
+      });
 
       final directory = await getApplicationDocumentsDirectory();
       final suffix = picked.name.contains('.')
@@ -83,14 +98,62 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
       ).copy('${directory.path}/safa_carrier_avatar$suffix');
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_avatarPreferenceKey, saved.path);
-      if (mounted) setState(() => _localAvatarPath = saved.path);
+      if (!mounted) return;
+
+      // Локальную копию показываем сразу — превью не должно ждать сеть.
+      setState(() {
+        _localAvatarPath = saved.path;
+      });
+
+      await _uploadAvatar(saved);
     } catch (_) {
       if (!mounted) return;
+      setState(() => _uploadingAvatar = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Не удалось выбрать фотографию')),
       );
     } finally {
       _pickingAvatar = false;
+    }
+  }
+
+  /// Отправляет фото на backend и обновляет профиль.
+  ///
+  /// Раньше аватар сохранялся только на устройстве: на сервере фото не
+  /// появлялось, а специалист не видел ни прогресса, ни результата.
+  Future<void> _uploadAvatar(File file) async {
+    try {
+      await ApiService.instance.uploadAvatar(
+        file: file,
+        onProgress: (value) {
+          if (!mounted) return;
+          setState(() => _avatarUploadProgress = value);
+        },
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _uploadingAvatar = false;
+        _avatarUploadProgress = 1;
+      });
+      await context.read<CarrierProfileProvider>().load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Фотография профиля обновлена')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingAvatar = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyErrorMessage(
+              e,
+              fallback: 'Не удалось загрузить фотографию',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -119,7 +182,9 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
 
     return Semantics(
       button: true,
-      label: 'Выбрать фотографию профиля',
+      label: _uploadingAvatar
+          ? 'Фотография профиля загружается'
+          : 'Выбрать фотографию профиля',
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: _pickAvatar,
@@ -136,6 +201,49 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
                   child: image,
                 ),
               ),
+              if (_uploadingAvatar)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.6,
+                              color: Colors.white,
+                              // До первого onSendProgress крутим бесконечный
+                              // индикатор, дальше показываем реальную долю.
+                              value: _avatarUploadProgress > 0
+                                  ? _avatarUploadProgress
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            _avatarUploadProgress > 0
+                                ? '${(_avatarUploadProgress * 100).round()}%'
+                                : 'Загрузка',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -143,12 +251,14 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: _accent,
+                    color: _uploadingAvatar ? _greyText : _accent,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Icon(
-                    Icons.photo_camera_rounded,
+                  child: Icon(
+                    _uploadingAvatar
+                        ? Icons.cloud_upload_rounded
+                        : Icons.photo_camera_rounded,
                     color: Colors.white,
                     size: 16,
                   ),

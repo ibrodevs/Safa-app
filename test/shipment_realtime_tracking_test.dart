@@ -53,7 +53,7 @@ void main() {
     ).readAsStringSync();
 
     expect(repository, contains("source != 'coordinates'"));
-    expect(repository, contains('_coordinateOnlyAddress.hasMatch(address)'));
+    expect(repository, contains('_addressLetter.hasMatch(address)'));
   });
 
   test('active carrier tracking survives backgrounding on Android and iOS', () {

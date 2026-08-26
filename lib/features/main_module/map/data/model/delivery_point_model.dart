@@ -26,22 +26,20 @@ class DeliveryPoint {
        _container = container,
        _q = q;
 
-  static final RegExp _bazarPattern = RegExp(
-    r'Базар\s*:?\s*([^•·]+)',
+  // Разбираем только собственные подписи — «Базар: X · Проход: Y» и легаси
+  // «Контейнер 125 • Проход 4». Метка обязана стоять в начале фрагмента.
+  // Раньше шаблоны ловили голое слово в любом месте строки, и адрес от
+  // геокодера («Дордой базар, Кожевенная улица») превращался в мусорный
+  // `bazar` без прохода и контейнера — backend отвечал на такой заказ 400.
+  static RegExp _labelPattern(String label) => RegExp(
+    '(?:^|[·•])\\s*$label(?:\\s*:\\s*|\\s+)([^•·]+)',
     caseSensitive: false,
   );
-  static final RegExp _districtPattern = RegExp(
-    r'Район\s*:?\s*([^•·]+)',
-    caseSensitive: false,
-  );
-  static final RegExp _containerPattern = RegExp(
-    r'Контейнер\s*:?\s*([^•·]+)',
-    caseSensitive: false,
-  );
-  static final RegExp _passagePattern = RegExp(
-    r'Проход\s*:?\s*([^•·]+)',
-    caseSensitive: false,
-  );
+
+  static final RegExp _bazarPattern = _labelPattern('Базар');
+  static final RegExp _districtPattern = _labelPattern('Район');
+  static final RegExp _containerPattern = _labelPattern('Контейнер');
+  static final RegExp _passagePattern = _labelPattern('Проход');
 
   static String? _clean(String? value) {
     final cleaned = value?.trim() ?? '';
@@ -126,13 +124,30 @@ class DeliveryPoint {
     return title.trim().isNotEmpty ? title.trim() : subtitle.trim();
   }
 
-  Map<String, dynamic> toStopJson() => <String, dynamic>{
-    'title': compactAddress.isNotEmpty ? compactAddress : title,
-    'lat': lat,
-    'lon': lon,
-    'bazar': bazar ?? '',
-    'passage': passage ?? '',
-    'container': container ?? '',
-    'q': q ?? '',
-  };
+  /// Контейнер описан полностью только когда известны все три части.
+  /// Backend отклоняет частичный набор («Для контейнера нужны все поля»),
+  /// поэтому неполные данные отправлять нельзя — точка уйдёт по координатам.
+  bool get hasFullContainerAddress =>
+      (bazar ?? '').isNotEmpty &&
+      (passage ?? '').isNotEmpty &&
+      (container ?? '').isNotEmpty;
+
+  /// Backend ограничивает подпись точки 255 символами.
+  static String _fitTitle(String value) =>
+      value.length <= 255 ? value : value.substring(0, 255).trimRight();
+
+  Map<String, dynamic> toStopJson() {
+    final full = hasFullContainerAddress;
+    final label = compactAddress.isNotEmpty ? compactAddress : title;
+
+    return <String, dynamic>{
+      'title': _fitTitle(label),
+      'lat': lat,
+      'lon': lon,
+      'bazar': full ? bazar! : '',
+      'passage': full ? passage! : '',
+      'container': full ? container! : '',
+      'q': q ?? '',
+    };
+  }
 }

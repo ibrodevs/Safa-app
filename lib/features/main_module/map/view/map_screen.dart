@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
@@ -11,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/design/app_design.dart';
+import '../../../../core/map/safa_yandex_map.dart';
 import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
@@ -71,7 +71,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   double _centerLon = 74.6122;
   double _zoom = 15;
 
-  final MapController _mapController = MapController();
+  final SafaMapController _mapController = SafaMapController();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
   final MarketMapRepository _marketMapRepository = MarketMapRepository();
   final TextEditingController _descriptionController = TextEditingController();
@@ -109,6 +109,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   List<LatLng> _routePoints = const [];
   String? _routeSignature;
   bool _routing = false;
+  Timer? _routeRetryTimer;
 
   StreamSubscription<ServiceStatus>? _serviceStatusStream;
   Timer? _containersDebounce;
@@ -157,10 +158,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     return pts.map((p) => '${f(p.latitude)},${f(p.longitude)}').join('|');
   }
 
-  Future<List<LatLng>> _buildOsrmLegRoute({
-    required LatLng a,
-    required LatLng b,
-  }) async {
+  Future<List<LatLng>> _buildOsrmRoute(List<LatLng> stops) async {
+    if (stops.length < 2) return const [];
     final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
@@ -168,157 +167,50 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       ),
     );
 
-    const profiles = <String>['foot', 'walking', 'driving'];
-    final coords = '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
+    // Один запрос сохраняет порядок всех остановок A → B → C. Отдельные
+    // запросы для каждого плеча чаще попадали под rate limit и оставляли на
+    // карте прямые сегменты вместо дороги.
+    final coords = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
 
-    for (final profile in profiles) {
-      try {
-        final resp = await dio.get(
-          'https://router.project-osrm.org/route/v1/$profile/$coords',
-          queryParameters: {
-            'overview': 'full',
-            'geometries': 'geojson',
-            'steps': 'false',
-          },
-        );
+    try {
+      final resp = await dio.get(
+        'https://router.project-osrm.org/route/v1/driving/$coords',
+        queryParameters: {
+          'overview': 'full',
+          'geometries': 'geojson',
+          'steps': 'false',
+          'alternatives': 'false',
+          'continue_straight': 'false',
+          'radiuses': List.filled(stops.length, 'unlimited').join(';'),
+        },
+      );
 
-        final data = resp.data;
-        final routes = (data is Map) ? data['routes'] : null;
-        if (routes is! List || routes.isEmpty) continue;
+      final data = resp.data;
+      final routes = (data is Map) ? data['routes'] : null;
+      if (routes is! List || routes.isEmpty) return const [];
 
-        final geom = routes.first['geometry'];
-        final coordsList = (geom is Map) ? geom['coordinates'] : null;
-        if (coordsList is! List) continue;
+      final geom = routes.first['geometry'];
+      final coordsList = (geom is Map) ? geom['coordinates'] : null;
+      if (coordsList is! List) return const [];
 
-        final out = <LatLng>[];
-        for (final c in coordsList) {
-          if (c is! List || c.length < 2) continue;
-          final lon = (c[0] as num).toDouble();
-          final lat = (c[1] as num).toDouble();
-          out.add(LatLng(lat, lon));
-        }
-
-        if (out.isNotEmpty) return out;
-      } catch (_) {
-        // Пробуем следующий профиль маршрутизации.
+      final out = <LatLng>[];
+      for (final c in coordsList) {
+        if (c is! List || c.length < 2) continue;
+        final lon = (c[0] as num).toDouble();
+        final lat = (c[1] as num).toDouble();
+        out.add(LatLng(lat, lon));
       }
+
+      if (out.length >= 2) return _dedupeRoutePoints(out);
+    } catch (_) {
+      // При временной ошибке не показываем вводящую в заблуждение прямую.
     }
 
     return const [];
   }
 
-  List<_PassageLine> _passageLines() {
-    final lines = <_PassageLine>[];
-    for (final feature in _marketMapFeatures) {
-      if (feature.kind != 'passage' || feature.geometryType != 'LineString') {
-        continue;
-      }
-      final points = _linePointsFromCoordinates(feature.coordinates);
-      if (points.length < 2) continue;
-      lines.add(_PassageLine(id: feature.id, points: points));
-    }
-    return lines;
-  }
-
-  List<LatLng> _linePointsFromCoordinates(dynamic raw) {
-    if (raw is! List) return const [];
-    final points = <LatLng>[];
-    for (final item in raw) {
-      if (item is! List || item.length < 2) continue;
-      final lon = _asDouble(item[0]);
-      final lat = _asDouble(item[1]);
-      if (lat == null || lon == null) continue;
-      points.add(LatLng(lat, lon));
-    }
-    return points;
-  }
-
-  double? _asDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString() ?? '');
-  }
-
-  _PassageSnap? _nearestPassageSnap(
-    LatLng point,
-    List<_PassageLine> lines, {
-    double maxDistanceM = 90,
-  }) {
-    _PassageSnap? best;
-    for (final line in lines) {
-      for (var i = 0; i < line.points.length - 1; i++) {
-        final projected = _projectToSegment(
-          point,
-          line.points[i],
-          line.points[i + 1],
-        );
-        final distanceM = _distanceMeters(point, projected.point);
-        if (distanceM > maxDistanceM) continue;
-        if (best == null || distanceM < best.distanceM) {
-          best = _PassageSnap(
-            line: line,
-            point: projected.point,
-            segmentIndex: i,
-            t: projected.t,
-            distanceM: distanceM,
-          );
-        }
-      }
-    }
-    return best;
-  }
-
-  _ProjectedPoint _projectToSegment(LatLng p, LatLng a, LatLng b) {
-    final latScale = 111320.0;
-    final lonScale = latScale * math.cos(p.latitude * math.pi / 180);
-    final ax = (a.longitude - p.longitude) * lonScale;
-    final ay = (a.latitude - p.latitude) * latScale;
-    final bx = (b.longitude - p.longitude) * lonScale;
-    final by = (b.latitude - p.latitude) * latScale;
-    final dx = bx - ax;
-    final dy = by - ay;
-    final len2 = dx * dx + dy * dy;
-    final rawT = len2 <= 0 ? 0.0 : (-(ax * dx + ay * dy) / len2);
-    final t = rawT.clamp(0.0, 1.0);
-    return _ProjectedPoint(
-      point: LatLng(
-        a.latitude + (b.latitude - a.latitude) * t,
-        a.longitude + (b.longitude - a.longitude) * t,
-      ),
-      t: t,
-    );
-  }
-
   double _distanceMeters(LatLng a, LatLng b) {
     return const Distance().as(LengthUnit.Meter, a, b);
-  }
-
-  List<LatLng> _passageSegmentBetween(_PassageSnap a, _PassageSnap b) {
-    final points = a.line.points;
-    if (a.line.id != b.line.id || points.length < 2) return const [];
-
-    final forward = <LatLng>[a.point];
-    for (var i = a.segmentIndex + 1; i <= b.segmentIndex; i++) {
-      if (i >= 0 && i < points.length) forward.add(points[i]);
-    }
-    forward.add(b.point);
-
-    final backward = <LatLng>[a.point];
-    for (var i = a.segmentIndex; i > b.segmentIndex; i--) {
-      if (i >= 0 && i < points.length) backward.add(points[i]);
-    }
-    backward.add(b.point);
-
-    return _routeLengthMeters(forward) <= _routeLengthMeters(backward)
-        ? _dedupeRoutePoints(forward)
-        : _dedupeRoutePoints(backward);
-  }
-
-  double _routeLengthMeters(List<LatLng> points) {
-    var total = 0.0;
-    for (var i = 0; i < points.length - 1; i++) {
-      total += _distanceMeters(points[i], points[i + 1]);
-    }
-    return total;
   }
 
   List<LatLng> _dedupeRoutePoints(List<LatLng> points) {
@@ -333,45 +225,13 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
   Future<List<LatLng>> _buildRouteMultiLeg(List<LatLng> pts) async {
     if (pts.length < 2) return const [];
-    final passages = _passageLines();
-    final full = <LatLng>[];
-
-    for (var i = 0; i < pts.length - 1; i++) {
-      final a = pts[i];
-      final b = pts[i + 1];
-      final snapA = _nearestPassageSnap(a, passages);
-      final snapB = _nearestPassageSnap(b, passages);
-      var leg = <LatLng>[];
-
-      if (snapA != null && snapB != null && snapA.line.id == snapB.line.id) {
-        final passage = _passageSegmentBetween(snapA, snapB);
-        if (passage.length >= 2) {
-          leg = _dedupeRoutePoints([a, ...passage, b]);
-        }
-      }
-
-      if (leg.isEmpty) {
-        leg = await _buildOsrmLegRoute(a: a, b: b);
-      }
-      if (leg.isEmpty) leg = [a, b];
-
-      if (full.isEmpty) {
-        full.addAll(leg);
-      } else {
-        full.addAll(leg.skip(1));
-      }
-
-      if (leg.length <= 2 && i != pts.length - 2) {
-        await Future.delayed(const Duration(milliseconds: 1100));
-      }
-    }
-
-    return _dedupeRoutePoints(full);
+    return _buildOsrmRoute(pts);
   }
 
   // --- Контейнеры -------------------------------------------------------
 
   void _scheduleContainersRefresh({bool immediate = false}) {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     _containersDebounce?.cancel();
     _containersDebounce = Timer(
       immediate ? Duration.zero : const Duration(milliseconds: 450),
@@ -380,6 +240,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   Future<void> _refreshVisibleContainers() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (!mounted) return;
     if (_containersLoading) {
       _containersRefreshPending = true;
@@ -388,7 +249,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
     late final LatLngBounds bounds;
     try {
-      bounds = _mapController.camera.visibleBounds;
+      bounds = _mapController.visibleBounds!;
     } catch (_) {
       return;
     }
@@ -459,6 +320,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   Future<void> _focusContainers() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (_containersLoading) return;
 
     setState(() => _containersLoading = true);
@@ -495,6 +357,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   void _scheduleMarketMapRefresh({bool immediate = false}) {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     _marketMapDebounce?.cancel();
     _marketMapDebounce = Timer(
       immediate ? Duration.zero : const Duration(milliseconds: 450),
@@ -520,6 +383,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   }
 
   Future<void> _loadMarketMap() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (_marketMapLoading) {
       _marketMapRefreshPending = true;
       return;
@@ -527,7 +391,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
     late final LatLngBounds bounds;
     try {
-      bounds = _mapController.camera.visibleBounds;
+      bounds = _mapController.visibleBounds!;
     } catch (_) {
       return;
     }
@@ -589,15 +453,15 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
     final padding = EdgeInsets.fromLTRB(36, 96, 36, 300 + bottomSafe);
 
-    _mapController.fitCamera(
-      CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: padding),
-    );
+    _mapController.fitBounds(LatLngBounds.fromPoints(pts), padding: padding);
   }
 
   Future<void> _syncRouteAndCamera() async {
     if (!mounted) return;
 
     if (!_showFulfillmentSheet && !_searchMode) {
+      _routeRetryTimer?.cancel();
+      _routeRetryTimer = null;
       if (_routePoints.isNotEmpty || _routeSignature != null) {
         setState(() {
           _routePoints = const [];
@@ -632,9 +496,19 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       if (!mounted) return;
 
       setState(() {
-        _routeSignature = sig;
-        _routePoints = route.isNotEmpty ? route : pts;
+        _routeSignature = route.isNotEmpty ? sig : null;
+        _routePoints = route;
       });
+      _routeRetryTimer?.cancel();
+      _routeRetryTimer = null;
+      if (route.isEmpty && mounted && _activeShipmentId != null) {
+        _routeRetryTimer = Timer(const Duration(seconds: 5), () {
+          _routeRetryTimer = null;
+          if (mounted && _activeShipmentId != null) {
+            unawaited(_syncRouteAndCamera());
+          }
+        });
+      }
     } finally {
       _routing = false;
     }
@@ -777,6 +651,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     _containersDebounce?.cancel();
     _marketMapDebounce?.cancel();
     _mapIdleDebounce?.cancel();
+    _routeRetryTimer?.cancel();
     _descriptionController.dispose();
     _stopShipmentPolling();
     super.dispose();
@@ -848,7 +723,12 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _mapController.move(LatLng(_myLat, _myLon), 15);
       });
 
-      await addressProvider.fetchGpsHereAddress(lat: _myLat, lon: _myLon);
+      await addressProvider.fetchGpsHereAddress(
+        lat: _myLat,
+        lon: _myLon,
+        preferPublicAddress:
+            _config.type == 'delivery' || _config.type == 'cars',
+      );
     } catch (e, st) {
       debugPrint('initLocation error: $e\n$st');
       if (mounted) setState(() => _gate = _LocationGate.denied);
@@ -1085,6 +965,15 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     }
   }
 
+  Future<void> _refreshShipmentAfterPayment(int shipmentId) async {
+    // A periodic request may be finishing with the pre-payment snapshot.
+    // Wait briefly for it and then make one guaranteed fresh request.
+    for (var attempt = 0; attempt < 20 && _shipmentPollInFlight; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    await _pollShipment(shipmentId);
+  }
+
   void _showOrderCompletedSheet() {
     if (!mounted) return;
     showAppBottomSheet<void>(
@@ -1122,6 +1011,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         stopNumber: stopNumber,
         headline: headline,
         headlineSubtitle: headlineSubtitle,
+        addressOnly: _config.type == 'delivery' || _config.type == 'cars',
       ),
     );
   }
@@ -1586,6 +1476,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
               containersCount: _visibleContainers.length,
               onBack: () => context.go('/home'),
               onContainers: _focusContainers,
+              showContainers: SafaMobileMapFeatures.backendDrawingLayersEnabled,
             ),
           ),
 
@@ -1627,14 +1518,22 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     required String? detailText,
     required bool showContainerLabels,
   }) {
-    final markers = <Marker>[];
+    final markers = <SafaMapMarker>[];
     final containerPolygons = <Polygon>[];
-    final marketMap = _marketMapRenderData();
-    final publishedContainerIds = _publishedContainerIds();
-    final renderedLooseContainers = _renderedLooseContainers(
-      publishedContainerIds,
-      hideWhenPublishedContainersVisible: marketMap.hasRenderedContainers,
-    );
+    final marketMap = SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? _marketMapRenderData()
+        : MarketMapRenderData.empty;
+    final publishedContainerIds =
+        SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? _publishedContainerIds()
+        : const <int>{};
+    final renderedLooseContainers =
+        SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? _renderedLooseContainers(
+            publishedContainerIds,
+            hideWhenPublishedContainersVisible: marketMap.hasRenderedContainers,
+          )
+        : const <ContainerRef>[];
     final shouldDrawLooseContainerShapes =
         _zoom >= _containerShapeMinZoom &&
         (renderedLooseContainers.length <= _maxRenderedLooseContainers ||
@@ -1656,16 +1555,14 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           : _featureCenter(feature.coordinates);
       if (center == null) continue;
       markers.add(
-        Marker(
+        SafaMapMarker(
+          id: 'published-container-${feature.id}',
           point: center,
           width: 48,
           height: 48,
           alignment: Alignment.center,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _onMarketMapContainerTapped(feature),
-            child: const SizedBox.expand(),
-          ),
+          onTap: () => _onMarketMapContainerTapped(feature),
+          child: const SizedBox.expand(),
         ),
       );
     }
@@ -1691,16 +1588,18 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       }
 
       markers.add(
-        Marker(
+        SafaMapMarker(
+          id: 'container-${container.id}',
           point: LatLng(lat, lon),
           width: ContainerMapMarker.hitSize,
           height: ContainerMapMarker.hitSize,
           alignment: Alignment.center,
+          onTap: () => _onContainerTapped(container),
+          visualKey: '$selected-$showLooseContainerLabels-${container.number}',
           child: ContainerMapMarker(
             container: container,
             selected: selected,
             showLabel: showLooseContainerLabels,
-            onTap: () => _onContainerTapped(container),
           ),
         ),
       );
@@ -1708,11 +1607,14 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
     if (!_searchMode) {
       markers.add(
-        Marker(
+        SafaMapMarker(
+          id: 'my-location',
           point: LatLng(_myLat, _myLon),
           width: 220,
           height: 120,
           alignment: Alignment.topCenter,
+          visualKey:
+              '$gpsAddress-$gpsLoading-$gpsError-$bazarTitle-$detailText',
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1733,11 +1635,13 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       final pts = _spreadSamePoints(_extractStopPoints(_activeStops));
       for (int i = 0; i < pts.length; i++) {
         markers.add(
-          Marker(
+          SafaMapMarker(
+            id: 'active-stop-$i',
             point: pts[i],
             width: 32,
             height: 32,
             alignment: Alignment.center,
+            visualKey: '${i == 0}-${i == pts.length - 1}',
             child: _StopDotMarker(
               index: i + 1,
               isFirst: i == 0,
@@ -1755,96 +1659,68 @@ class _OrderMapScreenState extends State<OrderMapScreen>
             DateTime.now().toUtc().difference(updatedAt.toUtc()) >
                 const Duration(minutes: 2);
         markers.add(
-          Marker(
+          SafaMapMarker(
+            id: 'courier-live',
             point: courierPosition,
             width: 112,
             height: 68,
             alignment: Alignment.bottomCenter,
+            visualKey: '$isStale',
             child: _CourierTrackingMarker(isStale: isStale),
           ),
         );
       }
     }
 
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: LatLng(_centerLat, _centerLon),
-        initialZoom: 15,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
-        onMapReady: () {
-          _scheduleContainersRefresh(immediate: true);
-          _scheduleMarketMapRefresh(immediate: true);
-        },
-        onPositionChanged: (pos, hasGesture) {
-          final c = pos.center;
-          _centerLat = c.latitude;
-          _centerLon = c.longitude;
-          if (hasGesture) {
-            _setMapMoving(true);
-            _scheduleMapIdle();
-          }
+    return SafaYandexMap(
+      controller: _mapController,
+      initialCenter: LatLng(_centerLat, _centerLon),
+      initialZoom: 15,
+      onPositionChanged: (pos, hasGesture) {
+        final c = pos.center;
+        _centerLat = c.latitude;
+        _centerLon = c.longitude;
+        if (hasGesture) {
+          _setMapMoving(true);
+          _scheduleMapIdle();
+        }
 
-          // Перерисовываем экран только при переходе через порог масштаба,
-          // из которого зависит видимость подписей контейнеров, — жест
-          // панорамирования сам по себе setState не вызывает.
-          final wasLabelled = _zoom >= _containerLabelMinZoom;
-          final oldZoomBucket = _zoom.floor();
-          final isLabelled = pos.zoom >= _containerLabelMinZoom;
-          final newZoomBucket = pos.zoom.floor();
-          _zoom = pos.zoom;
-          if ((wasLabelled != isLabelled || oldZoomBucket != newZoomBucket) &&
-              mounted) {
-            setState(() {});
-          }
+        // Перерисовываем экран только при переходе через порог масштаба,
+        // из которого зависит видимость подписей контейнеров, — жест
+        // панорамирования сам по себе setState не вызывает.
+        final wasLabelled = _zoom >= _containerLabelMinZoom;
+        final oldZoomBucket = _zoom.floor();
+        final isLabelled = pos.zoom >= _containerLabelMinZoom;
+        final newZoomBucket = pos.zoom.floor();
+        _zoom = pos.zoom;
+        if ((wasLabelled != isLabelled || oldZoomBucket != newZoomBucket) &&
+            mounted) {
+          setState(() {});
+        }
 
-          if (!hasGesture) {
-            _scheduleContainersRefresh();
-            _scheduleMarketMapRefresh();
-          }
-        },
-      ),
-      children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-          userAgentPackageName: 'kg.genesis.dogo',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          panBuffer: 0,
-          keepBuffer: 1,
-          tileDisplay: const TileDisplay.instantaneous(),
-        ),
-        if (marketMap.polygons.isNotEmpty)
-          PolygonLayer(
-            polygons: marketMap.polygons,
-            simplificationTolerance: 1.2,
+        if (!hasGesture) {
+          _scheduleContainersRefresh();
+          _scheduleMarketMapRefresh();
+        }
+      },
+      polygons: [...marketMap.polygons, ...containerPolygons],
+      polylines: [
+        ...marketMap.polylines,
+        if ((_showFulfillmentSheet || _searchMode) &&
+            _routePoints.isNotEmpty) ...[
+          Polyline(
+            points: _routePoints,
+            strokeWidth: 6,
+            color: AppColors.routeLineHalo,
           ),
-        if (marketMap.polylines.isNotEmpty)
-          PolylineLayer(
-            polylines: marketMap.polylines,
-            simplificationTolerance: 1.2,
+          Polyline(
+            points: _routePoints,
+            strokeWidth: 3.5,
+            color: AppColors.primary,
           ),
-        if (containerPolygons.isNotEmpty)
-          PolygonLayer(polygons: containerPolygons),
-        if ((_showFulfillmentSheet || _searchMode) && _routePoints.isNotEmpty)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: _routePoints,
-                strokeWidth: 6,
-                color: AppColors.routeLineHalo,
-              ),
-              Polyline(
-                points: _routePoints,
-                strokeWidth: 3.5,
-                color: AppColors.primary,
-              ),
-            ],
-          ),
-        MarkerLayer(markers: [...marketMap.markers, ...markers]),
+        ],
       ],
+      markers: [...marketMap.markers, ...markers],
     );
   }
 
@@ -1947,9 +1823,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         statusCode: _currentStatusCode,
       );
     } else if (_currentStatus == ShipmentStatus.awaitingPayment && !_isPaid) {
+      final shipmentId = _activeShipmentId!;
       panel = ShipmentPaymentSheet(
-        shipmentId: _activeShipmentId!,
+        shipmentId: shipmentId,
         amount: _fare,
+        onPaymentConfirmed: () => _refreshShipmentAfterPayment(shipmentId),
       );
     } else {
       panel = SearchingSheet(
@@ -1984,6 +1862,7 @@ class _MapTopBar extends StatelessWidget {
     required this.containersCount,
     required this.onBack,
     required this.onContainers,
+    this.showContainers = true,
   });
 
   final ServiceConfig config;
@@ -1991,6 +1870,7 @@ class _MapTopBar extends StatelessWidget {
   final int containersCount;
   final VoidCallback onBack;
   final VoidCallback onContainers;
+  final bool showContainers;
 
   @override
   Widget build(BuildContext context) {
@@ -2028,49 +1908,21 @@ class _MapTopBar extends StatelessWidget {
             ),
           ),
         ),
-        AppSpacing.hGapXs,
-        AppMapActionButton(
-          icon: Icons.grid_view_rounded,
-          semanticLabel: containersLoading
-              ? 'Загружаем контейнеры'
-              : 'Показать контейнеры: $containersCount',
-          loading: containersLoading,
-          badgeColor: containersCount > 0 ? AppColors.container : null,
-          onTap: onContainers,
-        ),
+        if (showContainers) ...[
+          AppSpacing.hGapXs,
+          AppMapActionButton(
+            icon: Icons.grid_view_rounded,
+            semanticLabel: containersLoading
+                ? 'Загружаем контейнеры'
+                : 'Показать контейнеры: $containersCount',
+            loading: containersLoading,
+            badgeColor: containersCount > 0 ? AppColors.container : null,
+            onTap: onContainers,
+          ),
+        ],
       ],
     );
   }
-}
-
-final class _PassageLine {
-  const _PassageLine({required this.id, required this.points});
-
-  final String id;
-  final List<LatLng> points;
-}
-
-final class _PassageSnap {
-  const _PassageSnap({
-    required this.line,
-    required this.point,
-    required this.segmentIndex,
-    required this.t,
-    required this.distanceM,
-  });
-
-  final _PassageLine line;
-  final LatLng point;
-  final int segmentIndex;
-  final double t;
-  final double distanceM;
-}
-
-final class _ProjectedPoint {
-  const _ProjectedPoint({required this.point, required this.t});
-
-  final LatLng point;
-  final double t;
 }
 
 /// Маркер точки маршрута активного заказа.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../../core/map/safa_yandex_map.dart';
 import '../../data/model/market_map_feature.dart';
 
 final class MarketMapRenderData {
@@ -14,13 +15,13 @@ final class MarketMapRenderData {
 
   final List<Polygon> polygons;
   final List<Polyline> polylines;
-  final List<Marker> markers;
+  final List<SafaMapMarker> markers;
   final int renderedContainerCount;
 
   static const empty = MarketMapRenderData(
     polygons: <Polygon>[],
     polylines: <Polyline>[],
-    markers: <Marker>[],
+    markers: <SafaMapMarker>[],
     renderedContainerCount: 0,
   );
 
@@ -54,7 +55,7 @@ final class MarketMapRenderData {
   }) {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
-    final markers = <Marker>[];
+    final markers = <SafaMapMarker>[];
     var renderedContainerCount = 0;
     var renderedContainerLabelCount = 0;
     final containerLabelLimit = containerLabelLimitForZoom(zoom);
@@ -320,13 +321,15 @@ final class MarketMapRenderData {
     return _boundsCenter(points);
   }
 
-  static Marker _labelMarker(LatLng point, String text, Color color) {
+  static SafaMapMarker _labelMarker(LatLng point, String text, Color color) {
     final label = text.trim();
-    return Marker(
+    return SafaMapMarker(
+      id: 'label-${point.latitude}-${point.longitude}-$label',
       point: point,
       width: 72,
       height: 28,
       alignment: Alignment.center,
+      visualKey: '${color.toARGB32()}-$label',
       child: IgnorePointer(
         child: Center(
           child: Transform.translate(

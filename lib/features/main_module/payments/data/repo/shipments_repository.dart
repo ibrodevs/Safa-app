@@ -14,6 +14,50 @@ final class ShipmentsRepository {
     throw ApiException('Некорректный формат ответа сервера');
   }
 
+  /// Достаёт человекочитаемый текст из ответа DRF.
+  ///
+  /// Ошибки валидации приходят вложенными:
+  /// `{"stops": {"0": ["Точка должна быть внутри базара"]}}`.
+  /// Раньше в исключение уходил `toString()` всей карты, и пользователь видел
+  /// только «Не удалось создать заказ» — без причины.
+  static String? _detailMessage(dynamic data, {int depth = 0}) {
+    if (depth > 4) return null;
+
+    if (data is String) {
+      final value = data.trim();
+      if (value.isEmpty || value.startsWith('<')) return null;
+      // Технические коды вроде only_for_client показывать нет смысла.
+      if (!value.contains(' ')) return null;
+      return value;
+    }
+    if (data is List) {
+      for (final item in data) {
+        final message = _detailMessage(item, depth: depth + 1);
+        if (message != null) return message;
+      }
+      return null;
+    }
+    if (data is Map) {
+      for (final key in const ['detail', 'error', 'message']) {
+        if (data.containsKey(key)) {
+          final message = _detailMessage(data[key], depth: depth + 1);
+          if (message != null) return message;
+        }
+      }
+      for (final value in data.values) {
+        final message = _detailMessage(value, depth: depth + 1);
+        if (message != null) return message;
+      }
+    }
+    return null;
+  }
+
+  static ApiException _asApiException(DioException error, String fallback) {
+    final status = error.response?.statusCode;
+    final detail = _detailMessage(error.response?.data);
+    return ApiException(detail ?? fallback, statusCode: status);
+  }
+
   Future<int> createShipment({
     required String title,
     required String description,
@@ -39,9 +83,7 @@ final class ShipmentsRepository {
       if (parsed == null) throw ApiException('Shipment id не найден в ответе');
       return parsed;
     } on DioException catch (e) {
-      throw ApiException(
-        e.response?.data?.toString() ?? 'Не удалось создать доставку',
-      );
+      throw _asApiException(e, 'Не удалось создать доставку');
     }
   }
 
@@ -60,9 +102,7 @@ final class ShipmentsRepository {
       if (v is bool) return v;
       return (v?.toString() ?? '').toLowerCase() == 'true';
     } on DioException catch (e) {
-      throw ApiException(
-        e.response?.data?.toString() ?? 'Не удалось проверить оплату',
-      );
+      throw _asApiException(e, 'Не удалось проверить оплату');
     }
   }
 }
@@ -198,8 +238,9 @@ extension ShipmentsRepositoryActive on ShipmentsRepository {
 
       return null;
     } on DioException catch (e) {
-      throw ApiException(
-        e.response?.data?.toString() ?? 'Не удалось загрузить доставки',
+      throw ShipmentsRepository._asApiException(
+        e,
+        'Не удалось загрузить доставки',
       );
     }
   }

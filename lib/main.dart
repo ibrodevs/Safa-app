@@ -4,6 +4,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:yandex_maps_mapkit_lite/init.dart' as yandex_init;
+import 'package:yandex_maps_mapkit_lite/mapkit_factory.dart';
+import 'core/map/safa_yandex_map.dart';
 import 'core/design/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
@@ -45,6 +48,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  if (SafaMapKitConfig.isConfigured) {
+    await yandex_init.initMapkit(
+      apiKey: SafaMapKitConfig.apiKey,
+      locale: 'ru_RU',
+    );
+    mapkit.onStart();
+  }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
@@ -86,8 +96,38 @@ Future<void> main() async {
   unawaited(_safeInitServices());
 }
 
-class DoGoApp extends StatelessWidget {
+class DoGoApp extends StatefulWidget {
   const DoGoApp({super.key});
+
+  @override
+  State<DoGoApp> createState() => _DoGoAppState();
+}
+
+class _DoGoAppState extends State<DoGoApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!SafaMapKitConfig.isConfigured) return;
+    if (state == AppLifecycleState.resumed) {
+      mapkit.onStart();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      mapkit.onStop();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (SafaMapKitConfig.isConfigured) mapkit.onTerminate();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

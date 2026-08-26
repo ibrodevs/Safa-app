@@ -3,15 +3,21 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('carrier map refreshes published Safa map for current viewport', () {
+  test('carrier does not request or render backend-authored map layers', () {
     final source = File(
       'lib/features/carrier_module/home/carrier_home_screen.dart',
     ).readAsStringSync();
+    final mapConfig = File(
+      'lib/core/map/safa_yandex_map.dart',
+    ).readAsStringSync();
 
     expect(source, contains('_refreshMarketMapForViewport'));
-    expect(source, contains('_scheduleMarketMapViewportRefresh'));
-    expect(source, contains('onMapReady:'));
-    expect(source, contains('maxContainers: 192'));
-    expect(source, contains('MarketMapRenderData.fromFeatures'));
+    expect(
+      source,
+      contains(
+        'if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;',
+      ),
+    );
+    expect(mapConfig, contains('backendDrawingLayersEnabled = false'));
   });
 }

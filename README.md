@@ -6,8 +6,9 @@ Flutter client for DoGO/SafaApp. The app supports client and carrier registratio
 
 - Flutter SDK matching `environment.sdk` in `pubspec.yaml`
 - Android Studio/Xcode for platform builds
+- JDK 21 for Android builds (required by the official Yandex MapKit plugin)
 - Firebase project configuration
-- Google Maps API keys restricted by Android package `kg.genesis.safa_app` and the iOS bundle identifier
+- Yandex MapKit Mobile SDK key
 
 ## Setup
 
@@ -25,17 +26,19 @@ flutter run --dart-define=DOGO_API_BASE_URL=http://127.0.0.1:8000/api/
 
 Finik uses compile-time `--dart-define` values; no real key is stored in assets or git. See [`docs/FINIK_SETUP.md`](docs/FINIK_SETUP.md) and the backend guide `DoGO/docs/FINIK_CHATFLOW_SETUP.md`.
 
-## Google Maps
+## Yandex MapKit
 
-Android reads `GOOGLE_MAPS_API_KEY` from Gradle properties or environment:
+The client, point picker and carrier screens use the official Yandex MapKit
+Lite Flutter SDK. The Android app contains its restricted mobile MapKit key,
+so normal runs and builds do not require a `MAPKIT_API_KEY` environment value:
 
 ```bash
-GOOGLE_MAPS_API_KEY=your_key flutter run
+flutter run \
+  --dart-define=DOGO_API_BASE_URL=http://127.0.0.1:8000/api/
 ```
 
-iOS has `GoogleMapsApiKey` placeholder in `ios/Runner/Info.plist`; configure the build setting or xcconfig value before enabling Google Maps screens.
-
-The current production map screen still uses the existing `flutter_map` flow while Google Maps configuration is prepared. Do not remove the old map until the Google Maps screen has been fully verified.
+Use a key created specifically for **MapKit — Mobile SDK**. The backend
+`YANDEX_API_KEY` used for geocoding is a separate configuration.
 
 ## Build APK
 
@@ -50,6 +53,10 @@ FINIK_BETA=false \
 ```
 
 Use `release` instead of `debug` only when the release keystore is configured.
+Release builds create separate `armeabi-v7a`, `arm64-v8a`, and `x86_64` APKs,
+with minification, resource shrinking, obfuscation and external debug symbols.
+Install the APK matching the phone CPU; most current Android phones use
+`arm64-v8a`. This is much smaller than a universal debug APK.
 Before compiling, the script checks the live backend Finik endpoint, payment
 flow version, HTTPS callback, beta mode and API-key fingerprint. It therefore
 requires the updated backend to be deployed and reloaded first.
@@ -66,7 +73,6 @@ Release APK requires Android signing files:
 Build release through the same guarded script:
 
 ```bash
-GOOGLE_MAPS_API_KEY=your_key \
 DOGO_API_BASE_URL=https://yourusername.pythonanywhere.com/api/ \
 FINIK_API_KEY=your_production_finik_api_client_key \
 FINIK_BETA=false \
@@ -78,7 +84,7 @@ Install on Android:
 ```bash
 flutter install
 # or
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 ## Firebase

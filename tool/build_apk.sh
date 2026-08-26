@@ -79,11 +79,40 @@ print("Finik backend preflight: OK")
 PY
 
 flutter pub get
-flutter build apk "--$build_mode" \
-  --dart-define="DOGO_API_BASE_URL=$api_base_url" \
-  --dart-define="FINIK_API_KEY=$FINIK_API_KEY" \
-  --dart-define="FINIK_BETA=$FINIK_BETA" \
-  --dart-define="FINIK_ITEM_NAME_EN=$item_name_en"
 
-echo "APK: build/app/outputs/flutter-apk/app-$build_mode.apk"
-shasum -a 256 "build/app/outputs/flutter-apk/app-$build_mode.apk"
+build_args=(
+  apk
+  "--$build_mode"
+  "--dart-define=DOGO_API_BASE_URL=$api_base_url"
+  "--dart-define=FINIK_API_KEY=$FINIK_API_KEY"
+  "--dart-define=FINIK_BETA=$FINIK_BETA"
+  "--dart-define=FINIK_ITEM_NAME_EN=$item_name_en"
+)
+
+if [[ "$build_mode" == "release" ]]; then
+  # A universal APK contains native libraries for every CPU and is especially
+  # large with a map SDK. ABI splits let each phone download only its binaries.
+  build_args+=(
+    --split-per-abi
+    --obfuscate
+    --split-debug-info=build/symbols/android
+  )
+fi
+
+flutter build "${build_args[@]}"
+
+if [[ "$build_mode" == "release" ]]; then
+  apk_files=(build/app/outputs/flutter-apk/app-*-release.apk)
+else
+  apk_files=(build/app/outputs/flutter-apk/app-debug.apk)
+fi
+
+for apk_file in "${apk_files[@]}"; do
+  if [[ ! -f "$apk_file" ]]; then
+    echo "Expected APK was not created: $apk_file" >&2
+    exit 1
+  fi
+  echo "APK: $apk_file"
+  ls -lh "$apk_file"
+  shasum -a 256 "$apk_file"
+done

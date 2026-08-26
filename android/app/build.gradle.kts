@@ -31,10 +31,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
-            project.findProperty("GOOGLE_MAPS_API_KEY") as String?
-                ?: System.getenv("GOOGLE_MAPS_API_KEY")
-                ?: ""
     }
 
     signingConfigs {
@@ -71,4 +67,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    implementation("com.google.android.gms:play-services-location:21.1.0")
 }

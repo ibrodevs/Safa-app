@@ -26,13 +26,19 @@ void main() {
     expect(summary, contains('title: stops[i].compactTitle'));
   });
 
-  test('specialist map refreshes published containers for viewport', () {
+  test('specialist map keeps backend-authored drawing layers disabled', () {
     final source = File(
       'lib/features/carrier_module/home/carrier_home_screen.dart',
     ).readAsStringSync();
+    final map = File('lib/core/map/safa_yandex_map.dart').readAsStringSync();
     expect(source, contains('_refreshMarketMapForViewport'));
-    expect(source, contains('onMapReady:'));
-    expect(source, contains('maxContainers: 192'));
+    expect(
+      source,
+      contains(
+        'if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;',
+      ),
+    );
+    expect(map, contains('backendDrawingLayersEnabled = false'));
   });
 
   test(

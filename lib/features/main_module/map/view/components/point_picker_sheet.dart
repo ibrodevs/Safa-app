@@ -38,6 +38,7 @@ class PointPickerSheet extends StatefulWidget {
     this.headline,
     this.headlineSubtitle,
     this.stopNumber,
+    this.addressOnly = false,
   });
 
   final PointPickerMode mode;
@@ -52,6 +53,10 @@ class PointPickerSheet extends StatefulWidget {
 
   /// Номер остановки для [PointPickerMode.intermediate].
   final int? stopNumber;
+
+  /// Для обычной доставки и тачки клиент выбирает только почтовый адрес.
+  /// Справочники базаров, проходов и контейнеров остаются только у аманата.
+  final bool addressOnly;
 
   @override
   State<PointPickerSheet> createState() => _PointPickerSheetState();
@@ -174,7 +179,7 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
     });
   }
 
-  Future<void> _openMapPicker() async {
+  Future<void> _openMapPicker({bool autofocusSearch = false}) async {
     FocusScope.of(context).unfocus();
 
     final picked = await Navigator.of(context).push<DeliveryPoint>(
@@ -182,6 +187,8 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
         builder: (_) => MapPickerScreen(
           initial: LatLng(widget.lat, widget.lon),
           title: _title,
+          addressOnly: widget.addressOnly,
+          autofocusSearch: autofocusSearch,
         ),
       ),
     );
@@ -192,9 +199,10 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
       _bazar = null;
       _passage = null;
       _container = null;
-      _bazarCtrl.text = picked.bazar?.trim().isNotEmpty == true
-          ? picked.bazar!.trim()
-          : picked.title;
+      // Адрес с карты — это не название базара: подставляем его в поле
+      // только когда пикер вернул контейнер с базаром. Иначе поле остаётся
+      // пустым, а выбранный адрес показывает карточка ниже.
+      _bazarCtrl.text = picked.bazar?.trim() ?? '';
       _containerCtrl.text = picked.container ?? '';
       _passageCtrl.text = picked.passage ?? '';
       _error = null;
@@ -265,8 +273,8 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
 
   bool get _hasSelection =>
       _pickedOnMap != null ||
-      _container != null ||
-      _containerCtrl.text.trim().isNotEmpty;
+      (!widget.addressOnly &&
+          (_container != null || _containerCtrl.text.trim().isNotEmpty));
 
   @override
   Widget build(BuildContext context) {
@@ -296,50 +304,77 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
             Text(widget.headlineSubtitle!, style: AppTypography.caption),
             AppSpacing.gapSm,
           ],
-          RefSuggestField<BazarRef>(
-            controller: _bazarCtrl,
-            hint: widget.mode.bazarHint,
-            label: 'Базар',
-            fetch: _fetchBazars,
-            onSelected: _onBazarSelected,
-            onTextEdited: () {
-              _bazar = null;
-              _pickedOnMap = null;
-            },
-          ),
-          AppSpacing.gapSm,
-          AppSecondaryButton(
-            label: 'Выбрать на карте',
-            icon: Icons.map_outlined,
-            accent: true,
-            size: AppButtonSize.medium,
-            onPressed: _submitting ? null : _openMapPicker,
-          ),
-          AppSpacing.gapLg,
-          const Divider(height: 1, color: AppColors.border),
-          AppSpacing.gapLg,
-          Text('Контейнер и проход', style: AppTypography.cardTitle),
-          AppSpacing.gapSm,
-          RefSuggestField<ContainerRef>(
-            controller: _containerCtrl,
-            hint: 'Номер контейнера',
-            label: 'Контейнер',
-            fetch: _fetchContainers,
-            onSelected: _onContainerSelected,
-            onTextEdited: () {
-              _container = null;
-              if (_error != null) setState(() => _error = null);
-            },
-          ),
-          AppSpacing.gapSm,
-          RefSuggestField<PassageRef>(
-            controller: _passageCtrl,
-            hint: 'Номер прохода',
-            label: 'Проход',
-            fetch: _fetchPassages,
-            onSelected: _onPassageSelected,
-            onTextEdited: () => _passage = null,
-          ),
+          if (widget.addressOnly)
+            Row(
+              children: [
+                Expanded(
+                  child: AppSecondaryButton(
+                    label: 'Поиск адреса',
+                    accent: true,
+                    size: AppButtonSize.medium,
+                    onPressed: _submitting
+                        ? null
+                        : () => _openMapPicker(autofocusSearch: true),
+                  ),
+                ),
+                AppSpacing.hGapXs,
+                Expanded(
+                  child: AppSecondaryButton(
+                    label: 'Выбрать точку',
+                    accent: true,
+                    size: AppButtonSize.medium,
+                    onPressed: _submitting ? null : _openMapPicker,
+                  ),
+                ),
+              ],
+            )
+          else
+            AppSecondaryButton(
+              label: 'Выбрать на карте',
+              icon: Icons.map_outlined,
+              accent: true,
+              size: AppButtonSize.medium,
+              onPressed: _submitting ? null : _openMapPicker,
+            ),
+          if (!widget.addressOnly) ...[
+            AppSpacing.gapSm,
+            RefSuggestField<BazarRef>(
+              controller: _bazarCtrl,
+              hint: widget.mode.bazarHint,
+              label: 'Базар',
+              fetch: _fetchBazars,
+              onSelected: _onBazarSelected,
+              onTextEdited: () {
+                _bazar = null;
+                _pickedOnMap = null;
+              },
+            ),
+            AppSpacing.gapLg,
+            const Divider(height: 1, color: AppColors.border),
+            AppSpacing.gapLg,
+            Text('Контейнер и проход', style: AppTypography.cardTitle),
+            AppSpacing.gapSm,
+            RefSuggestField<ContainerRef>(
+              controller: _containerCtrl,
+              hint: 'Номер контейнера',
+              label: 'Контейнер',
+              fetch: _fetchContainers,
+              onSelected: _onContainerSelected,
+              onTextEdited: () {
+                _container = null;
+                if (_error != null) setState(() => _error = null);
+              },
+            ),
+            AppSpacing.gapSm,
+            RefSuggestField<PassageRef>(
+              controller: _passageCtrl,
+              hint: 'Номер прохода',
+              label: 'Проход',
+              fetch: _fetchPassages,
+              onSelected: _onPassageSelected,
+              onTextEdited: () => _passage = null,
+            ),
+          ],
           if (_pickedOnMap != null) ...[
             AppSpacing.gapMd,
             _PickedOnMapNotice(point: _pickedOnMap!),
@@ -357,7 +392,9 @@ class _PickedOnMapNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final details = point.subtitle.trim();
+    final details = point.compactSubtitle.trim().isNotEmpty
+        ? point.compactSubtitle.trim()
+        : point.subtitle.trim();
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),

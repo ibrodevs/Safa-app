@@ -14,11 +14,30 @@ class DeliveryGeoRepository {
   static final RegExp _coordinateOnlyAddress = RegExp(
     r'^\s*-?\d{1,3}(?:\.\d+)?\s*[,;]\s*-?\d{1,3}(?:\.\d+)?\s*$',
   );
+  static final RegExp _addressLetter = RegExp(r'[A-Za-zА-Яа-яЁё]');
+
+  static bool _isReadableAddress(String value) {
+    final address = value.trim();
+    return address.isNotEmpty &&
+        !_coordinateOnlyAddress.hasMatch(address) &&
+        _addressLetter.hasMatch(address);
+  }
 
   Future<DeliveryReverseGeo> getAddress({
     required double lat,
     required double lon,
+    bool preferPublicAddress = false,
   }) async {
+    if (preferPublicAddress) {
+      try {
+        final json = await _osm.reverseRaw(lat: lat, lon: lon);
+        final external = DeliveryReverseGeo.fromJson(json);
+        if (_isReadableAddress(external.address)) return external;
+      } catch (_) {
+        // Backend остаётся резервом, если внешний геокодер недоступен.
+      }
+    }
+
     // Сначала спрашиваем наш backend. Если точка попала внутрь контейнера,
     // созданного в админ-панели, backend вернёт иерархию Safa:
     // базар → район → проход → контейнер. Это важнее внешнего адреса улицы.
@@ -32,9 +51,7 @@ class DeliveryGeoRepository {
         final json = Map<String, dynamic>.from(data);
         final address = json['address']?.toString().trim() ?? '';
         final source = json['source']?.toString().trim() ?? '';
-        if (address.isNotEmpty &&
-            source != 'coordinates' &&
-            !_coordinateOnlyAddress.hasMatch(address)) {
+        if (source != 'coordinates' && _isReadableAddress(address)) {
           return DeliveryReverseGeo.fromJson(json);
         }
       }
@@ -43,7 +60,9 @@ class DeliveryGeoRepository {
     }
 
     final json = await _osm.reverseRaw(lat: lat, lon: lon);
-    return DeliveryReverseGeo.fromJson(json);
+    final external = DeliveryReverseGeo.fromJson(json);
+    if (_isReadableAddress(external.address)) return external;
+    throw StateError('Readable address was not found for the selected point');
   }
 
   Future<List<DeliveryAutocompleteResult>> autocomplete(String query) async {

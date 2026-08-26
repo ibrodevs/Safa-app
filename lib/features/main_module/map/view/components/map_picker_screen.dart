@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../../core/design/app_design.dart';
+import '../../../../../core/map/safa_yandex_map.dart';
 import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/delivery_point_model.dart';
 import '../../data/model/delivery_refs_models.dart';
@@ -19,19 +20,22 @@ import '../widgets/market_map_layers.dart';
 
 /// Экран выбора точки на карте.
 ///
-/// Логика не изменена: reverse-геокодинг с дебаунсом 650 ms, загрузка
-/// контейнеров по видимой области с дебаунсом 350 ms, отбрасывание устаревших
-/// ответов по номеру запроса, сохранение последних маркеров при сетевой ошибке
-/// и сохранение выбранного контейнера в списке маркеров.
+/// Точка выбирается тапом или перемещением карты. После остановки камеры
+/// выполняется reverse-геокодирование; координаты никогда не используются как
+/// видимая подпись адреса.
 class MapPickerScreen extends StatefulWidget {
   const MapPickerScreen({
     super.key,
     required this.initial,
     this.title = 'Выбор точки',
+    this.addressOnly = false,
+    this.autofocusSearch = false,
   });
 
   final LatLng initial;
   final String title;
+  final bool addressOnly;
+  final bool autofocusSearch;
 
   @override
   State<MapPickerScreen> createState() => _MapPickerScreenState();
@@ -45,13 +49,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   static const int _maxRenderedContainerMarkers = 96;
   static const int _maxRenderedPublishedContainers = 220;
 
-  final MapController _mapController = MapController();
+  final SafaMapController _mapController = SafaMapController();
   final TextEditingController _query = TextEditingController();
   final FocusNode _focus = FocusNode();
   final DeliveryRefsRepository _refsRepository = DeliveryRefsRepository();
   final MarketMapRepository _marketMapRepository = MarketMapRepository();
 
   LatLng _center = const LatLng(42.8746, 74.6122);
+
+  /// Точка, для которой запрошен показанный адрес. Камера после тапа ещё
+  /// анимируется, поэтому подтверждать надо именно её, а не текущий центр.
+  LatLng? _addressPoint;
   double _zoom = 15;
   Timer? _reverseDebounce;
   Timer? _containersDebounce;
@@ -96,13 +104,18 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       context.read<DeliveryAutocompleteProvider>().clearSuggestions();
       _mapController.move(_center, 15);
 
+      _addressPoint = _center;
       await context.read<DeliveryAddressProvider>().fetchPickerHereAddress(
         lat: _center.latitude,
         lon: _center.longitude,
+        preferPublicAddress: widget.addressOnly,
       );
 
       _scheduleContainersRefresh(immediate: true);
       _scheduleMarketMapRefresh(immediate: true);
+      if (widget.autofocusSearch && mounted) {
+        _focus.requestFocus();
+      }
     });
   }
 
@@ -117,19 +130,30 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     super.dispose();
   }
 
-  void _scheduleReverse(LatLng center) {
+  void _scheduleReverse(LatLng center, {bool immediate = false}) {
     _reverseDebounce?.cancel();
-    _reverseDebounce = Timer(const Duration(milliseconds: 650), () {
+
+    void run() {
       if (!mounted) return;
 
+      _addressPoint = center;
       context.read<DeliveryAddressProvider>().fetchPickerHereAddress(
         lat: center.latitude,
         lon: center.longitude,
+        preferPublicAddress: widget.addressOnly,
       );
-    });
+    }
+
+    if (immediate) {
+      run();
+      return;
+    }
+
+    _reverseDebounce = Timer(const Duration(milliseconds: 650), run);
   }
 
   void _scheduleContainersRefresh({bool immediate = false}) {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     _containersDebounce?.cancel();
     _containersDebounce = Timer(
       immediate ? Duration.zero : const Duration(milliseconds: 350),
@@ -138,6 +162,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   void _scheduleMarketMapRefresh({bool immediate = false}) {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     _marketMapDebounce?.cancel();
     _marketMapDebounce = Timer(
       immediate ? Duration.zero : const Duration(milliseconds: 450),
@@ -169,6 +194,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   Future<void> _refreshVisibleContainers() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (!mounted) return;
     if (_containersLoading) {
       _containersRefreshPending = true;
@@ -177,7 +203,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
     late final LatLngBounds bounds;
     try {
-      bounds = _mapController.camera.visibleBounds;
+      bounds = _mapController.visibleBounds!;
     } catch (_) {
       return;
     }
@@ -245,6 +271,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   Future<void> _refreshMarketMap() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (!mounted) return;
     if (_marketMapLoading) {
       _marketMapRefreshPending = true;
@@ -253,7 +280,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
     late final LatLngBounds bounds;
     try {
-      bounds = _mapController.camera.visibleBounds;
+      bounds = _mapController.visibleBounds!;
     } catch (_) {
       return;
     }
@@ -306,14 +333,20 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _scheduleMarketMapRefresh(immediate: true);
   }
 
-  void _moveTo(LatLng point, {double zoom = 16}) {
+  void _moveTo(
+    LatLng point, {
+    double zoom = 16,
+    bool immediateReverse = false,
+  }) {
     setState(() {
       _center = point;
       _selectedContainer = null;
+      _mapMoving = false;
     });
 
+    _mapIdleDebounce?.cancel();
     _mapController.move(point, zoom);
-    _scheduleReverse(point);
+    _scheduleReverse(point, immediate: immediateReverse);
     _scheduleContainersRefresh();
     _scheduleMarketMapRefresh();
   }
@@ -331,6 +364,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     setState(() {
       _selectedContainer = container;
       _center = point;
+      _addressPoint = point;
     });
 
     _mapController.move(point, 17);
@@ -383,11 +417,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       );
     }
 
+    final point = _addressPoint ?? _center;
+
     return DeliveryPoint(
       title: hereAddress.isNotEmpty ? hereAddress : 'Точка на карте',
       subtitle: hereAddress,
-      lat: _center.latitude,
-      lon: _center.longitude,
+      lat: point.latitude,
+      lon: point.longitude,
       bazar: '',
       container: '',
       passage: '',
@@ -403,13 +439,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     final hereAddress = address.pickerHereAddress ?? '';
     final hereLoading = address.pickerLoading;
     final hereError = address.pickerError;
-    final selectedContainer = _selectedContainer;
+    final selectedContainer = SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? _selectedContainer
+        : null;
 
     final topInset = MediaQuery.viewPaddingOf(context).top;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final horizontal = AppResponsive.horizontalPadding(context);
     final showLabels = _zoom >= _containerLabelMinZoom;
-    final marketMap = _marketMapRenderData();
+    final marketMap = SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? _marketMapRenderData()
+        : MarketMapRenderData.empty;
     final hasPublishedContainers = marketMap.hasRenderedContainers;
     final showShapes =
         !_mapMoving &&
@@ -417,136 +457,124 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         (_visibleContainers.length <= _maxRenderedContainerShapes ||
             _zoom >= _containerLabelMinZoom);
 
-    final containerPolygons = _visibleContainers
-        .where((c) => c.latValue != null && c.lonValue != null)
-        .where(
-          (c) =>
-              !hasPublishedContainers &&
-              (selectedContainer?.id == c.id || showShapes),
-        )
-        .map((container) {
-          final selected = selectedContainer?.id == container.id;
-          return Polygon(
-            points: _containerPolygonPoints(
-              container.latValue!,
-              container.lonValue!,
-            ),
-            color: selected
-                ? AppColors.primary.withValues(alpha: 0.16)
-                : AppColors.white.withValues(alpha: 0.2),
-            borderColor: selected ? AppColors.primary : AppColors.textPrimary,
-            borderStrokeWidth: selected ? 2.2 : 1.2,
-          );
-        })
-        .toList();
+    final containerPolygons =
+        (SafaMobileMapFeatures.backendDrawingLayersEnabled
+                ? _visibleContainers
+                : const <ContainerRef>[])
+            .where((c) => c.latValue != null && c.lonValue != null)
+            .where(
+              (c) =>
+                  !hasPublishedContainers &&
+                  (selectedContainer?.id == c.id || showShapes),
+            )
+            .map((container) {
+              final selected = selectedContainer?.id == container.id;
+              return Polygon(
+                points: _containerPolygonPoints(
+                  container.latValue!,
+                  container.lonValue!,
+                ),
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.16)
+                    : AppColors.white.withValues(alpha: 0.2),
+                borderColor: selected
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+                borderStrokeWidth: selected ? 2.2 : 1.2,
+              );
+            })
+            .toList();
 
     final markerLimit = MarketMapRenderData.containerRenderLimitForZoom(_zoom);
-    final markers = _visibleContainers
-        .where((c) => c.latValue != null && c.lonValue != null)
-        .where(
-          (c) =>
-              !_mapMoving ||
-              selectedContainer?.id == c.id ||
-              _visibleContainers.length <= 24,
-        )
-        .take(
-          _mapMoving ? 1 : markerLimit.clamp(0, _maxRenderedContainerMarkers),
-        )
-        .map((container) {
-          final selected = selectedContainer?.id == container.id;
-          final hideLooseVisual = hasPublishedContainers;
-          return Marker(
-            point: LatLng(container.latValue!, container.lonValue!),
-            width: ContainerMapMarker.hitSize,
-            height: ContainerMapMarker.hitSize,
-            alignment: Alignment.center,
-            child: hideLooseVisual
-                ? _ContainerTapTarget(
-                    container: container,
-                    onTap: () => _selectContainer(container),
-                  )
-                : ContainerMapMarker(
-                    container: container,
-                    selected: selected,
-                    showLabel: showLabels && !hasPublishedContainers,
-                    onTap: () => _selectContainer(container),
-                  ),
-          );
-        })
-        .toList();
+    final markers =
+        (SafaMobileMapFeatures.backendDrawingLayersEnabled
+                ? _visibleContainers
+                : const <ContainerRef>[])
+            .where((c) => c.latValue != null && c.lonValue != null)
+            .where(
+              (c) =>
+                  !_mapMoving ||
+                  selectedContainer?.id == c.id ||
+                  _visibleContainers.length <= 24,
+            )
+            .take(
+              _mapMoving
+                  ? 1
+                  : markerLimit.clamp(0, _maxRenderedContainerMarkers),
+            )
+            .map((container) {
+              final selected = selectedContainer?.id == container.id;
+              final hideLooseVisual = hasPublishedContainers;
+              return SafaMapMarker(
+                id: 'picker-container-${container.id}',
+                point: LatLng(container.latValue!, container.lonValue!),
+                width: ContainerMapMarker.hitSize,
+                height: ContainerMapMarker.hitSize,
+                alignment: Alignment.center,
+                onTap: () => _selectContainer(container),
+                visualKey:
+                    '$selected-$hideLooseVisual-$showLabels-${container.number}',
+                child: hideLooseVisual
+                    ? _ContainerTapTarget(
+                        container: container,
+                        onTap: () => _selectContainer(container),
+                      )
+                    : ContainerMapMarker(
+                        container: container,
+                        selected: selected,
+                        showLabel: showLabels && !hasPublishedContainers,
+                        onTap: () => _selectContainer(container),
+                      ),
+              );
+            })
+            .toList();
 
-    final mapMarkers = <Marker>[...marketMap.markers, ...markers];
+    final mapMarkers = <SafaMapMarker>[...marketMap.markers, ...markers];
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 15,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-              onMapReady: () {
-                _scheduleContainersRefresh(immediate: true);
-                _scheduleMarketMapRefresh(immediate: true);
-              },
-              onPositionChanged: (position, hasGesture) {
-                _center = position.center;
+          SafaYandexMap(
+            controller: _mapController,
+            initialCenter: _center,
+            initialZoom: 15,
+            // Тап по карте — это явный выбор точки: адрес запрашиваем сразу
+            // для тапнутых координат, не дожидаясь конца анимации камеры.
+            onTap: (point) =>
+                _moveTo(point, zoom: _zoom, immediateReverse: true),
+            onPositionChanged: (position, hasGesture) {
+              _center = position.center;
 
-                if (hasGesture) {
-                  if (!_mapMoving && mounted) {
-                    setState(() => _mapMoving = true);
-                  }
-                  if (_selectedContainer != null) {
-                    setState(() => _selectedContainer = null);
-                  }
-                  _scheduleMapIdle(position.center);
+              if (hasGesture) {
+                if (!_mapMoving && mounted) {
+                  setState(() => _mapMoving = true);
                 }
+                if (_selectedContainer != null) {
+                  setState(() => _selectedContainer = null);
+                }
+                _scheduleMapIdle(position.center);
+              }
 
-                final wasLabelled = _zoom >= _containerLabelMinZoom;
-                final isLabelled = position.zoom >= _containerLabelMinZoom;
-                final oldZoomBucket = _zoom.floor();
-                final newZoomBucket = position.zoom.floor();
-                _zoom = position.zoom;
-                if ((wasLabelled != isLabelled ||
-                        oldZoomBucket != newZoomBucket) &&
-                    mounted) {
-                  setState(() {});
-                }
+              final wasLabelled = _zoom >= _containerLabelMinZoom;
+              final isLabelled = position.zoom >= _containerLabelMinZoom;
+              final oldZoomBucket = _zoom.floor();
+              final newZoomBucket = position.zoom.floor();
+              _zoom = position.zoom;
+              if ((wasLabelled != isLabelled ||
+                      oldZoomBucket != newZoomBucket) &&
+                  mounted) {
+                setState(() {});
+              }
 
-                if (!hasGesture) {
-                  _scheduleContainersRefresh();
-                  _scheduleMarketMapRefresh();
-                }
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                userAgentPackageName: 'kg.genesis.dogo',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                panBuffer: 0,
-                keepBuffer: 1,
-                tileDisplay: const TileDisplay.instantaneous(),
-              ),
-              if (marketMap.polygons.isNotEmpty)
-                PolygonLayer(
-                  polygons: marketMap.polygons,
-                  simplificationTolerance: 1.2,
-                ),
-              if (marketMap.polylines.isNotEmpty)
-                PolylineLayer(
-                  polylines: marketMap.polylines,
-                  simplificationTolerance: 1.2,
-                ),
-              if (containerPolygons.isNotEmpty)
-                PolygonLayer(polygons: containerPolygons),
-              if (mapMarkers.isNotEmpty) MarkerLayer(markers: mapMarkers),
-            ],
+              if (!hasGesture) {
+                _scheduleContainersRefresh();
+                _scheduleMarketMapRefresh();
+              }
+            },
+            polygons: [...marketMap.polygons, ...containerPolygons],
+            polylines: marketMap.polylines,
+            markers: mapMarkers,
           ),
 
           // Центральный маркер выбора — виден, пока контейнер не выбран.
@@ -590,17 +618,18 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   ),
                 ],
                 AppSpacing.gapXs,
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: AppMapStatusChip(
-                    label: _containersLoading
-                        ? 'Контейнеры…'
-                        : _marketMapLoading
-                        ? 'Карта базара…'
-                        : 'Контейнеры: ${_visibleContainers.length}',
-                    loading: _containersLoading || _marketMapLoading,
+                if (SafaMobileMapFeatures.backendDrawingLayersEnabled)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: AppMapStatusChip(
+                      label: _containersLoading
+                          ? 'Контейнеры…'
+                          : _marketMapLoading
+                          ? 'Карта базара…'
+                          : 'Контейнеры: ${_visibleContainers.length}',
+                      loading: _containersLoading || _marketMapLoading,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -621,9 +650,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               containerDetails: selectedContainer == null
                   ? null
                   : _containerDetails(selectedContainer),
-              onConfirm: () => Navigator.of(
-                context,
-              ).pop(_buildPickedPoint(hereAddress: hereAddress)),
+              onConfirm:
+                  !hereLoading && hereError == null && hereAddress.isNotEmpty
+                  ? () => Navigator.of(
+                      context,
+                    ).pop(_buildPickedPoint(hereAddress: hereAddress))
+                  : null,
             ),
           ),
         ],
@@ -838,7 +870,7 @@ class _PickerBottomCard extends StatelessWidget {
   final String? hereError;
   final String? containerSubtitle;
   final String? containerDetails;
-  final VoidCallback onConfirm;
+  final VoidCallback? onConfirm;
 
   /// Текст кнопки зависит от того, что именно выбрано.
   String get _actionLabel {
@@ -908,6 +940,8 @@ class _PickerBottomCard extends StatelessWidget {
             label: _actionLabel,
             size: AppButtonSize.medium,
             onPressed: onConfirm,
+            loading: hereLoading,
+            loadingLabel: 'Определяем адрес…',
           ),
         ],
       ),

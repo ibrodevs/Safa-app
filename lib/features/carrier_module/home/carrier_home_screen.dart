@@ -11,7 +11,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/services/order_alert_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/map/safa_yandex_map.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
@@ -65,7 +67,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   static const _accent = AppColors.primary;
 
   final LatLng _bishkekCenter = const LatLng(42.8746, 74.6122);
-  final MapController _mapController = MapController();
+  final SafaMapController _mapController = SafaMapController();
   final MarketMapRepository _marketMapRepository = MarketMapRepository();
 
   double _myLat = 42.8746;
@@ -103,7 +105,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   Timer? _pollTimer;
 
   bool _routing = false;
+  bool _acceptingOrder = false;
+
+  /// Маршрут, который не удалось построить из-за уже идущего расчёта.
+  /// Без этого смена точки во время построения предыдущего плеча оставляла
+  /// на карте старую линию.
+  List<LatLng>? _pendingRoutePoints;
   bool _didFitOnce = false;
+
+  /// Точка маршрута, на которую уже наводили камеру. Смена цели должна
+  /// заново показать плечо «я → следующая точка».
+  int? _fittedStopIndex;
   String? _routeSignature;
   List<LatLng> _routePoints = const [];
   LatLng? _lastRouteOrigin;
@@ -148,7 +160,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   void _handlePushEvent(Map<String, dynamic> data) {
     final type = data['type']?.toString();
     final eventShipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
-    if (type == 'shipment_offer' && !_hasActive) {
+    if (type == 'shipment_offer' && !_hasActive && !_showWelcome) {
       unawaited(_refreshNearbySilently());
     } else if (type == 'shipment_status' && eventShipmentId == _activeId) {
       unawaited(_poll(eventShipmentId!));
@@ -207,6 +219,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           _nearby = const [];
           _nearbyIndex = 0;
         });
+        _stopOrderAlert();
         _startPolling(parsed.id);
         await _syncRouteAndCameraForActive();
         return;
@@ -226,6 +239,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     _posSub?.cancel();
     _pushSub?.cancel();
     _shipmentRealtime.dispose();
+    unawaited(OrderAlertService.instance.stop());
     super.dispose();
   }
 
@@ -461,18 +475,11 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     if (_hasActive || _nearbyRefreshInFlight) return;
     _nearbyRefreshInFlight = true;
     try {
-      final ok = await _ensureLocationPermission();
-      if (!ok) return;
-
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-
       final page = await ApiService.instance.getNearbyShipments(
-        lat: pos.latitude,
-        lon: pos.longitude,
+        // Координаты влияют только на сортировку. Нельзя прекращать опрос
+        // свободных заказов из-за временно недоступного GPS.
+        lat: _myLat,
+        lon: _myLon,
       );
 
       final rejectedIds = await _getRejectedIds();
@@ -482,8 +489,15 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           .toList();
 
       if (!mounted) return;
+      // За время сетевого запроса специалист мог уже принять заказ. Старый
+      // ответ ленты не должен снова запускать звук и вибрацию.
+      if (_hasActive || _acceptingOrder) {
+        _stopOrderAlert();
+        return;
+      }
 
       if (filteredResults.isEmpty) {
+        _stopOrderAlert();
         if (_nearby.isEmpty && _showEmptyOrders) return;
         setState(() {
           _nearby = const [];
@@ -516,7 +530,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           ),
         ),
       );
-      if (_nearbyUiHash == nextUiHash && !_showEmptyOrders) return;
+      if (_nearbyUiHash == nextUiHash && !_showEmptyOrders) {
+        _syncOrderAlert();
+        return;
+      }
 
       setState(() {
         _showEmptyOrders = false;
@@ -526,8 +543,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _nearbyIndex = 0;
         _nearbyUiHash = nextUiHash;
 
-        _myLat = pos.latitude;
-        _myLon = pos.longitude;
         _centerLat = _myLat;
         _centerLon = _myLon;
 
@@ -536,6 +551,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _routePoints = const [];
       });
 
+      _syncOrderAlert();
       await _syncRouteAndCameraForNearby();
     } catch (_) {
       // Следующий push или короткий polling повторит запрос.
@@ -569,6 +585,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 
       if (filteredResults.isEmpty) {
         if (!mounted) return;
+        _stopOrderAlert();
         setState(() {
           _nearby = const [];
           _nearbyIndex = 0;
@@ -598,6 +615,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       // появляться без перезапуска приложения.
       _startNearbyPolling();
 
+      _syncOrderAlert();
       await _syncRouteAndCameraForNearby();
     } catch (e) {
       if (!mounted) return;
@@ -615,6 +633,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     final currentId = _currentNearby?.id;
 
     // Immediate feedback
+    _stopOrderAlert();
     setState(() {
       _routePoints = const [];
       _routeSignature = null;
@@ -629,8 +648,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   }
 
   Future<void> _acceptCurrent() async {
+    if (_acceptingOrder) return;
     final s = _currentNearby;
     if (s == null) return;
+    // Сигнал звучит до принятия заказа — гасим его сразу по нажатию,
+    // не дожидаясь ответа сервера.
+    _stopOrderAlert();
+    setState(() => _acceptingOrder = true);
     try {
       final raw = await _acceptRaw(s.id);
       final parsed = _parseActive(raw, fallbackIndex: 0);
@@ -652,12 +676,25 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _routeSignature = null;
         _routePoints = const [];
       });
+      // Повторно гасим сигнал после фиксации активного заказа: это закрывает
+      // гонку с уже выполнявшимся запросом ленты свободных заказов.
+      _stopOrderAlert();
       _startPolling(parsed.id);
       await _initLocation();
       await _syncRouteAndCameraForActive();
     } catch (e) {
       if (!mounted) return;
+      // Если принятие действительно не состоялось, снова разрешаем ленте
+      // показать свободный заказ и возобновить сигнал для него.
+      setState(() => _acceptingOrder = false);
+      await _refreshNearbySilently();
+      if (!mounted) return;
+      _syncOrderAlert();
       AppSnackBar.showError(context, error: e);
+    } finally {
+      if (mounted && _acceptingOrder) {
+        setState(() => _acceptingOrder = false);
+      }
     }
   }
 
@@ -713,6 +750,22 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     }
   }
 
+  /// Включает звук и вибрацию для показанного заказа.
+  ///
+  /// Сигнал держится, пока специалист не примет или не отклонит заявку:
+  /// поэтому ключом служит id заказа, а повторные опросы ленты трек не
+  /// перезапускают.
+  void _syncOrderAlert() {
+    final shipment = _hasActive || _acceptingOrder ? null : _currentNearby;
+    if (shipment == null) {
+      unawaited(OrderAlertService.instance.stop());
+      return;
+    }
+    unawaited(OrderAlertService.instance.start(shipment.id));
+  }
+
+  void _stopOrderAlert() => unawaited(OrderAlertService.instance.stop());
+
   void _startNearbyPolling() {
     _nearbyPollTimer?.cancel();
     _nearbyPollTimer = Timer.periodic(
@@ -745,6 +798,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       _showWelcome = true;
 
       _didFitOnce = false;
+      _fittedStopIndex = null;
+      _pendingRoutePoints = null;
       _routeSignature = null;
       _routePoints = const [];
       _lastRouteOrigin = null;
@@ -871,43 +926,46 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       ),
     );
 
-    const profiles = <String>['foot', 'walking', 'driving'];
     final coords = '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
 
-    for (final profile in profiles) {
-      try {
-        final resp = await dio.get(
-          'https://router.project-osrm.org/route/v1/$profile/$coords',
-          queryParameters: {
-            'overview': 'full',
-            'geometries': 'geojson',
-            'steps': 'false',
-          },
-        );
+    try {
+      final resp = await dio.get(
+        'https://router.project-osrm.org/route/v1/driving/$coords',
+        queryParameters: {
+          'overview': 'full',
+          'geometries': 'geojson',
+          'steps': 'false',
+          'alternatives': 'false',
+          'continue_straight': 'false',
+          'radiuses': 'unlimited;unlimited',
+        },
+      );
 
-        final data = resp.data;
-        final routes = (data is Map) ? data['routes'] : null;
-        if (routes is! List || routes.isEmpty) continue;
+      final data = resp.data;
+      final routes = (data is Map) ? data['routes'] : null;
+      if (routes is! List || routes.isEmpty) return const [];
 
-        final geom = routes.first['geometry'];
-        final coordsList = (geom is Map) ? geom['coordinates'] : null;
-        if (coordsList is! List) continue;
+      final geom = routes.first['geometry'];
+      final coordsList = (geom is Map) ? geom['coordinates'] : null;
+      if (coordsList is! List) return const [];
 
-        final out = <LatLng>[];
-        for (final c in coordsList) {
-          if (c is! List || c.length < 2) continue;
-          final lon = (c[0] as num).toDouble();
-          final lat = (c[1] as num).toDouble();
-          out.add(LatLng(lat, lon));
-        }
-        if (out.isNotEmpty) return out;
-      } catch (_) {}
+      final out = <LatLng>[];
+      for (final c in coordsList) {
+        if (c is! List || c.length < 2) continue;
+        final lon = (c[0] as num).toDouble();
+        final lat = (c[1] as num).toDouble();
+        out.add(LatLng(lat, lon));
+      }
+      if (out.length >= 2) return out;
+    } catch (_) {
+      // Не рисуем прямую линию через здания, если дорожный сервис недоступен.
     }
 
     return const [];
   }
 
   Future<void> _loadMarketMapForPoints(List<LatLng> pts) async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (_marketMapLoading || pts.isEmpty) return;
     final hash = Object.hashAll(
       pts.map(
@@ -956,6 +1014,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   }
 
   void _scheduleMarketMapViewportRefresh({bool immediate = false}) {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     _marketMapViewportDebounce?.cancel();
     _marketMapViewportDebounce = Timer(
       immediate ? Duration.zero : const Duration(milliseconds: 420),
@@ -972,6 +1031,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   }
 
   Future<void> _refreshMarketMapForViewport() async {
+    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
     if (!mounted) return;
     if (_marketMapViewportLoading) {
       _marketMapViewportRefreshPending = true;
@@ -980,7 +1040,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 
     late final LatLngBounds bounds;
     try {
-      bounds = _mapController.camera.visibleBounds;
+      bounds = _mapController.visibleBounds!;
     } catch (_) {
       return;
     }
@@ -1166,7 +1226,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       if (leg.isEmpty) {
         leg = await _buildOsrmLegRoute(a: a, b: b);
       }
-      if (leg.isEmpty) leg = [a, b];
+      if (leg.isEmpty) return const [];
 
       if (full.isEmpty) {
         full.addAll(leg);
@@ -1219,9 +1279,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     final padding = EdgeInsets.fromLTRB(36, 90, 36, 320 + bottomSafe);
 
     try {
-      _mapController.fitCamera(
-        CameraFit.bounds(bounds: bounds, padding: padding, maxZoom: 17),
-      );
+      _mapController.fitBounds(bounds, padding: padding, maxZoom: 17);
     } catch (_) {
       _mapController.move(clean.first, 15);
     }
@@ -1238,10 +1296,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     await _syncRouteAndCameraCommon(pts);
   }
 
+  /// Маршрут активного заказа: от текущей геопозиции специалиста до точки,
+  /// к которой он едет сейчас. После `advance` цель сдвигается на следующую
+  /// остановку, и линия перестраивается от нового местоположения.
   Future<void> _syncRouteAndCameraForActive() async {
     _lastRouteOrigin = LatLng(_myLat, _myLon);
     if (_activeStatus == ShipmentStatus.awaitingPayment ||
         _activeStatus == ShipmentStatus.completed) {
+      _fittedStopIndex = null;
       if (_routePoints.isNotEmpty && mounted) {
         setState(() => _routePoints = const []);
       }
@@ -1250,6 +1312,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     final stopPoints = _pointsFromStops(_activeStops);
     if (stopPoints.isEmpty) return;
     final targetIndex = _activeCurrentStopIndex.clamp(0, stopPoints.length - 1);
+
+    // Сменилась цель — снова показываем всё плечо целиком.
+    if (_fittedStopIndex != targetIndex) {
+      _fittedStopIndex = targetIndex;
+      _didFitOnce = false;
+    }
+
     final pts = <LatLng>[LatLng(_myLat, _myLon), stopPoints[targetIndex]];
     await _syncRouteAndCameraCommon(pts);
   }
@@ -1271,17 +1340,32 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 
     final sig = _signature(pts);
     if (_routeSignature == sig) return;
-    if (_routing) return;
+    if (_routing) {
+      // Построение плеча идёт по сети и занимает секунды. Запоминаем цель,
+      // чтобы после текущего расчёта сразу перестроить линию, а не оставить
+      // на карте маршрут до предыдущей точки.
+      _pendingRoutePoints = pts;
+      return;
+    }
     _routing = true;
 
     try {
-      final route = await _buildRouteMultiLeg(pts);
-      if (!mounted) return;
+      var target = pts;
+      while (true) {
+        final route = await _buildRouteMultiLeg(target);
+        if (!mounted) return;
 
-      setState(() {
-        _routeSignature = sig;
-        _routePoints = route.isNotEmpty ? route : pts;
-      });
+        final targetSignature = _signature(target);
+        setState(() {
+          _routeSignature = targetSignature;
+          _routePoints = route;
+        });
+
+        final pending = _pendingRoutePoints;
+        _pendingRoutePoints = null;
+        if (pending == null || _signature(pending) == targetSignature) break;
+        target = pending;
+      }
     } finally {
       _routing = false;
     }
@@ -1325,7 +1409,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     final padding = MediaQuery.viewPaddingOf(context);
     final bottomSafe = padding.bottom;
 
-    final markers = <Marker>[];
+    final markers = <SafaMapMarker>[];
 
     final stopPts = <LatLng>[];
     if (_hasActive) {
@@ -1342,27 +1426,57 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       }
     }
 
-    for (final p in stopPts) {
+    // Точка, к которой специалист едет прямо сейчас, подсвечивается — иначе
+    // на маршруте из нескольких остановок непонятно, какая из них следующая.
+    final targetStopIndex = _hasActive && stopPts.isNotEmpty
+        ? _activeCurrentStopIndex.clamp(0, stopPts.length - 1)
+        : -1;
+
+    for (var index = 0; index < stopPts.length; index += 1) {
+      final p = stopPts[index];
+      final isTarget = index == targetStopIndex;
       markers.add(
-        Marker(
+        SafaMapMarker(
+          id: 'carrier-stop-$index',
           point: p,
-          width: 26,
-          height: 26,
+          width: isTarget ? 34 : 26,
+          height: isTarget ? 34 : 26,
           alignment: Alignment.center,
-          child: const _StopDot(),
+          visualKey: 'stop-$isTarget',
+          zIndex: isTarget ? 32 : 30,
+          child: _StopDot(active: isTarget),
         ),
       );
     }
 
-    final marketMap = _mapMoving
-        ? MarketMapRenderData.empty
-        : _marketMapRenderCache ??= MarketMapRenderData.fromFeatures(
-            _marketMapFeatures,
-            zoom: _zoom,
-            center: LatLng(_centerLat, _centerLon),
-            maxContainerFeatures: 48,
-            showLabels: true,
-          );
+    // Собственная позиция специалиста: маршрут строится от неё, и без маркера
+    // невозможно понять, откуда идёт линия.
+    if (_hasActive || _currentNearby != null) {
+      markers.add(
+        SafaMapMarker(
+          id: 'carrier-me',
+          point: LatLng(_myLat, _myLon),
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          visualKey: 'me',
+          zIndex: 34,
+          child: const _MeDot(),
+        ),
+      );
+    }
+
+    final marketMap = SafaMobileMapFeatures.backendDrawingLayersEnabled
+        ? (_mapMoving
+              ? MarketMapRenderData.empty
+              : _marketMapRenderCache ??= MarketMapRenderData.fromFeatures(
+                  _marketMapFeatures,
+                  zoom: _zoom,
+                  center: LatLng(_centerLat, _centerLon),
+                  maxContainerFeatures: 48,
+                  showLabels: true,
+                ))
+        : MarketMapRenderData.empty;
 
     Widget bottom;
     if (_showWelcome) {
@@ -1372,6 +1486,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         shipment: _currentNearby!,
         accent: _accent,
         routeLoading: _routing,
+        accepting: _acceptingOrder,
         onAccept: _acceptCurrent,
         onReject: _rejectNearby,
       );
@@ -1413,88 +1528,58 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: LatLng(_centerLat, _centerLon),
-              initialZoom: 15,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-              onMapReady: () =>
-                  _scheduleMarketMapViewportRefresh(immediate: true),
-              onPositionChanged: (pos, hasGesture) {
-                _centerLat = pos.center.latitude;
-                _centerLon = pos.center.longitude;
-                final oldZoomBucket = _zoom.floor();
-                _zoom = pos.zoom;
-                if (hasGesture) {
-                  if (!_mapMoving) {
-                    _mapMoving = true;
-                    _marketMapRenderCache = null;
-                    if (mounted) setState(() {});
-                  }
-                  _mapIdleDebounce?.cancel();
-                  _mapIdleDebounce = Timer(
-                    const Duration(milliseconds: 200),
-                    () {
-                      if (!mounted) return;
-                      setState(() {
-                        _mapMoving = false;
-                        _marketMapRenderCache = null;
-                      });
-                      _scheduleMarketMapViewportRefresh(immediate: true);
-                    },
-                  );
-                }
-                if (oldZoomBucket != _zoom.floor()) {
+          SafaYandexMap(
+            controller: _mapController,
+            initialCenter: LatLng(_centerLat, _centerLon),
+            initialZoom: 15,
+            // Слои базара подгружаются, как только карта готова: до этого
+            // visibleBounds ещё не определены и запрос уходил впустую.
+            onMapReady: () =>
+                _scheduleMarketMapViewportRefresh(immediate: true),
+            onPositionChanged: (pos, hasGesture) {
+              _centerLat = pos.center.latitude;
+              _centerLon = pos.center.longitude;
+              final oldZoomBucket = _zoom.floor();
+              _zoom = pos.zoom;
+              if (hasGesture) {
+                if (!_mapMoving) {
+                  _mapMoving = true;
                   _marketMapRenderCache = null;
                   if (mounted) setState(() {});
                 }
-                if (!hasGesture) _scheduleMarketMapViewportRefresh();
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                userAgentPackageName: 'kg.genesis.dogo',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                panBuffer: 0,
-                keepBuffer: 1,
-                tileDisplay: const TileDisplay.instantaneous(),
-              ),
-              if (marketMap.polygons.isNotEmpty)
-                PolygonLayer(
-                  polygons: marketMap.polygons,
-                  simplificationTolerance: 1.2,
-                ),
-              if (marketMap.polylines.isNotEmpty)
-                PolylineLayer(
-                  polylines: marketMap.polylines,
-                  simplificationTolerance: 1.2,
-                ),
-
+                _mapIdleDebounce?.cancel();
+                _mapIdleDebounce = Timer(const Duration(milliseconds: 200), () {
+                  if (!mounted) return;
+                  setState(() {
+                    _mapMoving = false;
+                    _marketMapRenderCache = null;
+                  });
+                  _scheduleMarketMapViewportRefresh(immediate: true);
+                });
+              }
+              if (oldZoomBucket != _zoom.floor()) {
+                _marketMapRenderCache = null;
+                if (mounted) setState(() {});
+              }
+              if (!hasGesture) _scheduleMarketMapViewportRefresh();
+            },
+            polygons: marketMap.polygons,
+            polylines: [
+              ...marketMap.polylines,
               if (_routePoints.isNotEmpty) ...[
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 5,
-                      color: Colors.black.withValues(alpha: 0.15),
-                    ),
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 3,
-                      color: Colors.white,
-                    ),
-                  ],
+                Polyline(
+                  points: _routePoints,
+                  strokeWidth: 6,
+                  color: AppColors.routeLineHalo,
+                ),
+                Polyline(
+                  points: _routePoints,
+                  strokeWidth: 3.5,
+                  color: AppColors.primary,
                 ),
               ],
-              if (marketMap.markers.isNotEmpty)
-                MarkerLayer(markers: marketMap.markers),
-              if (markers.isNotEmpty) MarkerLayer(markers: markers),
             ],
+            markers: [...marketMap.markers, ...markers],
           ),
           Positioned.fill(
             child: IgnorePointer(
@@ -1534,20 +1619,47 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 }
 
 class _StopDot extends StatelessWidget {
-  const _StopDot();
+  const _StopDot({this.active = false});
+
+  /// Следующая точка маршрута — крупнее и в акцентном цвете.
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 22,
-      height: 22,
+      width: active ? 30 : 22,
+      height: active ? 30 : 22,
       decoration: BoxDecoration(
-        color: const Color(0xFFF6D9C8),
+        color: active ? AppColors.primary : const Color(0xFFF6D9C8),
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
         boxShadow: const [
           BoxShadow(
             color: Color(0x22000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeDot extends StatelessWidget {
+  const _MeDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -1668,6 +1780,7 @@ class _ShipmentSheet extends StatelessWidget {
     required this.shipment,
     required this.accent,
     required this.routeLoading,
+    required this.accepting,
     required this.onAccept,
     required this.onReject,
   });
@@ -1675,6 +1788,7 @@ class _ShipmentSheet extends StatelessWidget {
   final NearbyShipment shipment;
   final Color accent;
   final bool routeLoading;
+  final bool accepting;
   final VoidCallback onAccept;
   final VoidCallback onReject;
 
@@ -1799,7 +1913,7 @@ class _ShipmentSheet extends StatelessWidget {
             height: 52,
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: onAccept,
+              onPressed: accepting ? null : onAccept,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accent,
                 foregroundColor: Colors.white,
@@ -1808,10 +1922,21 @@ class _ShipmentSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                 ),
               ),
-              child: const Text(
-                'Забрать заказ',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-              ),
+              child: accepting
+                  ? const SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Забрать заказ',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 10),

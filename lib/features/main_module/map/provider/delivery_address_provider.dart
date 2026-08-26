@@ -14,6 +14,8 @@ class DeliveryAddressProvider extends ChangeNotifier {
   DeliveryReverseGeo? _pickerHere;
   bool _pickerLoading = false;
   String? _pickerError;
+  int _gpsRequestSerial = 0;
+  int _pickerRequestSerial = 0;
 
   String? _fromAddress;
   double? _fromLat;
@@ -55,48 +57,71 @@ class DeliveryAddressProvider extends ChangeNotifier {
   Future<void> fetchGpsHereAddress({
     required double lat,
     required double lon,
+    bool preferPublicAddress = false,
   }) async {
+    final serial = ++_gpsRequestSerial;
     _gpsLoading = true;
     _gpsError = null;
+    _gpsHere = null;
     notifyListeners();
     try {
       debugPrint('reverse GPS: lat=$lat lon=$lon');
-      final result = await _repo.getAddress(lat: lat, lon: lon);
+      final result = await _repo.getAddress(
+        lat: lat,
+        lon: lon,
+        preferPublicAddress: preferPublicAddress,
+      );
+      if (serial != _gpsRequestSerial) return;
       debugPrint('reverse GPS ok: ${result.address}');
       _gpsHere = result;
     } catch (e, st) {
+      if (serial != _gpsRequestSerial) return;
       _gpsError = e.toString();
       debugPrint('fetchGpsHereAddress error: $e\n$st');
       _gpsHere = null;
     } finally {
-      _gpsLoading = false;
-      notifyListeners();
+      if (serial == _gpsRequestSerial) {
+        _gpsLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> fetchPickerHereAddress({
     required double lat,
     required double lon,
+    bool preferPublicAddress = false,
   }) async {
+    final serial = ++_pickerRequestSerial;
     _pickerLoading = true;
     _pickerError = null;
+    _pickerHere = null;
     notifyListeners();
     try {
       debugPrint('reverse PICKER: lat=$lat lon=$lon');
-      final result = await _repo.getAddress(lat: lat, lon: lon);
+      final result = await _repo.getAddress(
+        lat: lat,
+        lon: lon,
+        preferPublicAddress: preferPublicAddress,
+      );
+      if (serial != _pickerRequestSerial) return;
       debugPrint('reverse PICKER ok: ${result.address}');
       _pickerHere = result;
     } catch (e, st) {
+      if (serial != _pickerRequestSerial) return;
       _pickerError = e.toString();
       debugPrint('fetchPickerHereAddress error: $e\n$st');
       _pickerHere = null;
     } finally {
-      _pickerLoading = false;
-      notifyListeners();
+      if (serial == _pickerRequestSerial) {
+        _pickerLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   void clearPickerHere() {
+    _pickerRequestSerial += 1;
     _pickerHere = null;
     _pickerError = null;
     _pickerLoading = false;

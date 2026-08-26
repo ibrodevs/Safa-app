@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../../data/notifications/service/push_service.dart';
-import '../widgets/header_empty_row.dart';
+import '../widgets/carrier_empty_state.dart';
 
 class EmptyOrdersScreen extends StatelessWidget {
   const EmptyOrdersScreen({super.key});
@@ -91,52 +91,10 @@ class _EmptyOrdersBodyState extends State<_EmptyOrdersBody> {
           strokeWidth: 2.4,
           displacement: 32,
           onRefresh: () => context.read<ProfileProvider>().loadProfile(),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                HeaderEmptyRow(avatarUrl: avatarUrl, title: greeting),
-                const SizedBox(height: 260),
-                const Center(
-                  child: Text(
-                    'Пока нет активных\nзаказов',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontFamily: 'SFProDisplay',
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: _leaveLine,
-                    icon: const Icon(Icons.power_settings_new_rounded),
-                    label: const Text(
-                      'Выйти с линии',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red, width: 1.4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: CarrierEmptyState(
+            greeting: greeting,
+            avatarUrl: avatarUrl,
+            onLeaveLine: _leaveLine,
           ),
         ),
       ),

@@ -14,10 +14,12 @@ class ShipmentPaymentSheet extends StatefulWidget {
     super.key,
     required this.shipmentId,
     required this.amount,
+    required this.onPaymentConfirmed,
   });
 
   final int shipmentId;
   final int amount;
+  final Future<void> Function() onPaymentConfirmed;
 
   @override
   State<ShipmentPaymentSheet> createState() => _ShipmentPaymentSheetState();
@@ -45,7 +47,12 @@ class _ShipmentPaymentSheetState extends State<ShipmentPaymentSheet> {
       if (!mounted) return;
 
       // Результат оплаты подхватывается поллингом статуса заказа.
-      await GoRouter.of(context).pushNamed<bool>('finik_pay');
+      final paid = await GoRouter.of(context).pushNamed<bool>('finik_pay');
+      if (paid == true) {
+        // Не ждём очередного фонового тика: backend уже подтвердил платёж и
+        // перевёл заказ в completed, поэтому сразу обновляем экран заказа.
+        await widget.onPaymentConfirmed();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(
