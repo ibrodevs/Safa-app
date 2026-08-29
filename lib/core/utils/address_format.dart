@@ -17,13 +17,11 @@ const Set<String> _countryNames = {
   'российская федерация',
   'узбекистан',
   'таджикистан',
-  'китай',
   'kyrgyzstan',
   'kazakhstan',
   'russia',
   'uzbekistan',
   'tajikistan',
-  'china',
 };
 
 bool _isNoisePart(String part) {
@@ -45,7 +43,36 @@ String formatReadableAddress(String? raw) {
       .where((part) => part.isNotEmpty)
       .toList();
 
-  final cleaned = parts.join(', ');
+  if (parts.isEmpty) return source;
+
+  // Попробуем привести части в более читаемый для пользователя порядок.
+  // Ожидаемый приоритет: Проход (проход, проход №), Номер/код (начинается с цифры),
+  // Базар/рынок (содержит слова рынок/базар), затем всё остальное.
+  final passageRe = RegExp(r'\bпроход\b', caseSensitive: false, unicode: true);
+  final bazarRe = RegExp(r'\b(рынок|базар)\b', caseSensitive: false, unicode: true);
+  final startsWithDigit = RegExp(r'^\s*\d');
+
+  final passageParts = <String>[];
+  final numericParts = <String>[];
+  final bazarParts = <String>[];
+  final others = <String>[];
+
+  for (final part in parts) {
+    final p = part.trim();
+    if (p.isEmpty) continue;
+    if (passageRe.hasMatch(p)) {
+      passageParts.add(p);
+    } else if (startsWithDigit.hasMatch(p)) {
+      numericParts.add(p);
+    } else if (bazarRe.hasMatch(p)) {
+      bazarParts.add(p);
+    } else {
+      others.add(p);
+    }
+  }
+
+  final reordered = [...passageParts, ...numericParts, ...bazarParts, ...others];
+  final cleaned = reordered.join(', ');
   // Если после чистки не осталось ничего осмысленного — лучше исходная строка,
   // чем пустая подпись под маркером.
   return cleaned.isEmpty ? source : cleaned;

@@ -34,19 +34,24 @@ class OsmGeoApi {
     ];
     final isDordoiQuery =
         dordoiKeywords.any((kw) => cleanQuery.toLowerCase().contains(kw)) ||
-        RegExp(r'\b\d+\s*[-/]?\s*проход\b|\bпроход\s*\d+\b', caseSensitive: false).hasMatch(cleanQuery) ||
+        RegExp(r'\b\d+\s*[-/]?\s*(?:проход|ряд)\b|\b(?:проход|ряд)\s*\d+\b', caseSensitive: false).hasMatch(cleanQuery) ||
         RegExp(r'^\d+\s*[,/ -]\s*\d+(?:[/ -]\d+)?$').hasMatch(cleanQuery);
 
     final results = <Map<String, dynamic>>[];
 
     if (isDordoiQuery) {
-      String passage = '';
-      String container = '';
-      String sector = '';
+      final yandexMatches = await _searchYandexWeb(cleanQuery);
+      if (yandexMatches.isNotEmpty) {
+        results.addAll(yandexMatches);
+      } else {
+        String passage = '';
+        String container = '';
+        String sector = '';
 
       for (final s in [
         'мурас-спорт',
         'мурас спорт',
+        'китай',
         'алкан',
         'алканов',
         'европа',
@@ -59,7 +64,16 @@ class OsmGeoApi {
         'автозапчасти',
       ]) {
         if (cleanQuery.toLowerCase().contains(s)) {
-          final sTitle = s.replaceAll('мурас спорт', 'Мурас-Спорт').toUpperCase();
+          final String sTitle;
+          if (s.contains('мурас')) {
+            sTitle = 'Мурас-Спорт';
+          } else if (s.contains('алкан')) {
+            sTitle = 'Алкан';
+          } else if (s.contains('ак-суу')) {
+            sTitle = 'Ак-Суу';
+          } else {
+            sTitle = s[0].toUpperCase() + s.substring(1);
+          }
           sector = 'рынок $sTitle';
           break;
         }
@@ -123,6 +137,7 @@ class OsmGeoApi {
         'lon': 74.6217,
       });
     }
+  }
 
     final searchQ = cleanQuery.toLowerCase().contains('бишкек')
         ? cleanQuery
@@ -196,11 +211,123 @@ class OsmGeoApi {
     required double lat,
     required double lon,
   }) async {
+    final yandex = await _reverseYandexWeb(lat: lat, lon: lon);
+    if (yandex.trim().isNotEmpty) return {'address': yandex};
+
     final nom = await _reverseNominatimDebug(lat: lat, lon: lon);
     if (nom.trim().isNotEmpty) return {'address': nom};
 
     final ph = await _reversePhotonDebug(lat: lat, lon: lon);
     return {'address': ph};
+  }
+
+  Future<String> _reverseYandexWeb({
+    required double lat,
+    required double lon,
+  }) async {
+    try {
+      final r = await _dio.get(
+        'https://yandex.ru/maps/',
+        queryParameters: {
+          'll': '$lon,$lat',
+          'mode': 'search',
+          'sll': '$lon,$lat',
+          'text': '$lat,$lon',
+          'z': 19,
+        },
+        options: Options(
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'ru-RU,ru;q=0.9',
+          },
+          sendTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+          validateStatus: (_) => true,
+        ),
+      );
+      if (r.statusCode == 200 && r.data is String) {
+        final html = r.data as String;
+        final m1 = RegExp(
+          r'<meta\s+itemProp="description"\s+content="([^"]+)"',
+        ).firstMatch(html);
+        if (m1 != null) {
+          final val = m1.group(1)?.trim() ?? '';
+          if (val.isNotEmpty) return val;
+        }
+        final m2 = RegExp(
+          r'class="toponym-card-title-view__description">([^<]+)</div>',
+        ).firstMatch(html);
+        if (m2 != null) {
+          final val = m2.group(1)?.trim() ?? '';
+          if (val.isNotEmpty) return val;
+        }
+      }
+    } catch (e) {
+      AppLogger.d('YANDEX_WEB EX: $e');
+    }
+    return '';
+  }
+
+  Future<List<Map<String, dynamic>>> _searchYandexWeb(String query) async {
+    final clean = query.trim();
+    if (clean.isEmpty) return const [];
+
+    final searchTerms = <String>[];
+    if (clean.toLowerCase().contains('ряд') && !clean.toLowerCase().contains('китай')) {
+      searchTerms.add('Дордой Китай $clean');
+      searchTerms.add('Дордой $clean');
+    } else if (!clean.toLowerCase().contains('дордой')) {
+      searchTerms.add('Дордой $clean');
+    } else {
+      searchTerms.add(clean);
+    }
+
+    final results = <Map<String, dynamic>>[];
+    for (final term in searchTerms) {
+      try {
+        final r = await _dio.get(
+          'https://yandex.ru/maps/',
+          queryParameters: {'text': term, 'z': 19},
+          options: Options(
+            headers: {
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept-Language': 'ru-RU,ru;q=0.9',
+            },
+            sendTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
+            validateStatus: (_) => true,
+          ),
+        );
+        if (r.statusCode == 200 && r.data is String) {
+          final html = r.data as String;
+          final coordsMatch =
+              RegExp(r'"coordinates":\[([0-9.]+),([0-9.]+)\]').firstMatch(html);
+          final itemMatch =
+              RegExp(r'"title":"([^"]+)","description":"([^"]+)"').firstMatch(html);
+          if (coordsMatch != null && itemMatch != null) {
+            final lon = double.tryParse(coordsMatch.group(1) ?? '') ?? 0.0;
+            final lat = double.tryParse(coordsMatch.group(2) ?? '') ?? 0.0;
+            final title = itemMatch.group(1) ?? '';
+            final desc = itemMatch.group(2) ?? '';
+            final full = '$title, $desc';
+            if (lat != 0.0 && lon != 0.0) {
+              results.add({
+                'title': title,
+                'address': full,
+                'lat': lat,
+                'lon': lon,
+              });
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        AppLogger.d('YANDEX_WEB_SEARCH EX: $e');
+      }
+    }
+    return results;
   }
 
   Future<String> _reverseNominatimDebug({

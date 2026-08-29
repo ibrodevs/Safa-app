@@ -1761,8 +1761,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       polygons: [...marketMap.polygons, ...containerPolygons],
       polylines: [
         ...marketMap.polylines,
-        if ((_showFulfillmentSheet || _searchMode) &&
-            _routePoints.isNotEmpty) ...[
+        if (_routePoints.isNotEmpty) ...[
           Polyline(
             points: _routePoints,
             strokeWidth: 6,

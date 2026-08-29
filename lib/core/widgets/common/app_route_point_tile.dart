@@ -124,7 +124,9 @@ class AppRoutePointTile extends StatelessWidget {
                           : FontWeight.w600,
                     ),
                   ),
-                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  if (subtitle != null &&
+                      subtitle!.trim().isNotEmpty &&
+                      subtitle!.trim() != title.trim()) ...[
                     const SizedBox(height: 2),
                     Text(
                       subtitle!,

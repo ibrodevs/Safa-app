@@ -351,6 +351,27 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _scheduleMarketMapRefresh();
   }
 
+  void _onSearchResultSelected(LatLng point, String selectedAddress) {
+    _reverseDebounce?.cancel();
+    _mapIdleDebounce?.cancel();
+
+    setState(() {
+      _center = point;
+      _addressPoint = point;
+      _selectedContainer = null;
+      _mapMoving = false;
+    });
+
+    _mapController.move(point, 16.5);
+    context.read<DeliveryAddressProvider>().setPickerAddressExplicit(
+      address: selectedAddress,
+      lat: point.latitude,
+      lon: point.longitude,
+    );
+    _scheduleContainersRefresh();
+    _scheduleMarketMapRefresh();
+  }
+
   void _selectContainer(ContainerRef container) {
     final lat = container.latValue;
     final lon = container.lonValue;
@@ -609,12 +630,16 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   _SuggestionList(
                     loading: autocomplete.loading,
                     items: autocomplete.items,
-                    onSelected: (lat, lon) {
+                    onSelected: (item) {
                       FocusScope.of(context).unfocus();
+                      FocusManager.instance.primaryFocus?.unfocus();
                       context
                           .read<DeliveryAutocompleteProvider>()
                           .clearSuggestions();
-                      _moveTo(LatLng(lat, lon));
+                      final lat = (item.lat as num).toDouble();
+                      final lon = (item.lon as num).toDouble();
+                      final addr = (item.address ?? item.title ?? '').toString().trim();
+                      _onSearchResultSelected(LatLng(lat, lon), addr);
                     },
                   ),
                 ],
@@ -776,7 +801,7 @@ class _SuggestionList extends StatelessWidget {
 
   final bool loading;
   final List<dynamic> items;
-  final void Function(double lat, double lon) onSelected;
+  final void Function(dynamic item) onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -803,8 +828,7 @@ class _SuggestionList extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = items[index];
                 return InkWell(
-                  onTap: () =>
-                      onSelected(item.lat as double, item.lon as double),
+                  onTap: () => onSelected(item),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,

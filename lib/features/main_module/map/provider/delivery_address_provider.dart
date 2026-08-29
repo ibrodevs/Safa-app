@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../../../core/utils/address_format.dart';
 import '../data/model/delivery_reverse_geo.dart';
 import '../data/repo/delivery_geo_repository.dart';
 
@@ -36,7 +37,7 @@ class DeliveryAddressProvider extends ChangeNotifier {
   double? get fromLon => _fromLon;
 
   void setFromAddress({required String address, double? lat, double? lon}) {
-    final a = address.trim();
+    final a = formatReadableAddress(address);
     if (a.isEmpty) {
       clearFromAddress();
       return;
@@ -118,6 +119,20 @@ class DeliveryAddressProvider extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void setPickerAddressExplicit({
+    required String address,
+    required double lat,
+    required double lon,
+  }) {
+    _pickerRequestSerial += 1;
+    _pickerLoading = false;
+    _pickerError = null;
+    _pickerHere = DeliveryReverseGeo(
+      address: formatReadableAddress(address),
+    );
+    notifyListeners();
   }
 
   void clearPickerHere() {

@@ -28,19 +28,9 @@ class DeliveryGeoRepository {
     required double lon,
     bool preferPublicAddress = false,
   }) async {
-    if (preferPublicAddress) {
-      try {
-        final json = await _osm.reverseRaw(lat: lat, lon: lon);
-        final external = DeliveryReverseGeo.fromJson(json);
-        if (_isReadableAddress(external.address)) return external;
-      } catch (_) {
-        // Backend остаётся резервом, если внешний геокодер недоступен.
-      }
-    }
-
-    // Сначала спрашиваем наш backend. Если точка попала внутрь контейнера,
-    // созданного в админ-панели, backend вернёт иерархию Safa:
-    // базар → район → проход → контейнер. Это важнее внешнего адреса улицы.
+    // 1. Всегда сначала запрашиваем бэкенд: на бэкенде работает прямой
+    // Яндекс-геокодер, возвращающий точные адреса Дордоя
+    // («0-й проход, 10Б, рынок Китай, рынок Дордой, Бишкек») и адреса города.
     try {
       final response = await _api.dio.get<dynamic>(
         'delivery/geo/reverse/',
@@ -56,9 +46,10 @@ class DeliveryGeoRepository {
         }
       }
     } catch (_) {
-      // Если backend временно недоступен, карта всё равно должна работать.
+      // Если бэкенд недоступен, работает клиентский геокодер ниже.
     }
 
+    // 2. Резервный клиентский геокодер (Яндекс -> Nominatim -> Photon)
     final json = await _osm.reverseRaw(lat: lat, lon: lon);
     final external = DeliveryReverseGeo.fromJson(json);
     if (_isReadableAddress(external.address)) return external;
