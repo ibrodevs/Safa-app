@@ -50,3 +50,4 @@ app.*.map.json
 # Local Android release signing credentials. Never commit these files.
 /android/key.properties
 /android/upload-keystore.jks
+.env
