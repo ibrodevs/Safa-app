@@ -143,6 +143,67 @@ class _DetailContent extends StatelessWidget {
           ),
           AppSpacing.gapLg,
 
+          if (detail.carrierFirstName != null &&
+              detail.carrierFirstName!.isNotEmpty) ...[
+            const AppSectionHeader(title: 'Специалист'),
+            AppSpacing.gapXs,
+            AppCard(
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: (detail.carrierAvatarUrl != null &&
+                              detail.carrierAvatarUrl!.isNotEmpty)
+                          ? Image.network(
+                              detail.carrierAvatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const CircleAvatar(
+                                backgroundColor: AppColors.primarySoft,
+                                child: Icon(
+                                  Icons.person_rounded,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : const CircleAvatar(
+                              backgroundColor: AppColors.primarySoft,
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          detail.carrierFirstName!,
+                          style: AppTypography.cardTitle,
+                        ),
+                        if (detail.carrierSpecialistType != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            detail.carrierSpecialistType == 'cart'
+                                ? 'Тачкист'
+                                : 'Доставщик',
+                            style: AppTypography.captionMuted,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AppSpacing.gapLg,
+          ],
+
           const AppSectionHeader(title: 'О посылке'),
           AppSpacing.gapXs,
           AppCard(

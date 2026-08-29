@@ -780,6 +780,37 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     _nearbyPollTimer = null;
   }
 
+  void _finishActiveAndStayOnLine() {
+    _shipmentRealtime.disconnect();
+    _pollTimer?.cancel();
+    _pollTimer = null;
+
+    setState(() {
+      _activeId = null;
+      _activePublicCode = '';
+      _activeStatus = ShipmentStatus.unknown;
+      _activeCurrentStopIndex = 0;
+      _activeStops = const [];
+      _activeFare = 0;
+      _activeIncome = 0;
+      _activeUiHash = null;
+
+      _showWelcome = false;
+      _showEmptyOrders = false;
+
+      _didFitOnce = false;
+      _fittedStopIndex = null;
+      _pendingRoutePoints = null;
+      _routeSignature = null;
+      _routePoints = const [];
+      _lastRouteOrigin = null;
+    });
+
+    _startNearbyPolling();
+    unawaited(_refreshNearbySilently());
+    unawaited(_initLocation());
+  }
+
   void _stopActiveAndBackToWelcome({String? message}) {
     _shipmentRealtime.disconnect();
     _pollTimer?.cancel();
@@ -1496,7 +1527,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           publicCode: _activePublicCode,
           fare: _activeIncome,
           accent: _accent,
-          onDone: () => _stopActiveAndBackToWelcome(),
+          onDone: () => _finishActiveAndStayOnLine(),
           stops: _activeStops,
         );
       } else if (_activeStatus == ShipmentStatus.awaitingPayment) {

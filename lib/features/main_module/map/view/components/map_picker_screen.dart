@@ -539,14 +539,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             controller: _mapController,
             initialCenter: _center,
             initialZoom: 15,
-            // Тап по карте — это явный выбор точки: адрес запрашиваем сразу
-            // для тапнутых координат, не дожидаясь конца анимации камеры.
-            onTap: (point) =>
-                _moveTo(point, zoom: _zoom, immediateReverse: true),
+            onTap: (point) {
+              FocusManager.instance.primaryFocus?.unfocus();
+              _moveTo(point, zoom: _zoom, immediateReverse: true);
+            },
             onPositionChanged: (position, hasGesture) {
               _center = position.center;
 
               if (hasGesture) {
+                FocusManager.instance.primaryFocus?.unfocus();
                 if (!_mapMoving && mounted) {
                   setState(() => _mapMoving = true);
                 }

@@ -167,6 +167,16 @@ class _FinikStatusOverlay extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    if (status == FinikFlowStatus.succeeded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Timer(const Duration(milliseconds: 1400), () {
+          if (context.mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop(true);
+          }
+        });
+      });
+    }
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 300),

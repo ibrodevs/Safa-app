@@ -113,6 +113,10 @@ class ShipmentsListItemDto {
   final List<DeliveryPoint> stops;
   final bool isPaid;
   final int fare;
+  final String? carrierFirstName;
+  final String? carrierPhone;
+  final String? carrierAvatarUrl;
+  final String? carrierSpecialistType;
 
   const ShipmentsListItemDto({
     required this.id,
@@ -120,6 +124,10 @@ class ShipmentsListItemDto {
     required this.stops,
     this.isPaid = false,
     this.fare = 0,
+    this.carrierFirstName,
+    this.carrierPhone,
+    this.carrierAvatarUrl,
+    this.carrierSpecialistType,
   });
 
   static double? _toDouble(dynamic v) {
@@ -203,6 +211,10 @@ class ShipmentsListItemDto {
       fare: paymentDueAmount > 0
           ? paymentDueAmount
           : (finalFare > 0 ? finalFare : estimatedFare),
+      carrierFirstName: j['carrier_first_name']?.toString(),
+      carrierPhone: j['carrier_phone']?.toString(),
+      carrierAvatarUrl: j['carrier_avatar_url']?.toString(),
+      carrierSpecialistType: j['carrier_specialist_type']?.toString(),
     );
   }
 }

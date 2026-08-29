@@ -315,21 +315,21 @@ class _HeroCampaignCard extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _openDetails(context),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(13),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x26000000),
-                blurRadius: 22,
-                spreadRadius: -4,
-                offset: Offset(0, 9),
-              ),
-            ],
-          ),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(13),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26000000),
+              blurRadius: 22,
+              spreadRadius: -4,
+              offset: Offset(0, 9),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
           child: Stack(
             children: [
               Positioned.fill(
@@ -598,8 +598,8 @@ class _TransparencyReportCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
         onTap: () => _openTransparencyReports(context, campaign),
         child: Container(
-          height: 62,
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          constraints: const BoxConstraints(minHeight: 62),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(13),

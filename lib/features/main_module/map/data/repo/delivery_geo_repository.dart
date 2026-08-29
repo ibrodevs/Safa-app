@@ -66,7 +66,33 @@ class DeliveryGeoRepository {
   }
 
   Future<List<DeliveryAutocompleteResult>> autocomplete(String query) async {
-    final list = await _osm.autocompleteRaw(query);
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+
+    try {
+      final response = await _api.dio.get<dynamic>(
+        'delivery/geo/autocomplete/',
+        queryParameters: {'q': q},
+      );
+      final data = response.data;
+      if (response.statusCode == 200 && data is Map) {
+        final results = data['results'];
+        if (results is List && results.isNotEmpty) {
+          return results
+              .whereType<Map>()
+              .map(
+                (e) => DeliveryAutocompleteResult.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
+              )
+              .toList();
+        }
+      }
+    } catch (_) {
+      // Fallback to client-side OSM if backend is unreachable
+    }
+
+    final list = await _osm.autocompleteRaw(q);
     return list.map((e) => DeliveryAutocompleteResult.fromJson(e)).toList();
   }
 }

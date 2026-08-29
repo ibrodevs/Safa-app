@@ -66,6 +66,49 @@ class ActiveOrderBanner extends StatelessWidget {
               ),
             ),
           ],
+          if (shipment.carrierFirstName != null &&
+              shipment.carrierFirstName!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: (shipment.carrierAvatarUrl != null &&
+                            shipment.carrierAvatarUrl!.isNotEmpty)
+                        ? Image.network(
+                            shipment.carrierAvatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${shipment.carrierSpecialistType == "cart" ? "Тачкист" : "Специалист"}: ${shipment.carrierFirstName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (onTap != null) ...[
             AppSpacing.gapXs,
             Row(

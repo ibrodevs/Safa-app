@@ -47,6 +47,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   bool _pollInFlight = false;
 
   void reset() {
+    _qrBackgroundTimer?.cancel();
+    _qrBackgroundTimer = null;
     _pollTimer?.cancel();
     _pollTimer = null;
     _pollTicks = 0;
@@ -126,6 +128,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     }
   }
 
+  Timer? _qrBackgroundTimer;
+
   void recordCreatedItem(Map<String, dynamic>? data) {
     if (data == null) return;
     final id = data['id']?.toString();
@@ -133,15 +137,50 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     finikItemId = id;
     final payment = init;
     if (payment != null) {
-      // Persist the Finik item ID immediately. The backend can then verify a
-      // completed payment even if the callback is delayed or the app closes.
       unawaited(
         _paymentsRepo.reconcileShipmentPayment(
           paymentId: payment.paymentId,
           itemId: id,
         ),
       );
+      _startBackgroundQrPolling();
     }
+  }
+
+  void _startBackgroundQrPolling() {
+    _qrBackgroundTimer?.cancel();
+    _qrBackgroundTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (status != FinikFlowStatus.awaitingFinikUi) {
+        timer.cancel();
+        return;
+      }
+      try {
+        var paid = false;
+        final payment = init;
+        if (payment != null) {
+          paid = await _paymentsRepo.reconcileShipmentPayment(
+            paymentId: payment.paymentId,
+            itemId: finikItemId,
+            transactionId: finikTransactionId,
+          );
+        }
+        if (shipmentId != null) {
+          paid = paid || await _shipmentsRepo.isShipmentPaid(shipmentId!);
+        } else if (amanatCampaignId != null && amanatDonationId != null) {
+          paid = paid ||
+              await _paymentsRepo.isAmanatDonationPaid(
+                campaignId: amanatCampaignId!,
+                donationId: amanatDonationId!,
+              );
+        }
+        if (paid) {
+          timer.cancel();
+          _pollTimer?.cancel();
+          status = FinikFlowStatus.succeeded;
+          notifyListeners();
+        }
+      } catch (_) {}
+    });
   }
 
   void handlePaymentResult(Map<String, dynamic>? data) {
@@ -244,6 +283,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _qrBackgroundTimer?.cancel();
     _pollTimer?.cancel();
     super.dispose();
   }

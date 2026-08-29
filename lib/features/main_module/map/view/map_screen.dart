@@ -101,6 +101,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   String _currentStatusCode = 'pending';
   bool _isPaid = true;
   int _fare = 0;
+  String? _carrierFirstName;
+  String? _carrierPhone;
+  String? _carrierAvatarUrl;
+  String? _carrierSpecialistType;
   String? _shipmentUiSignature;
   LatLng? _courierPosition;
   DateTime? _courierPositionUpdatedAt;
@@ -459,30 +463,53 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   Future<void> _syncRouteAndCamera() async {
     if (!mounted) return;
 
-    if (!_showFulfillmentSheet && !_searchMode) {
-      _routeRetryTimer?.cancel();
-      _routeRetryTimer = null;
+    final List<LatLng> pts;
+    if (_activeShipmentId != null) {
+      if (!_showFulfillmentSheet && !_searchMode) {
+        _routeRetryTimer?.cancel();
+        _routeRetryTimer = null;
+        if (_routePoints.isNotEmpty || _routeSignature != null) {
+          setState(() {
+            _routePoints = const [];
+            _routeSignature = null;
+          });
+        }
+        _didFitOnFulfillment = false;
+        return;
+      }
+      pts = _extractStopPoints(_activeStops);
+      if (!_didFitOnFulfillment && pts.isNotEmpty) {
+        _didFitOnFulfillment = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _fitToPoints(pts);
+        });
+      }
+    } else {
+      // Предпросмотр маршрута при создании заказа сразу после выбора точек
+      final creationPts = <LatLng>[];
+      if (_fromPoint?.lat != null && _fromPoint?.lon != null) {
+        creationPts.add(LatLng(_fromPoint!.lat!, _fromPoint!.lon!));
+      } else if (_fromPoint == null && _myLat.isFinite && _myLon.isFinite) {
+        creationPts.add(LatLng(_myLat, _myLon));
+      }
+      for (final p in _intermediatePoints) {
+        if (p.lat != null && p.lon != null) {
+          creationPts.add(LatLng(p.lat!, p.lon!));
+        }
+      }
+      if (_deliveryPoint?.lat != null && _deliveryPoint?.lon != null) {
+        creationPts.add(LatLng(_deliveryPoint!.lat!, _deliveryPoint!.lon!));
+      }
+      pts = creationPts;
+    }
+
+    if (pts.length < 2) {
       if (_routePoints.isNotEmpty || _routeSignature != null) {
         setState(() {
           _routePoints = const [];
           _routeSignature = null;
         });
       }
-      _didFitOnFulfillment = false;
-      return;
-    }
-
-    final pts = _extractStopPoints(_activeStops);
-
-    if (!_didFitOnFulfillment && pts.isNotEmpty) {
-      _didFitOnFulfillment = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _fitToPoints(pts);
-      });
-    }
-
-    if (pts.length < 2) {
-      if (_routePoints.isNotEmpty) setState(() => _routePoints = const []);
       return;
     }
 
@@ -499,6 +526,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _routeSignature = route.isNotEmpty ? sig : null;
         _routePoints = route;
       });
+
+      if (route.isNotEmpty && _activeShipmentId == null) {
+        _fitToPoints(pts);
+      }
+
       _routeRetryTimer?.cancel();
       _routeRetryTimer = null;
       if (route.isEmpty && mounted && _activeShipmentId != null) {
@@ -559,6 +591,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _currentStatusCode = active.status;
         _isPaid = active.isPaid;
         _fare = active.fare;
+        _carrierFirstName = active.carrierFirstName;
+        _carrierPhone = active.carrierPhone;
+        _carrierAvatarUrl = active.carrierAvatarUrl;
+        _carrierSpecialistType = active.carrierSpecialistType;
         _showFulfillmentSheet =
             status == ShipmentStatus.assigned ||
             status == ShipmentStatus.inTransit;
@@ -897,6 +933,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       _routeSignature = null;
       _isPaid = true;
       _fare = 0;
+      _carrierFirstName = null;
+      _carrierPhone = null;
+      _carrierAvatarUrl = null;
+      _carrierSpecialistType = null;
       _courierPosition = null;
       _courierPositionUpdatedAt = null;
       _didFitCourierOnce = false;
@@ -937,6 +977,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         dto.status,
         dto.isPaid,
         dto.fare,
+        dto.carrierFirstName,
+        dto.carrierPhone,
+        dto.carrierAvatarUrl,
+        dto.carrierSpecialistType,
         shouldShowFulfillment,
         Object.hashAll(
           dto.stops.map(
@@ -954,6 +998,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _showFulfillmentSheet = shouldShowFulfillment;
         _isPaid = dto.isPaid;
         _fare = dto.fare;
+        _carrierFirstName = dto.carrierFirstName;
+        _carrierPhone = dto.carrierPhone;
+        _carrierAvatarUrl = dto.carrierAvatarUrl;
+        _carrierSpecialistType = dto.carrierSpecialistType;
         _shipmentUiSignature = nextSignature;
       });
 
@@ -1033,6 +1081,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _fromPoint = result;
         _panelError = null;
       });
+      unawaited(_syncRouteAndCamera());
     }
   }
 
@@ -1047,6 +1096,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _deliveryPoint = result;
         _panelError = null;
       });
+      unawaited(_syncRouteAndCamera());
     }
   }
 
@@ -1061,6 +1111,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         _intermediatePoints.add(result);
         _panelError = null;
       });
+      unawaited(_syncRouteAndCamera());
     }
   }
 
@@ -1075,6 +1126,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
 
     if (result != null && mounted) {
       setState(() => _intermediatePoints[index] = result);
+      unawaited(_syncRouteAndCamera());
     }
   }
 
@@ -1091,6 +1143,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     if (!confirmed || !mounted) return;
 
     setState(() => _intermediatePoints.removeAt(index));
+    unawaited(_syncRouteAndCamera());
   }
 
   void _reorderIntermediatePoints(int oldIndex, int newIndex) {
@@ -1098,6 +1151,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       final point = _intermediatePoints.removeAt(oldIndex);
       _intermediatePoints.insert(newIndex, point);
     });
+    unawaited(_syncRouteAndCamera());
   }
 
   Future<void> _onContainerTapped(ContainerRef container) async {
@@ -1130,6 +1184,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           _intermediatePoints.add(point);
       }
     });
+    unawaited(_syncRouteAndCamera());
   }
 
   Future<void> _onMarketMapContainerTapped(MarketMapFeature feature) async {
@@ -1821,6 +1876,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       panel = OrderFulfillmentSheet(
         stops: _activeStops,
         statusCode: _currentStatusCode,
+        carrierFirstName: _carrierFirstName,
+        carrierPhone: _carrierPhone,
+        carrierAvatarUrl: _carrierAvatarUrl,
+        carrierSpecialistType: _carrierSpecialistType,
       );
     } else if (_currentStatus == ShipmentStatus.awaitingPayment && !_isPaid) {
       final shipmentId = _activeShipmentId!;

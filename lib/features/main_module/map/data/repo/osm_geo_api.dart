@@ -12,61 +12,184 @@ class OsmGeoApi {
   static const _ua = 'dogo-app/1.0 (contact: your-email@example.com)';
 
   Future<List<Map<String, dynamic>>> autocompleteRaw(String query) async {
-    final r = await _dio.get(
-      'https://photon.komoot.io/api/',
-      queryParameters: {'q': query, 'limit': 8, 'lang': 'ru'},
-      options: Options(
-        headers: {'User-Agent': _ua},
-        sendTimeout: const Duration(seconds: 6),
-        receiveTimeout: const Duration(seconds: 6),
-        validateStatus: (_) => true,
-      ),
-    );
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return const [];
 
-    final sc = r.statusCode ?? -1;
-    final t = r.data.runtimeType.toString();
-    final preview = _preview(r.data);
-    AppLogger.d('PHOTON_AUTOCOMPLETE sc=$sc type=$t body=$preview');
+    final dordoiKeywords = [
+      'проход',
+      'ряд',
+      'контейнер',
+      'дордой',
+      'мурас',
+      'алкан',
+      'европа',
+      'оберон',
+      'джунхай',
+      'кербен',
+      'ак-суу',
+      'север',
+      'восток',
+      'центральный',
+      'кишка',
+    ];
+    final isDordoiQuery =
+        dordoiKeywords.any((kw) => cleanQuery.toLowerCase().contains(kw)) ||
+        RegExp(r'\b\d+\s*[-/]?\s*проход\b|\bпроход\s*\d+\b', caseSensitive: false).hasMatch(cleanQuery) ||
+        RegExp(r'^\d+\s*[,/ -]\s*\d+(?:[/ -]\d+)?$').hasMatch(cleanQuery);
 
-    if (sc != 200) return const [];
+    final results = <Map<String, dynamic>>[];
 
-    final data = r.data;
-    if (data is! Map<String, dynamic>) return const [];
+    if (isDordoiQuery) {
+      String passage = '';
+      String container = '';
+      String sector = '';
 
-    final features = (data['features'] as List?) ?? const [];
+      for (final s in [
+        'мурас-спорт',
+        'мурас спорт',
+        'алкан',
+        'алканов',
+        'европа',
+        'оберон',
+        'джунхай',
+        'кербен',
+        'ак-суу',
+        'восток',
+        'север',
+        'автозапчасти',
+      ]) {
+        if (cleanQuery.toLowerCase().contains(s)) {
+          final sTitle = s.replaceAll('мурас спорт', 'Мурас-Спорт').toUpperCase();
+          sector = 'рынок $sTitle';
+          break;
+        }
+      }
 
-    return features.map<Map<String, dynamic>>((f) {
-      final props = (f is Map ? f['properties'] : null);
-      final geometry = (f is Map ? f['geometry'] : null);
+      final mPass = RegExp(
+        r'(\d+)(?:[-–—]?(?:й|ой|ий|ый))?\s*проход|проход\s*(?:№\s*)?([0-9a-zA-Zа-яА-Я]+)',
+        caseSensitive: false,
+      ).firstMatch(cleanQuery);
+      if (mPass != null) {
+        final pNum = mPass.group(1) ?? mPass.group(2) ?? '';
+        passage = int.tryParse(pNum) != null ? '$pNum-й проход' : 'проход $pNum';
+      } else if (cleanQuery.toLowerCase().contains('центральный')) {
+        passage = 'проход Центральный';
+      }
 
-      final propsMap = (props is Map)
-          ? props.cast<String, dynamic>()
-          : <String, dynamic>{};
-      final coords =
-          ((geometry is Map ? geometry['coordinates'] : null) as List?) ??
-          const [0, 0];
+      var rem = cleanQuery;
+      if (passage.isNotEmpty) {
+        rem = rem.replaceAll(
+          RegExp(r'(?:\d+[-–—]?(?:й|ой|ий|ый)?\s*проход|проход\s*[0-9a-zA-Zа-яА-Я]+|проход|центральный)', caseSensitive: false),
+          '',
+        );
+      }
+      if (sector.isNotEmpty) {
+        rem = rem.replaceAll(
+          RegExp(r'мурас[- ]?спорт|алкан(?:ов)?|европа|оберон|джунхай|кербен|ак-суу|восток|север|автозапчасти', caseSensitive: false),
+          '',
+        );
+      }
+      rem = rem.replaceAll(RegExp(r'контейнер|дордой|рынок', caseSensitive: false), '').replaceAll(RegExp(r'^[ ,.-/]+|[ ,.-/]+$'), '').trim();
+      if (rem.isNotEmpty) {
+        container = rem;
+      }
 
-      final lon = (coords.isNotEmpty && coords[0] is num)
-          ? (coords[0] as num).toDouble()
-          : 0.0;
-      final lat = (coords.length > 1 && coords[1] is num)
-          ? (coords[1] as num).toDouble()
-          : 0.0;
+      if (passage.isEmpty && container.isEmpty) {
+        final m = RegExp(r'^(\d+)\s*[,/ -]\s*(\d+)(?:[/ -](\d+))?$').firstMatch(cleanQuery);
+        if (m != null) {
+          container = m.group(1) ?? '';
+          passage = '${m.group(2)}-й проход';
+          if (m.group(3) != null) {
+            container = '$container/${m.group(3)}';
+          }
+        }
+      }
 
-      final name = (propsMap['name'] ?? '').toString();
-      final city = (propsMap['city'] ?? propsMap['state'] ?? '').toString();
-      final street = (propsMap['street'] ?? '').toString();
-      final housenumber = (propsMap['housenumber'] ?? '').toString();
+      final parts = <String>[];
+      if (passage.isNotEmpty) parts.add(passage);
+      if (container.isNotEmpty) parts.add(container);
+      if (sector.isNotEmpty) parts.add(sector);
+      parts.add('рынок Дордой');
+      parts.add('Бишкек');
 
-      final address = joinAddressParts([city, street, housenumber]);
+      final titleParts = [passage, container, sector].where((p) => p.isNotEmpty).toList();
+      final title = titleParts.isNotEmpty ? titleParts.join(', ') : 'рынок Дордой';
+      final fullAddress = parts.join(', ');
 
-      return {
-        'title': name.isNotEmpty ? name : address,
-        'address': address.isNotEmpty ? address : name,
-        'lat': lat,
-        'lon': lon,
-      };
-    }).toList();
+      results.add({
+        'title': title,
+        'address': fullAddress,
+        'lat': 42.9367,
+        'lon': 74.6217,
+      });
+    }
+
+    final searchQ = cleanQuery.toLowerCase().contains('бишкек')
+        ? cleanQuery
+        : 'Бишкек $cleanQuery';
+
+    try {
+      final r = await _dio.get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {
+          'q': searchQ,
+          'format': 'jsonv2',
+          'accept-language': 'ru',
+          'addressdetails': 1,
+          'countrycodes': 'kg',
+          'viewbox': '74.45,42.99,74.75,42.75',
+          'limit': 10,
+          'email': 'senya.kalchoroev@gmail.com',
+        },
+        options: Options(
+          headers: {'User-Agent': _ua},
+          sendTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+          validateStatus: (_) => true,
+        ),
+      );
+
+      final sc = r.statusCode ?? -1;
+      if (sc == 200 && r.data is List) {
+        final list = (r.data as List).whereType<Map>().toList();
+        final seen = results.map((e) => e['address'].toString()).toSet();
+        for (final item in list) {
+          final m = Map<String, dynamic>.from(item);
+          final addr = (m['address'] is Map)
+              ? Map<String, dynamic>.from(m['address'] as Map)
+              : <String, dynamic>{};
+
+          final road = (addr['road'] ?? addr['pedestrian'] ?? '').toString().trim();
+          final house = (addr['house_number'] ?? '').toString().trim();
+          final city = (addr['city'] ?? addr['town'] ?? 'Бишкек').toString().trim();
+          final name = (m['name'] ?? road).toString().trim();
+          final place = (addr['shop'] ?? addr['amenity'] ?? addr['marketplace'] ?? addr['suburb'] ?? '').toString().trim();
+
+          final parts = [road.isNotEmpty ? road : place, house, city.isNotEmpty ? city : 'Бишкек'].where((p) => p.isNotEmpty).toList();
+          final title = (road.isNotEmpty && house.isNotEmpty)
+              ? '$road, $house'
+              : (road.isNotEmpty ? road : (name.isNotEmpty ? name : m['display_name'].toString()));
+          final fullAddress = parts.isNotEmpty ? parts.join(', ') : m['display_name'].toString();
+
+          final lat = double.tryParse(m['lat']?.toString() ?? '') ?? 0.0;
+          final lon = double.tryParse(m['lon']?.toString() ?? '') ?? 0.0;
+
+          if (!seen.contains(fullAddress)) {
+            seen.add(fullAddress);
+            results.add({
+              'title': title,
+              'address': fullAddress,
+              'lat': lat,
+              'lon': lon,
+            });
+          }
+        }
+      }
+      return results;
+    } catch (e) {
+      AppLogger.d('OSM_AUTOCOMPLETE error=$e');
+      return results;
+    }
   }
 
   Future<Map<String, dynamic>> reverseRaw({
@@ -93,8 +216,6 @@ class OsmGeoApi {
           'format': 'jsonv2',
           'accept-language': 'ru',
           'zoom': 18,
-          // Без addressdetails остаётся только display_name — строка со
-          // страной и почтовым индексом.
           'addressdetails': 1,
           'email': 'senya.kalchoroev@gmail.com',
         },
@@ -107,15 +228,10 @@ class OsmGeoApi {
       );
 
       final sc = r.statusCode ?? -1;
-      final t = r.data.runtimeType.toString();
-      final preview = _preview(r.data);
-
-      AppLogger.d('NOMINATIM sc=$sc type=$t body=$preview');
-
       if (sc != 200) return '';
 
       if (r.data is Map<String, dynamic>) {
-        return _composeNominatimAddress(r.data as Map<String, dynamic>);
+        return _composeNominatimAddress(r.data as Map<String, dynamic>, lat: lat, lon: lon);
       }
 
       return '';
@@ -125,11 +241,11 @@ class OsmGeoApi {
     }
   }
 
-  /// Собирает адрес из структурированных полей Nominatim.
-  ///
-  /// `display_name` использовать нельзя: он всегда заканчивается почтовым
-  /// индексом и страной.
-  String _composeNominatimAddress(Map<String, dynamic> data) {
+  String _composeNominatimAddress(
+    Map<String, dynamic> data, {
+    double lat = 0.0,
+    double lon = 0.0,
+  }) {
     final raw = data['address'];
     final address = raw is Map
         ? raw.cast<String, dynamic>()
@@ -146,17 +262,61 @@ class OsmGeoApi {
     final city = field(['city', 'town', 'village', 'municipality']);
     final street = field(['road', 'pedestrian']);
     final house = field(['house_number']);
-    final place = field([
-      'shop',
-      'amenity',
-      'marketplace',
-      'neighbourhood',
-      'suburb',
-    ]);
+    final suburb = field(['suburb', 'neighbourhood', 'residential', 'quarter']);
+    final place = field(['shop', 'amenity', 'marketplace', 'commercial']);
 
-    final composed = street.isNotEmpty
-        ? joinAddressParts([city, street, house])
-        : joinAddressParts([city, place]);
+    final isDordoi =
+        (lat >= 42.925 && lat <= 42.955 && lon >= 74.605 && lon <= 74.650) ||
+        suburb.toLowerCase().contains('дордой') ||
+        street.toLowerCase().contains('проход') ||
+        place.toLowerCase().contains('дордой');
+
+    if (isDordoi) {
+      final parts = <String>[];
+      if (street.isNotEmpty) {
+        parts.add(street);
+      } else if (place.isNotEmpty && !place.toLowerCase().contains('дордой')) {
+        parts.add(place);
+      } else if (suburb.isNotEmpty && !suburb.toLowerCase().contains('дордой')) {
+        parts.add(suburb);
+      }
+
+      if (house.isNotEmpty) {
+        parts.add(house);
+      }
+
+      String submarket = '';
+      for (final cand in [place, suburb]) {
+        final cLow = cand.toLowerCase();
+        if (cand.isNotEmpty &&
+            !cLow.contains('дордой') &&
+            !cLow.contains('бишкек') &&
+            cand != street) {
+          submarket = cand;
+          break;
+        }
+      }
+      if (submarket.isNotEmpty) {
+        final subClean = submarket.toLowerCase().startsWith('рынок')
+            ? submarket
+            : 'рынок $submarket';
+        if (!parts.contains(subClean)) {
+          parts.add(subClean);
+        }
+      }
+
+      parts.add('рынок Дордой');
+      parts.add('Бишкек');
+      return parts.join(', ');
+    }
+
+    final streetPart = (street.isNotEmpty && house.isNotEmpty)
+        ? '$street, $house'
+        : (street.isNotEmpty ? street : place.isNotEmpty ? place : suburb);
+
+    final composed = streetPart.isNotEmpty
+        ? joinAddressParts([streetPart, city.isNotEmpty ? city : 'Бишкек'])
+        : (city.isNotEmpty ? city : 'Бишкек');
     if (composed.isNotEmpty) return composed;
 
     return formatReadableAddress((data['display_name'] ?? '').toString());

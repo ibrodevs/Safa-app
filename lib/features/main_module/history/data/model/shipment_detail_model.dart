@@ -114,6 +114,10 @@ class ShipmentDetail {
   final DateTime createdAt;
   final DateTime? paidAt;
   final DateTime? finishedAt;
+  final String? carrierFirstName;
+  final String? carrierPhone;
+  final String? carrierAvatarUrl;
+  final String? carrierSpecialistType;
 
   const ShipmentDetail({
     required this.id,
@@ -134,6 +138,10 @@ class ShipmentDetail {
     required this.createdAt,
     required this.paidAt,
     required this.finishedAt,
+    this.carrierFirstName,
+    this.carrierPhone,
+    this.carrierAvatarUrl,
+    this.carrierSpecialistType,
   });
 
   factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
@@ -172,6 +180,10 @@ class ShipmentDetail {
       finishedAt: json['finished_at'] != null
           ? _asDateTime(json['finished_at'])
           : null,
+      carrierFirstName: json['carrier_first_name']?.toString(),
+      carrierPhone: json['carrier_phone']?.toString(),
+      carrierAvatarUrl: json['carrier_avatar_url']?.toString(),
+      carrierSpecialistType: json['carrier_specialist_type']?.toString(),
     );
   }
 }
