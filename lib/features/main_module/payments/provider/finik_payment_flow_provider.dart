@@ -132,7 +132,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     if (id == null || id.isEmpty) return;
     finikItemId = id;
     final payment = init;
-    if (shipmentId != null && payment != null) {
+    if (payment != null) {
       // Persist the Finik item ID immediately. The backend can then verify a
       // completed payment even if the callback is delayed or the app closes.
       unawaited(
@@ -164,8 +164,8 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   }
 
   void startPollingPaid({
-    Duration interval = const Duration(seconds: 2),
-    int maxSeconds = 90,
+    Duration interval = const Duration(milliseconds: 1500),
+    int maxSeconds = 60,
   }) {
     if (!hasPaymentTarget) return;
 
@@ -187,21 +187,22 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
     _pollTicks++;
     try {
       var paid = false;
-      if (shipmentId != null) {
-        final payment = init;
-        if (payment != null) {
-          paid = await _paymentsRepo.reconcileShipmentPayment(
-            paymentId: payment.paymentId,
-            itemId: finikItemId,
-            transactionId: finikTransactionId,
-          );
-        }
-        paid = paid || await _shipmentsRepo.isShipmentPaid(shipmentId!);
-      } else {
-        paid = await _paymentsRepo.isAmanatDonationPaid(
-          campaignId: amanatCampaignId!,
-          donationId: amanatDonationId!,
+      final payment = init;
+      if (payment != null) {
+        paid = await _paymentsRepo.reconcileShipmentPayment(
+          paymentId: payment.paymentId,
+          itemId: finikItemId,
+          transactionId: finikTransactionId,
         );
+      }
+      if (shipmentId != null) {
+        paid = paid || await _shipmentsRepo.isShipmentPaid(shipmentId!);
+      } else if (amanatCampaignId != null && amanatDonationId != null) {
+        paid = paid ||
+            await _paymentsRepo.isAmanatDonationPaid(
+              campaignId: amanatCampaignId!,
+              donationId: amanatDonationId!,
+            );
       }
       if (paid) {
         _pollTimer?.cancel();

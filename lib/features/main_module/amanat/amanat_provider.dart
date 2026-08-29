@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/friendly_error.dart';
@@ -13,6 +15,9 @@ class AmanatProvider extends ChangeNotifier {
   final List<AmanatCategory> _categories = [];
   final List<AmanatCampaign> _campaigns = [];
   AmanatCampaign? _featuredCampaign;
+
+  Timer? _liveTimer;
+  int? _activePollingCampaignId;
 
   List<AmanatCategory> get categories => List.unmodifiable(_categories);
   List<AmanatCampaign> get campaigns => List.unmodifiable(_campaigns);
@@ -52,10 +57,12 @@ class AmanatProvider extends ChangeNotifier {
         title.contains('madras');
   }
 
-  Future<void> load() async {
-    _loading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+    }
     try {
       final categories = await _repository.loadCategories();
       final allCampaigns = _selectedCategorySlug == null
@@ -71,13 +78,20 @@ class AmanatProvider extends ChangeNotifier {
       _campaigns
         ..clear()
         ..addAll(campaigns);
+      if (!silent) {
+        _error = null;
+      }
     } catch (e) {
-      _error = friendlyErrorMessage(
-        e,
-        fallback: 'Не удалось загрузить Safa Amanat',
-      );
+      if (!silent) {
+        _error = friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось загрузить Safa Amanat',
+        );
+      }
     } finally {
-      _loading = false;
+      if (!silent) {
+        _loading = false;
+      }
       notifyListeners();
     }
   }
@@ -88,9 +102,11 @@ class AmanatProvider extends ChangeNotifier {
     await load();
   }
 
-  Future<AmanatCampaign?> refreshCampaign(int id) async {
-    _error = null;
-    notifyListeners();
+  Future<AmanatCampaign?> refreshCampaign(int id, {bool silent = false}) async {
+    if (!silent) {
+      _error = null;
+      notifyListeners();
+    }
     try {
       final updated = await _repository.loadCampaign(id);
       final index = _campaigns.indexWhere((campaign) => campaign.id == id);
@@ -105,9 +121,40 @@ class AmanatProvider extends ChangeNotifier {
       notifyListeners();
       return updated;
     } catch (e) {
-      _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить сбор');
-      notifyListeners();
+      if (!silent) {
+        _error = friendlyErrorMessage(e, fallback: 'Не удалось загрузить сбор');
+        notifyListeners();
+      }
       return null;
     }
+  }
+
+  /// Starts periodic background polling for live updates of Amanat stats.
+  void startLiveUpdates({
+    int? campaignId,
+    Duration interval = const Duration(seconds: 8),
+  }) {
+    _activePollingCampaignId = campaignId;
+    _liveTimer?.cancel();
+    _liveTimer = Timer.periodic(interval, (_) async {
+      if (_activePollingCampaignId != null) {
+        await refreshCampaign(_activePollingCampaignId!, silent: true);
+      } else {
+        await load(silent: true);
+      }
+    });
+  }
+
+  /// Stops periodic live updates.
+  void stopLiveUpdates() {
+    _liveTimer?.cancel();
+    _liveTimer = null;
+    _activePollingCampaignId = null;
+  }
+
+  @override
+  void dispose() {
+    stopLiveUpdates();
+    super.dispose();
   }
 }

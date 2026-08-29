@@ -23,7 +23,7 @@ case "${FINIK_BETA:-}" in
     ;;
 esac
 
-api_base_url="${DOGO_API_BASE_URL:-https://safabackend21.pythonanywhere.com/api/}"
+api_base_url="${DOGO_API_BASE_URL:-https://api.safa-app.com/api/}"
 item_name_en="${FINIK_ITEM_NAME_EN:-Safa delivery payment}"
 preflight_url="${api_base_url%/}/payments/finik/config/"
 

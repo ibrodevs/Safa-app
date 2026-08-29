@@ -49,6 +49,7 @@ Future<void> main() async {
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   if (SafaMapKitConfig.isConfigured) {
+    debugPrint('MAPKIT DEBUG: key=${SafaMapKitConfig.apiKey}');
     await yandex_init.initMapkit(
       apiKey: SafaMapKitConfig.apiKey,
       locale: 'ru_RU',

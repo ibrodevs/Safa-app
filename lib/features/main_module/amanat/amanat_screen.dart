@@ -4,6 +4,7 @@ import 'package:dogo/core/design/app_design.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../payments/provider/finik_payment_flow_provider.dart';
 import 'amanat_models.dart';
@@ -57,7 +58,16 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
   void initState() {
     super.initState();
     final provider = context.read<AmanatProvider>();
-    Future.microtask(provider.load);
+    Future.microtask(() {
+      provider.load();
+      provider.startLiveUpdates();
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<AmanatProvider>().stopLiveUpdates();
+    super.dispose();
   }
 
   @override
@@ -89,7 +99,7 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
             else if (featured != null) ...[
               _HeroCampaignCard(campaign: featured),
               const SizedBox(height: 14),
-              const _TransparencyReportCard(),
+              _TransparencyReportCard(campaign: featured),
             ],
           ],
         ),
@@ -115,7 +125,16 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
     super.initState();
     final provider = context.read<AmanatProvider>();
     final campaignId = widget.campaignId;
-    Future.microtask(() => provider.refreshCampaign(campaignId));
+    Future.microtask(() {
+      provider.refreshCampaign(campaignId);
+      provider.startLiveUpdates(campaignId: campaignId);
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<AmanatProvider>().stopLiveUpdates();
+    super.dispose();
   }
 
   @override
@@ -163,7 +182,7 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
               const SizedBox(height: 20),
               _DonationSummaryCard(campaign: selectedCampaign),
               const SizedBox(height: 14),
-              const _TransparencyReportCard(),
+              _TransparencyReportCard(campaign: selectedCampaign),
               const SizedBox(height: 18),
               _CampaignDescriptionCard(
                 campaign: selectedCampaign,
@@ -297,18 +316,35 @@ class _HeroCampaignCard extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => _openDetails(context),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(7),
-        child: SizedBox(
-          height: 185,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
           width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x26000000),
+                blurRadius: 22,
+                spreadRadius: -4,
+                offset: Offset(0, 9),
+              ),
+            ],
+          ),
           child: Stack(
-            fit: StackFit.expand,
             children: [
-              const _CampaignImage(warm: true),
-              Container(color: Colors.black.withValues(alpha: 0.34)),
+              Positioned.fill(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const _CampaignImage(warm: true),
+                    Container(color: Colors.black.withValues(alpha: 0.38)),
+                  ],
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -316,14 +352,14 @@ class _HeroCampaignCard extends StatelessWidget {
                       style: const TextStyle(
                         fontFamily: AppTypography.fontFamily,
                         fontSize: 20,
-                        height: 1.04,
+                        height: 1.1,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
-                      'Нужно:${_money(campaign.neededAmount)} сом',
+                      'Нужно: ${_money(campaign.neededAmount)} сом',
                       style: const TextStyle(
                         fontFamily: AppTypography.fontFamily,
                         fontSize: 15,
@@ -332,18 +368,18 @@ class _HeroCampaignCard extends StatelessWidget {
                         color: Colors.white,
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 14),
                     _StackedProgressBar(
                       height: 14,
                       voluntary: campaign.voluntaryProgress,
                       safa: campaign.safaProgress,
                       remaining: campaign.remainingProgress,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Text(
-                          'Собрано:${_money(campaign.collectedAmount)} сома',
+                          'Собрано: ${_money(campaign.collectedAmount)} сома',
                           style: const TextStyle(
                             fontFamily: AppTypography.fontFamily,
                             fontSize: 12,
@@ -355,7 +391,7 @@ class _HeroCampaignCard extends StatelessWidget {
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
                           child: SizedBox(
-                            height: 17,
+                            height: 16,
                             child: VerticalDivider(
                               width: 1,
                               thickness: 1,
@@ -365,10 +401,10 @@ class _HeroCampaignCard extends StatelessWidget {
                         ),
                         const Icon(
                           Icons.group_outlined,
-                          size: 18,
+                          size: 16,
                           color: Colors.white,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             '${campaign.helpersCount} человека помогли',
@@ -385,17 +421,17 @@ class _HeroCampaignCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         SizedBox(
-                          height: 34,
+                          height: 36,
                           child: FilledButton(
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFFFF8425),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 19,
+                                horizontal: 18,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -413,15 +449,15 @@ class _HeroCampaignCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         SizedBox(
-                          height: 34,
+                          height: 36,
                           child: TextButton.icon(
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
                               backgroundColor: Colors.black.withValues(
-                                alpha: .28,
+                                alpha: .32,
                               ),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 13,
+                                horizontal: 14,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -438,7 +474,7 @@ class _HeroCampaignCard extends StatelessWidget {
                             onPressed: () => _openDetails(context),
                             icon: const Icon(
                               Icons.chevron_right_rounded,
-                              size: 17,
+                              size: 18,
                             ),
                             iconAlignment: IconAlignment.end,
                             label: const Text('Подробнее'),
@@ -550,7 +586,9 @@ class _CampaignDescriptionCard extends StatelessWidget {
 }
 
 class _TransparencyReportCard extends StatelessWidget {
-  const _TransparencyReportCard();
+  const _TransparencyReportCard({this.campaign});
+
+  final AmanatCampaign? campaign;
 
   @override
   Widget build(BuildContext context) {
@@ -558,7 +596,7 @@ class _TransparencyReportCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(13),
-        onTap: () => _openTransparencyReports(context),
+        onTap: () => _openTransparencyReports(context, campaign),
         child: Container(
           height: 62,
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
@@ -632,7 +670,7 @@ class _TransparencyReportCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                onPressed: () => _openTransparencyReports(context),
+                onPressed: () => _openTransparencyReports(context, campaign),
                 child: const Text('Посмотреть'),
               ),
             ],
@@ -643,10 +681,301 @@ class _TransparencyReportCard extends StatelessWidget {
   }
 }
 
-void _openTransparencyReports(BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Отчетные документы Медресе скоро появятся')),
+void _openTransparencyReports(BuildContext context, AmanatCampaign? campaign) {
+  if (campaign == null) return;
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => _TransparencyDocumentsSheet(campaign: campaign),
   );
+}
+
+class _TransparencyDocumentsSheet extends StatelessWidget {
+  const _TransparencyDocumentsSheet({required this.campaign});
+
+  final AmanatCampaign campaign;
+
+  Future<void> _openDocument(BuildContext context, AmanatDocument doc) async {
+    if (doc.fileUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Файл документа недоступен')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(doc.fileUrl);
+    if (uri != null) {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть документ')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomSafe = math.max(MediaQuery.viewPaddingOf(context).bottom, 16.0);
+    final docs = campaign.documents;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE5E7EB),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Отчётные документы',
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                          ),
+                          if (docs.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF2E8),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${docs.length}',
+                                style: const TextStyle(
+                                  fontFamily: AppTypography.fontFamily,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        campaign.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF8F8F94),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          Flexible(
+            child: docs.isEmpty
+                ? Padding(
+                    padding: EdgeInsets.fromLTRB(24, 36, 24, 36 + bottomSafe),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFFF2E8),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 32,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Документы готовятся к публикации',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Все чеки, накладные, сметы и акты выполненных работ будут публиковаться здесь по мере реализации проекта.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 13,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomSafe),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
+                      return _DocumentTile(
+                        document: doc,
+                        onTap: () => _openDocument(context, doc),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocumentTile extends StatelessWidget {
+  const _DocumentTile({required this.document, required this.onTap});
+
+  final AmanatDocument document;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    IconData iconData = Icons.description_outlined;
+    Color iconColor = const Color(0xFFF59E0B);
+    Color bgColor = const Color(0xFFFEF3C7);
+
+    if (document.isPdf) {
+      iconData = Icons.picture_as_pdf_outlined;
+      iconColor = const Color(0xFFE11D48);
+      bgColor = const Color(0xFFFFE4E6);
+    } else if (document.isImage) {
+      iconData = Icons.image_outlined;
+      iconColor = const Color(0xFF2563EB);
+      bgColor = const Color(0xFFDBEAFE);
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(iconData, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      document.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    if (document.description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        document.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 12,
+                          color: Color(0xFF4B5563),
+                        ),
+                      ),
+                    ],
+                    if (document.createdAt.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        document.createdAt,
+                        style: const TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.open_in_new_rounded,
+                size: 20,
+                color: Color(0xFF9CA3AF),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _InfoLine extends StatelessWidget {
@@ -1087,18 +1416,24 @@ class _DonationSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const _LegendRow(
-            color: Color(0xFF3EBD44),
-            label: 'Добровольное пожертвование',
+          const SizedBox(height: 14),
+          _LegendRow(
+            color: const Color(0xFF3EBD44),
+            label: 'Добровольные пожертвования',
+            amount: '${_money(campaign.voluntaryAmount)} сом',
           ),
-          const SizedBox(height: 5),
-          const _LegendRow(
-            color: Color(0xFF148CFF),
+          const SizedBox(height: 7),
+          _LegendRow(
+            color: const Color(0xFF148CFF),
             label: 'Процентные сборы от Safa',
+            amount: '${_money(campaign.safaAmount)} сом',
           ),
-          const SizedBox(height: 5),
-          const _LegendRow(color: Color(0xFFFF8425), label: 'Остаток'),
+          const SizedBox(height: 7),
+          _LegendRow(
+            color: const Color(0xFFFF8425),
+            label: 'Остаток',
+            amount: '${_money(campaign.remainingAmount)} сом',
+          ),
         ],
       ),
     );
@@ -1106,10 +1441,15 @@ class _DonationSummaryCard extends StatelessWidget {
 }
 
 class _LegendRow extends StatelessWidget {
-  const _LegendRow({required this.color, required this.label});
+  const _LegendRow({
+    required this.color,
+    required this.label,
+    this.amount,
+  });
 
   final Color color;
   final String label;
+  final String? amount;
 
   @override
   Widget build(BuildContext context) {
@@ -1120,20 +1460,37 @@ class _LegendRow extends StatelessWidget {
           height: 14,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: AppTypography.fontFamily,
-            fontSize: 12,
-            height: 1.1,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: AppTypography.fontFamily,
+              fontSize: 12,
+              height: 1.15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF374151),
+            ),
           ),
         ),
+        if (amount != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            amount!,
+            style: const TextStyle(
+              fontFamily: AppTypography.fontFamily,
+              fontSize: 12,
+              height: 1.15,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1220,24 +1577,42 @@ class _StackedProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vFlex = (voluntary * 1000).round();
+    final sFlex = (safa * 1000).round();
+    final rFlex = math.max((remaining * 1000).round(), 0);
+    final total = vFlex + sFlex + rFlex;
+
+    if (total <= 0) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(height / 2),
+        child: Container(
+          height: height,
+          color: const Color(0xFFE5E7EB),
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(height / 2),
       child: SizedBox(
         height: height,
         child: Row(
           children: [
-            Expanded(
-              flex: (voluntary * 1000).round(),
-              child: Container(color: const Color(0xFF3EBD44)),
-            ),
-            Expanded(
-              flex: (safa * 1000).round(),
-              child: Container(color: const Color(0xFF148CFF)),
-            ),
-            Expanded(
-              flex: (remaining * 1000).round(),
-              child: Container(color: const Color(0xFFFF8425)),
-            ),
+            if (vFlex > 0)
+              Expanded(
+                flex: vFlex,
+                child: Container(color: const Color(0xFF3EBD44)),
+              ),
+            if (sFlex > 0)
+              Expanded(
+                flex: sFlex,
+                child: Container(color: const Color(0xFF148CFF)),
+              ),
+            if (rFlex > 0)
+              Expanded(
+                flex: rFlex,
+                child: Container(color: const Color(0xFFFF8425)),
+              ),
           ],
         ),
       ),

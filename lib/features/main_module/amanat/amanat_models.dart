@@ -41,6 +41,7 @@ class AmanatCampaign {
     required this.coverImageUrl,
     required this.isFeatured,
     required this.donors,
+    this.documents = const [],
   });
 
   final int id;
@@ -60,6 +61,7 @@ class AmanatCampaign {
   final String coverImageUrl;
   final bool isFeatured;
   final List<AmanatDonation> donors;
+  final List<AmanatDocument> documents;
 
   double get progress => neededAmount <= 0 ? 0 : collectedAmount / neededAmount;
   double get voluntaryProgress =>
@@ -70,6 +72,7 @@ class AmanatCampaign {
 
   factory AmanatCampaign.fromJson(Map<String, dynamic> json) {
     final donations = json['latest_donations'];
+    final docs = json['documents'];
     return AmanatCampaign(
       id: (json['id'] as num?)?.toInt() ?? 0,
       title: (json['title'] ?? '').toString(),
@@ -95,6 +98,55 @@ class AmanatCampaign {
                 )
                 .toList()
           : const [],
+      documents: docs is List
+          ? docs
+                .whereType<Map>()
+                .map(
+                  (e) => AmanatDocument.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList()
+          : const [],
+    );
+  }
+}
+
+@immutable
+class AmanatDocument {
+  const AmanatDocument({
+    required this.id,
+    required this.title,
+    required this.fileUrl,
+    required this.fileName,
+    required this.fileType,
+    required this.description,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String title;
+  final String fileUrl;
+  final String fileName;
+  final String fileType;
+  final String description;
+  final String createdAt;
+
+  bool get isPdf => fileType == 'pdf' || fileUrl.toLowerCase().endsWith('.pdf');
+  bool get isImage =>
+      fileType == 'image' ||
+      fileUrl.toLowerCase().endsWith('.jpg') ||
+      fileUrl.toLowerCase().endsWith('.jpeg') ||
+      fileUrl.toLowerCase().endsWith('.png') ||
+      fileUrl.toLowerCase().endsWith('.webp');
+
+  factory AmanatDocument.fromJson(Map<String, dynamic> json) {
+    return AmanatDocument(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      title: (json['title'] ?? '').toString(),
+      fileUrl: (json['file_url'] ?? '').toString(),
+      fileName: (json['file_name'] ?? '').toString(),
+      fileType: (json['file_type'] ?? 'document').toString(),
+      description: (json['description'] ?? '').toString(),
+      createdAt: _formatDate((json['created_at'] ?? '').toString()),
     );
   }
 }

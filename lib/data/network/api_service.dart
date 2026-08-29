@@ -24,7 +24,7 @@ final class ApiService {
 
   static String get _baseUrl => const String.fromEnvironment(
     'DOGO_API_BASE_URL',
-    defaultValue: 'https://safabackend21.pythonanywhere.com/api/',
+    defaultValue: 'https://api.safa-app.com/api/',
   );
 
   final SecureStorageService _storage = SecureStorageService();
