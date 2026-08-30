@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'package:dogo/core/design/app_colors.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../main_module/history/data/model/shipment_detail_model.dart';
 import '../../../../main_module/history/data/repo/shipment_detail_repo.dart';
@@ -244,6 +246,19 @@ class _HistoryDetailsBody extends StatelessWidget {
                   ),
                 ),
               ),
+              if (d.clientPhone != null && d.clientPhone!.trim().isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _ClientDetailCard(
+                      name: d.clientFirstName,
+                      phone: d.clientPhone!.trim(),
+                      avatarUrl: d.clientAvatarUrl,
+                    ),
+                  ),
+                ),
+              ],
               const SliverToBoxAdapter(child: _Divider()),
               SliverToBoxAdapter(
                 child: _Section(
@@ -391,4 +406,196 @@ class _DetailChip {
   final String text;
 
   const _DetailChip(this.asset, this.text);
+}
+
+class _ClientDetailCard extends StatelessWidget {
+  const _ClientDetailCard({
+    this.name,
+    required this.phone,
+    this.avatarUrl,
+  });
+
+  final String? name;
+  final String phone;
+  final String? avatarUrl;
+
+  String _formatKgPhone(String? input) {
+    if (input == null) return '—';
+    var digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '—';
+    if (digits.startsWith('0') && digits.length == 10) {
+      digits = digits.substring(1);
+    }
+    if (digits.length == 9) {
+      digits = '996$digits';
+    }
+    if (digits.length == 12 && digits.startsWith('996')) {
+      final op = digits.substring(3, 6);
+      final a = digits.substring(6, 8);
+      final b = digits.substring(8, 10);
+      final c = digits.substring(10, 12);
+      return '+996 $op $a-$b-$c';
+    }
+    return input.trim().startsWith('+') ? input.trim() : '+$digits';
+  }
+
+  Widget _avatarFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF38BDF8), Color(0xFF0284C7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white, size: 22),
+    );
+  }
+
+  Future<void> _makeCall(BuildContext context) async {
+    final clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (clean.isEmpty) return;
+    final uri = Uri.parse('tel:$clean');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось набрать номер $phone')),
+      );
+    }
+  }
+
+  Future<void> _openWhatsApp(BuildContext context) async {
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('https://wa.me/$digits');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось открыть WhatsApp для $phone')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clientName = (name != null && name!.trim().isNotEmpty)
+        ? name!.trim()
+        : 'Клиент';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: avatarUrl!.trim(),
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => _avatarFallback(),
+                      placeholder: (_, __) => _avatarFallback(),
+                    )
+                  : _avatarFallback(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        clientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Клиент',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _formatKgPhone(phone),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(36, 36),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.chat_bubble_rounded, size: 17),
+            tooltip: 'WhatsApp',
+            onPressed: () => _openWhatsApp(context),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(36, 36),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.phone_rounded, size: 18),
+            tooltip: 'Позвонить',
+            onPressed: () => _makeCall(context),
+          ),
+        ],
+      ),
+    );
+  }
 }

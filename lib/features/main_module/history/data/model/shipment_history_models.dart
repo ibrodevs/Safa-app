@@ -36,6 +36,9 @@ class ShipmentHistoryItem {
   final String stopsCount;
   final String status;
   final DateTime createdAt;
+  final String? clientFirstName;
+  final String? clientPhone;
+  final String? clientAvatarUrl;
 
   const ShipmentHistoryItem({
     required this.id,
@@ -47,6 +50,9 @@ class ShipmentHistoryItem {
     required this.stopsCount,
     required this.status,
     required this.createdAt,
+    this.clientFirstName,
+    this.clientPhone,
+    this.clientAvatarUrl,
   });
 
   factory ShipmentHistoryItem.fromJson(Map<String, dynamic> json) {
@@ -60,6 +66,9 @@ class ShipmentHistoryItem {
       stopsCount: json['stops_count']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       createdAt: _asDateTime(json['created_at']),
+      clientFirstName: json['client_first_name']?.toString(),
+      clientPhone: json['client_phone']?.toString(),
+      clientAvatarUrl: json['client_avatar_url']?.toString(),
     );
   }
 }

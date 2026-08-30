@@ -33,7 +33,7 @@ class CarrierProfileModel {
     }
 
     final dynamic cityRaw = json['city'];
-    final dynamic avatarRaw = json['avatar'];
+    final dynamic avatarRaw = json['avatar_url'] ?? json['avatar'];
 
     return CarrierProfileModel(
       role: json['role']?.toString() ?? '',

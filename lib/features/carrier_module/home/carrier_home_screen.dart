@@ -2060,13 +2060,16 @@ class _ActiveProgressSheet extends StatelessWidget {
         ? '${(distanceM / 1000).toStringAsFixed(1)} км'
         : '$distanceM метров';
 
-    final isLast = stops.isNotEmpty && currentIndex >= stops.length - 1;
     final ci = stops.isEmpty ? 0 : currentIndex.clamp(0, stops.length - 1);
-    final showTwoStops = (ci == 0 && stops.length >= 2);
 
-    final buttonText = (status == ShipmentStatus.assigned || showTwoStops)
-        ? 'Начать'
-        : (isLast ? 'Выполнено' : 'Следующая точка');
+    final String buttonText;
+    if (status == ShipmentStatus.assigned) {
+      buttonText = 'Забрать заказ';
+    } else if (ci < stops.length - 1) {
+      buttonText = 'Следующая точка';
+    } else {
+      buttonText = 'Выполнено';
+    }
 
     final items = <_StopUi>[];
     if (stops.isNotEmpty) {

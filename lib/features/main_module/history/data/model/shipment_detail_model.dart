@@ -118,6 +118,9 @@ class ShipmentDetail {
   final String? carrierPhone;
   final String? carrierAvatarUrl;
   final String? carrierSpecialistType;
+  final String? clientFirstName;
+  final String? clientPhone;
+  final String? clientAvatarUrl;
 
   const ShipmentDetail({
     required this.id,
@@ -142,6 +145,9 @@ class ShipmentDetail {
     this.carrierPhone,
     this.carrierAvatarUrl,
     this.carrierSpecialistType,
+    this.clientFirstName,
+    this.clientPhone,
+    this.clientAvatarUrl,
   });
 
   factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
@@ -184,6 +190,9 @@ class ShipmentDetail {
       carrierPhone: json['carrier_phone']?.toString(),
       carrierAvatarUrl: json['carrier_avatar_url']?.toString(),
       carrierSpecialistType: json['carrier_specialist_type']?.toString(),
+      clientFirstName: json['client_first_name']?.toString(),
+      clientPhone: json['client_phone']?.toString(),
+      clientAvatarUrl: json['client_avatar_url']?.toString(),
     );
   }
 }

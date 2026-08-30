@@ -1668,6 +1668,47 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     }
 
     if (!_searchMode) {
+      final creationStopPoints = <LatLng>[];
+      if (_fromPoint?.lat != null && _fromPoint?.lon != null) {
+        creationStopPoints.add(LatLng(_fromPoint!.lat!, _fromPoint!.lon!));
+      } else if (_fromPoint == null &&
+          _myLat.isFinite &&
+          _myLon.isFinite &&
+          (_deliveryPoint != null || _intermediatePoints.isNotEmpty)) {
+        creationStopPoints.add(LatLng(_myLat, _myLon));
+      }
+      for (final p in _intermediatePoints) {
+        if (p.lat != null && p.lon != null) {
+          creationStopPoints.add(LatLng(p.lat!, p.lon!));
+        }
+      }
+      if (_deliveryPoint?.lat != null && _deliveryPoint?.lon != null) {
+        creationStopPoints
+            .add(LatLng(_deliveryPoint!.lat!, _deliveryPoint!.lon!));
+      }
+
+      if (creationStopPoints.length >= 2) {
+        final spreadCreationPts = _spreadSamePoints(creationStopPoints);
+        for (int i = 0; i < spreadCreationPts.length; i++) {
+          markers.add(
+            SafaMapMarker(
+              id: 'route-creation-stop-$i',
+              point: spreadCreationPts[i],
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              visualKey: 'creation-stop-$i-${spreadCreationPts.length}',
+              zIndex: 32,
+              child: _StopDotMarker(
+                index: i + 1,
+                isFirst: i == 0,
+                isLast: i == spreadCreationPts.length - 1,
+              ),
+            ),
+          );
+        }
+      }
+
       markers.add(
         SafaMapMarker(
           id: 'my-location',

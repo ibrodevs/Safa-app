@@ -48,6 +48,7 @@ class CarrierProfileProvider extends ChangeNotifier {
 
       final today = DateTime.now();
       _selectedDate = _normalize(today);
+      _statsCache.clear();
 
       await _loadStatsFor(_selectedDate!);
     } catch (e, st) {
