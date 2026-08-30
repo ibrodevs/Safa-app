@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dogo/core/design/app_design.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -79,30 +80,39 @@ class _AmanatHomeBodyState extends State<_AmanatHomeBody> {
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: () => context.read<AmanatProvider>().load(),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: EdgeInsets.fromLTRB(15, 9, 15, 28 + bottomSafe),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _AmanatHeader(title: _amanatHomeTitle),
-            const SizedBox(height: 24),
-            if (state.loading && campaigns.isEmpty)
-              const _AmanatLoadingBlock()
-            else if (state.error != null && campaigns.isEmpty)
-              _AmanatErrorState(
-                message: state.error!,
-                onRetry: () => context.read<AmanatProvider>().load(),
-              )
-            else if (featured != null) ...[
-              _HeroCampaignCard(campaign: featured),
-              const SizedBox(height: 14),
-              _TransparencyReportCard(campaign: featured),
-            ],
-          ],
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            padding: EdgeInsets.fromLTRB(15, 9, 15, 28 + bottomSafe),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: (constraints.maxHeight - (37 + bottomSafe)).clamp(0.0, double.infinity),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _AmanatHeader(title: _amanatHomeTitle),
+                  const SizedBox(height: 24),
+                  if (state.loading && campaigns.isEmpty)
+                    const _AmanatLoadingBlock()
+                  else if (state.error != null && campaigns.isEmpty)
+                    _AmanatErrorState(
+                      message: state.error!,
+                      onRetry: () => context.read<AmanatProvider>().load(),
+                    )
+                  else if (featured != null) ...[
+                    _HeroCampaignCard(campaign: featured),
+                    const SizedBox(height: 14),
+                    _TransparencyReportCard(campaign: featured),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -119,6 +129,7 @@ class _AmanatDetailBody extends StatefulWidget {
 
 class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
   bool _expanded = false;
+  int _visibleDonorsCount = 5;
 
   @override
   void initState() {
@@ -170,6 +181,9 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
     }
     final selectedCampaign = campaign;
     final bottomSafe = math.max(MediaQuery.viewPaddingOf(context).bottom, 16.0);
+    final totalDonors = selectedCampaign.donors.length;
+    final shownCount = math.min(_visibleDonorsCount, totalDonors);
+
     return Stack(
       children: [
         SingleChildScrollView(
@@ -206,12 +220,45 @@ class _AmanatDetailBodyState extends State<_AmanatDetailBody> {
                   message:
                       'Пока никто не сделал пожертвование. Вы можете помочь первым',
                 )
-              else
-                for (int i = 0; i < selectedCampaign.donors.length; i++)
+              else ...[
+                for (int i = 0; i < shownCount; i++)
                   _DonorRow(
                     donation: selectedCampaign.donors[i],
-                    showDivider: i != selectedCampaign.donors.length - 1,
+                    showDivider: i != shownCount - 1,
                   ),
+                if (totalDonors > _visibleDonorsCount) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: Color(0xFFFFD6B8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _visibleDonorsCount += 5;
+                          });
+                        },
+                        icon: const Icon(Icons.expand_more_rounded, size: 18),
+                        label: Text(
+                          'Показать ещё (${totalDonors - _visibleDonorsCount})',
+                          style: const TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),
@@ -336,7 +383,10 @@ class _HeroCampaignCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    const _CampaignImage(warm: true),
+                    _CampaignImage(
+                      imageUrl: campaign.coverImageUrl,
+                      warm: true,
+                    ),
                     Container(color: Colors.black.withValues(alpha: 0.38)),
                   ],
                 ),
@@ -528,7 +578,7 @@ class _CampaignDescriptionCard extends StatelessWidget {
             child: SizedBox(
               height: 152,
               width: double.infinity,
-              child: const _CampaignImage(),
+              child: _CampaignImage(imageUrl: campaign.coverImageUrl),
             ),
           ),
           const SizedBox(height: 13),
@@ -1116,17 +1166,54 @@ class _AmanatLoadingBlock extends StatelessWidget {
 }
 
 class _CampaignImage extends StatelessWidget {
-  const _CampaignImage({this.warm = false});
+  const _CampaignImage({this.imageUrl, this.warm = false});
 
+  final String? imageUrl;
   final bool warm;
 
   @override
   Widget build(BuildContext context) {
+    if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: imageUrl!.trim(),
+        fit: BoxFit.cover,
+        placeholder: (_, __) => _buildFallback(),
+        errorWidget: (_, __, ___) => _buildFallback(),
+      );
+    }
+    return _buildFallback();
+  }
+
+  Widget _buildFallback() {
     return Image.asset(
       AppImages.amanatBanner,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) =>
-          warm ? const _WarmHeroArt() : const _BlueCampaignArt(),
+      errorBuilder: (_, __, ___) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: warm
+                ? const [
+                    Color(0xFFE88A38),
+                    Color(0xFFC75B16),
+                    Color(0xFF8C3E0F),
+                  ]
+                : const [
+                    Color(0xFF0D6EFD),
+                    Color(0xFF0B5ED7),
+                    Color(0xFF084298),
+                  ],
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.volunteer_activism_rounded,
+            size: 44,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1153,7 +1240,6 @@ Future<void> _showDonateSheet(
     builder: (sheetContext) {
       return StatefulBuilder(
         builder: (context, setSheetState) {
-          final provider = context.watch<AmanatProvider>();
           final bottomSafe = math.max(
             MediaQuery.viewPaddingOf(context).bottom,
             16.0,
@@ -1179,109 +1265,155 @@ Future<void> _showDonateSheet(
                     color: Colors.black,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Цель сбора: ${campaign.goal.isEmpty ? _medreseDonationTitle : campaign.goal}',
+                  style: const TextStyle(
+                    fontFamily: AppTypography.fontFamily,
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final amount in amounts)
-                      ChoiceChip(
-                        selected: amountController.text == amount.toString(),
-                        label: Text('${_money(amount)} сом'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontWeight: FontWeight.w700,
-                          color: amountController.text == amount.toString()
-                              ? Colors.white
-                              : Colors.black,
-                        ),
-                        onSelected: (_) => setSheetState(() {
-                          amountController.text = amount.toString();
-                          amountError = null;
-                        }),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: amounts.map((preset) {
+                    final isSelected =
+                        amountController.text == preset.toString();
+                    return ChoiceChip(
+                      label: Text('$preset сом'),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFFFFE8D6),
+                      backgroundColor: const Color(0xFFF3F4F6),
+                      labelStyle: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected
+                            ? AppColors.primary
+                            : const Color(0xFF374151),
                       ),
-                  ],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.transparent,
+                        ),
+                      ),
+                      onSelected: (_) {
+                        setSheetState(() {
+                          amountController.text = preset.toString();
+                          amountError = null;
+                        });
+                      },
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Сумма пожертвования',
-                    suffixText: 'сом',
+                    labelText: 'Другая сумма (сом)',
                     errorText: amountError,
-                    filled: true,
-                    fillColor: const Color(0xFFF7F7F8),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
                     ),
                   ),
+                  onChanged: (_) {
+                    if (amountError != null) {
+                      setSheetState(() => amountError = null);
+                    }
+                  },
                 ),
-                const SizedBox(height: 10),
-                CheckboxListTile(
-                  value: isAnonymous,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.primary,
-                  title: const Text('Показать как анонимное пожертвование'),
-                  onChanged: (value) =>
-                      setSheetState(() => isAnonymous = value ?? false),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: isAnonymous,
+                      activeColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      onChanged: (val) {
+                        setSheetState(() => isAnonymous = val ?? false);
+                      },
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Пожертвовать анонимно',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
+                if (paymentError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    paymentError!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
+                  height: 50,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     onPressed: paymentStarting
                         ? null
                         : () async {
-                            final amount = int.tryParse(
-                              amountController.text.replaceAll(
-                                RegExp(r'\D'),
-                                '',
-                              ),
-                            );
-                            if (amount == null || amount <= 0) {
-                              setSheetState(
-                                () => amountError = 'Введите сумму больше 0',
-                              );
+                            final raw = amountController.text.trim();
+                            final parsed = int.tryParse(raw);
+                            if (parsed == null || parsed <= 0) {
+                              setSheetState(() {
+                                amountError = 'Введите корректную сумму';
+                              });
                               return;
                             }
-                            amountError = null;
                             setSheetState(() {
                               paymentStarting = true;
                               paymentError = null;
                             });
                             try {
-                              final flow = context
-                                  .read<FinikPaymentFlowProvider>();
+                              final flow =
+                                  context.read<FinikPaymentFlowProvider>();
                               flow.reset();
                               await flow.startAmanatDonationPayment(
                                 campaignId: campaign.id,
-                                amount: amount,
+                                amount: parsed,
                                 isAnonymous: isAnonymous,
                               );
+                              if (!sheetContext.mounted) return;
+                              Navigator.of(sheetContext).pop();
                               if (!context.mounted) return;
                               final router = GoRouter.of(context);
-                              final messenger = ScaffoldMessenger.of(context);
-                              final amanatProvider = context
-                                  .read<AmanatProvider>();
-                              Navigator.of(context).pop();
                               final paid = await router.pushNamed<bool>(
                                 'finik_pay',
                               );
-                              if (paid == true) {
-                                await amanatProvider.refreshCampaign(
-                                  campaign.id,
-                                );
+                              if (paid == true && context.mounted) {
+                                final messenger = ScaffoldMessenger.of(context);
+                                await context
+                                    .read<AmanatProvider>()
+                                    .refreshCampaign(campaign.id);
                                 messenger.showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -1290,15 +1422,12 @@ Future<void> _showDonateSheet(
                                   ),
                                 );
                               }
-                            } catch (_) {
-                              if (context.mounted) {
-                                final flow = context
-                                    .read<FinikPaymentFlowProvider>();
+                            } catch (e) {
+                              if (sheetContext.mounted) {
                                 setSheetState(() {
                                   paymentStarting = false;
                                   paymentError =
-                                      flow.errorText ??
-                                      'Не удалось открыть оплату Finik';
+                                      'Не удалось начать оплату: $e';
                                 });
                               }
                             }
@@ -1312,23 +1441,16 @@ Future<void> _showDonateSheet(
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Пожертвовать на Медресе'),
+                        : const Text(
+                            'Перейти к оплате',
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
-                if (provider.error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    provider.error!,
-                    style: const TextStyle(color: AppColors.error),
-                  ),
-                ],
-                if (paymentError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    paymentError!,
-                    style: const TextStyle(color: AppColors.error),
-                  ),
-                ],
               ],
             ),
           );
@@ -1364,7 +1486,7 @@ class _DonationSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Нужно:${_money(campaign.neededAmount)} сом',
+            'Нужно: ${_money(campaign.neededAmount)} сом',
             style: const TextStyle(
               fontFamily: AppTypography.fontFamily,
               fontSize: 16,
@@ -1384,7 +1506,7 @@ class _DonationSummaryCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Собрано:${_money(campaign.collectedAmount)} сома',
+                'Собрано: ${_money(campaign.collectedAmount)} сома',
                 style: const TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: 12,
@@ -1618,144 +1740,6 @@ class _StackedProgressBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _WarmHeroArt extends StatelessWidget {
-  const _WarmHeroArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _WarmHeroPainter(),
-      child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _BlueCampaignArt extends StatelessWidget {
-  const _BlueCampaignArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _BlueCampaignPainter(),
-      child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _WarmHeroPainter extends CustomPainter {
-  const _WarmHeroPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF6A4B35), Color(0xFF2F2A25), Color(0xFF8C5E3F)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, bg);
-
-    final teddy = Paint()..color = const Color(0xFFB87548);
-    canvas.drawCircle(Offset(size.width * .52, size.height * .35), 45, teddy);
-    canvas.drawCircle(Offset(size.width * .38, size.height * .32), 18, teddy);
-    canvas.drawCircle(Offset(size.width * .64, size.height * .28), 18, teddy);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .5, size.height * .6),
-        width: 90,
-        height: 70,
-      ),
-      teddy,
-    );
-    canvas.drawCircle(
-      Offset(size.width * .46, size.height * .32),
-      5,
-      Paint()..color = Colors.black.withValues(alpha: .7),
-    );
-    canvas.drawCircle(
-      Offset(size.width * .57, size.height * .32),
-      5,
-      Paint()..color = Colors.black.withValues(alpha: .7),
-    );
-
-    final paperRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * .63, size.height * .22, 105, 105),
-      const Radius.circular(4),
-    );
-    canvas.drawRRect(paperRect, Paint()..color = const Color(0xFFE8E0D2));
-    final linePaint = Paint()
-      ..color = const Color(0xFFB8AA99)
-      ..strokeWidth = 1;
-    for (var y = size.height * .32; y < size.height * .72; y += 10) {
-      canvas.drawLine(
-        Offset(size.width * .66, y),
-        Offset(size.width * .89, y),
-        linePaint,
-      );
-    }
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: 'BEARS',
-        style: TextStyle(
-          color: Colors.black.withValues(alpha: .23),
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 2,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    canvas.save();
-    canvas.translate(size.width * .71, size.height * .62);
-    canvas.rotate(-0.18);
-    textPainter.paint(canvas, Offset.zero);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _BlueCampaignPainter extends CustomPainter {
-  const _BlueCampaignPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = const Color(0xFFCFE5F7));
-    final center = Offset(size.width * .55, size.height * .57);
-    for (var i = 0; i < 20; i++) {
-      final angle = i * .314;
-      final paint = Paint()
-        ..shader = RadialGradient(
-          colors: [
-            const Color(0xFF0637BA).withValues(alpha: .72),
-            const Color(0xFF77BBFF).withValues(alpha: .12),
-          ],
-        ).createShader(rect);
-      final path = Path()
-        ..moveTo(center.dx, center.dy)
-        ..quadraticBezierTo(
-          center.dx + 95 * math.cos(angle - .18),
-          center.dy + 75 * math.sin(angle - .18),
-          center.dx + 135 * math.cos(angle),
-          center.dy + 98 * math.sin(angle),
-        )
-        ..quadraticBezierTo(
-          center.dx + 95 * math.cos(angle + .18),
-          center.dy + 75 * math.sin(angle + .18),
-          center.dx,
-          center.dy,
-        )
-        ..close();
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 String _money(int value) {

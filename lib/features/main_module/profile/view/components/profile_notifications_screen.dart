@@ -2,6 +2,7 @@ import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/model/app_notification_model.dart';
 import '../../data/repo/notifications_repo.dart';
@@ -32,6 +33,23 @@ class _ProfileNotificationsScreenState
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _newShipments = prefs.getBool('notif_new_shipments') ?? true;
+      _statusUpdates = prefs.getBool('notif_status_updates') ?? true;
+      _promo = prefs.getBool('notif_promo') ?? false;
+      _system = prefs.getBool('notif_system') ?? true;
+    });
+  }
+
+  Future<void> _saveSetting(String key, bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, val);
   }
 
   @override
@@ -116,6 +134,7 @@ class _ProfileNotificationsScreenState
                             value: _newShipments,
                             onChanged: (value) {
                               setState(() => _newShipments = value);
+                              _saveSetting('notif_new_shipments', value);
                             },
                           ),
                           const Divider(height: 1),
@@ -128,6 +147,7 @@ class _ProfileNotificationsScreenState
                           value: _statusUpdates,
                           onChanged: (value) {
                             setState(() => _statusUpdates = value);
+                            _saveSetting('notif_status_updates', value);
                           },
                         ),
                         const Divider(height: 1),
@@ -138,6 +158,7 @@ class _ProfileNotificationsScreenState
                           value: _promo,
                           onChanged: (value) {
                             setState(() => _promo = value);
+                            _saveSetting('notif_promo', value);
                           },
                         ),
                         const Divider(height: 1),
@@ -148,6 +169,7 @@ class _ProfileNotificationsScreenState
                           value: _system,
                           onChanged: (value) {
                             setState(() => _system = value);
+                            _saveSetting('notif_system', value);
                           },
                         ),
                       ],

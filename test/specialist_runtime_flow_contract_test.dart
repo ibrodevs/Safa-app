@@ -48,14 +48,13 @@ void main() {
     expect(source, isNot(contains('color: Colors.white,\n                ),')));
   });
 
-  test('address services show search and map selection side by side', () {
+  test('address services show single map selection button', () {
     final source = File(
       'lib/features/main_module/map/view/components/point_picker_sheet.dart',
     ).readAsStringSync();
 
-    expect(source, contains("label: 'Поиск адреса'"));
-    expect(source, contains("label: 'Выбрать точку'"));
-    expect(source, contains('autofocusSearch: true'));
+    expect(source, contains("label: 'Указать на карте'"));
+    expect(source, contains('icon: Icons.map_outlined'));
   });
 
   test('avatar shows upload progress immediately after image selection', () {

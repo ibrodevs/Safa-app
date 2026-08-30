@@ -75,7 +75,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
             if (state.error != null && state.items.isEmpty) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
                 children: [
@@ -97,7 +97,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
             if (!state.loading && state.items.isEmpty) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
                 children: const [
@@ -119,7 +119,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
             return ListView.separated(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+                parent: ClampingScrollPhysics(),
               ),
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
               itemCount: state.items.length + 1 + (state.canLoadMore ? 1 : 0),

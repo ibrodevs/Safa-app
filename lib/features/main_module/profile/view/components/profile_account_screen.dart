@@ -1,7 +1,14 @@
+import 'dart:io';
+
+import 'package:dogo/core/design/app_design.dart';
 import 'package:dogo/core/utils/app_colors.dart';
+import 'package:dogo/core/utils/friendly_error.dart';
 import 'package:dogo/core/utils/snackbar_utils.dart';
+import 'package:dogo/core/widgets/app_widgets.dart';
+import 'package:dogo/data/network/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../../data/services/logout_service.dart';
 import '../../provider/profile_provider.dart';
@@ -19,6 +26,47 @@ class ProfileAccountScreen extends StatefulWidget {
 
 class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
   bool _requested = false;
+  bool _pickingAvatar = false;
+  bool _uploadingAvatar = false;
+
+  Future<void> _pickAndUploadAvatar() async {
+    if (_pickingAvatar || _uploadingAvatar) return;
+    _pickingAvatar = true;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      if (!mounted) return;
+
+      setState(() => _uploadingAvatar = true);
+      final file = File(picked.path);
+      await ApiService.instance.uploadAvatar(file: file);
+      if (!mounted) return;
+      await context.read<ProfileProvider>().loadProfile();
+      if (!mounted) return;
+      AppSnackBar.showSuccess(context, message: 'Фотография профиля обновлена');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(
+        context,
+        message: friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось загрузить фотографию',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pickingAvatar = false;
+          _uploadingAvatar = false;
+        });
+      }
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -117,6 +165,101 @@ class _ProfileAccountScreenState extends State<ProfileAccountScreen> {
                       ),
                       const SizedBox(height: 18),
                     ],
+                    _Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _pickAndUploadAvatar,
+                              child: Stack(
+                                children: [
+                                  AppAvatar(
+                                    url: profile?.avatar,
+                                    name: name,
+                                    size: 64,
+                                  ),
+                                  Positioned(
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: _uploadingAvatar
+                                            ? const SizedBox(
+                                                width: 12,
+                                                height: 12,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 1.5,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.camera_alt_rounded,
+                                                size: 12,
+                                                color: Colors.white,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Фотография профиля',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(0, 0),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      foregroundColor: AppColors.primary,
+                                    ),
+                                    onPressed: _uploadingAvatar
+                                        ? null
+                                        : _pickAndUploadAvatar,
+                                    child: Text(
+                                      _uploadingAvatar
+                                          ? 'Загрузка…'
+                                          : (profile?.avatar?.isNotEmpty == true
+                                              ? 'Изменить фото'
+                                              : 'Добавить фото'),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
                     const Text(
                       'Личные данные',
                       style: TextStyle(

@@ -333,7 +333,7 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
           onRefresh: () => context.read<CarrierProfileProvider>().load(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+              parent: ClampingScrollPhysics(),
             ),
             padding: EdgeInsets.fromLTRB(14, 24, 14, 24 + bottom),
             child: Column(

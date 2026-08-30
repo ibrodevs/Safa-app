@@ -131,23 +131,29 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
               child: RefreshIndicator(
                 onRefresh: provider.fetchSupport,
                 color: _accent,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        message,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.35,
-                          fontWeight: FontWeight.w500,
-                          color: _greyText,
-                        ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: ClampingScrollPhysics(),
                       ),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: (constraints.maxHeight - 40).clamp(0.0, double.infinity),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                                color: _greyText,
+                              ),
+                            ),
                       const SizedBox(height: 16),
                       Container(
                         width: double.infinity,
@@ -265,27 +271,40 @@ class _ProfileSupportScreenState extends State<ProfileSupportScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const _FaqTile(
-                        question: 'Заказ не подтверждается, что делать?',
-                        answer:
-                            'Проверьте интернет, попробуйте перезапустить приложение. '
-                            'Если не помогает — напишите нам в поддержку.',
-                      ),
-                      const SizedBox(height: 6),
-                      const _FaqTile(
-                        question: 'Списали деньги, но заказ не создался.',
-                        answer:
-                            'Сделайте скриншот операции и отправьте в поддержку — мы разберёмся.',
-                      ),
+                      if (support != null && support.faqs.isNotEmpty) ...[
+                        for (final faq in support.faqs) ...[
+                          _FaqTile(
+                            question: faq.question,
+                            answer: faq.answer,
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                      ] else ...[
+                        const _FaqTile(
+                          question: 'Заказ не подтверждается, что делать?',
+                          answer:
+                              'Проверьте интернет, попробуйте перезапустить приложение. '
+                              'Если не помогает — напишите нам в поддержку.',
+                        ),
+                        const SizedBox(height: 6),
+                        const _FaqTile(
+                          question: 'Списали деньги, но заказ не создался.',
+                          answer:
+                              'Сделайте скриншот операции и отправьте в поддержку — мы разберёмся.',
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
-    );
+    ],
+  ),
+),
+);
   }
 }
 

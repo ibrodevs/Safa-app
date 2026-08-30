@@ -1,12 +1,14 @@
 import 'package:dogo/core/design/app_design.dart';
 import 'package:dogo/core/widgets/app_widgets.dart';
 import 'package:dogo/features/auth_module/login/widgets/auth_brand_header.dart';
+import 'package:dogo/features/auth_module/register/data/models/register_request_model.dart';
 import 'package:dogo/features/auth_module/register/provider/auth_provider.dart';
 import 'package:dogo/features/auth_module/register/view/components/register_dots_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ConfirmWhatsappCodeScreen extends StatefulWidget {
   const ConfirmWhatsappCodeScreen({super.key});
@@ -78,7 +80,19 @@ class _ConfirmWhatsappCodeScreenState extends State<ConfirmWhatsappCodeScreen> {
     if (!mounted) return;
 
     if (ok) {
-      context.go('/privacy-policy');
+      final prefs = await SharedPreferences.getInstance();
+      final privacyAccepted = prefs.getBool('privacy_accepted') ?? false;
+      final role = provider.role == UserRole.carrier
+          ? 'carrier'
+          : prefs.getString('user_role');
+
+      if (!mounted) return;
+
+      if (!privacyAccepted) {
+        context.go('/privacy-policy');
+      } else {
+        context.go(role == 'carrier' ? '/home-carrier' : '/home');
+      }
       return;
     }
 

@@ -77,7 +77,7 @@ class AppScreenScaffold extends StatelessWidget {
       content = SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: EdgeInsets.fromLTRB(
           horizontal,

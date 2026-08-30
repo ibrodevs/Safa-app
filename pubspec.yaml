@@ -2,7 +2,7 @@ name: dogo
 description: "DoGo"
 publish_to: 'none'
 
-version: 1.0.17+19
+version: 1.0.20+22
 
 environment:
   sdk: ^3.9.0
@@ -28,6 +28,7 @@ dependencies:
   web_socket_channel: ^2.4.0
   provider: ^6.0.5
   dio: ^5.9.0
+  cached_network_image: ^3.4.1
   url_launcher: ^6.3.0
   app_links: ^6.3.2
   shared_preferences: ^2.4.0

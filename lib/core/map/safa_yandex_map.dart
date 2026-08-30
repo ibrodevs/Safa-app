@@ -183,7 +183,7 @@ class _SafaYandexMapState extends State<SafaYandexMap> {
   void _onMapCreated(ymk.MapWindow window) {
     _window = window;
     final map = window.map;
-    window.setMaxFps(30);
+    window.setMaxFps(60);
     map
       ..mapType = ymk.MapType.VectorMap
       ..rotateGesturesEnabled = false
@@ -192,7 +192,7 @@ class _SafaYandexMapState extends State<SafaYandexMap> {
       ..indoorEnabled = false
       ..awesomeModelsEnabled = false
       ..hdModeEnabled = false
-      ..poiLimit = 100
+      ..poiLimit = 30
       ..addCameraListener(_cameraListener)
       ..addInputListener(_mapTapListener);
     _move(widget.initialCenter, widget.initialZoom, animate: false);

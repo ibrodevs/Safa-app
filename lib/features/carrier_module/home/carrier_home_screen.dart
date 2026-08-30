@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/carrier_module/home/view/comp/empty_orders_screen.dart';
@@ -10,8 +11,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/order_alert_service.dart';
+import '../../../core/utils/kg_phone_format.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/map/safa_yandex_map.dart';
 import '../../../data/network/api_service.dart';
@@ -21,7 +25,6 @@ import '../../../data/realtime/shipment_realtime_service.dart';
 import '../../main_module/map/data/model/market_map_feature.dart';
 import '../../main_module/map/data/repo/market_map_repository.dart';
 import '../../main_module/map/view/widgets/market_map_layers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/model/nearby_shipment.dart';
 
@@ -100,6 +103,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   List<_StopUi> _activeStops = const [];
   int _activeFare = 0;
   int _activeIncome = 0;
+  String? _activeClientFirstName;
+  String? _activeClientPhone;
+  String? _activeClientAvatarUrl;
   int? _activeUiHash;
 
   Timer? _pollTimer;
@@ -214,6 +220,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           _activeStops = parsed.stops;
           _activeFare = parsed.fare;
           _activeIncome = parsed.income;
+          _activeClientFirstName = parsed.clientFirstName;
+          _activeClientPhone = parsed.clientPhone;
+          _activeClientAvatarUrl = parsed.clientAvatarUrl;
           _showWelcome = false;
           _showEmptyOrders = false;
           _nearby = const [];
@@ -429,6 +438,10 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         (j['courier_income'] as num?)?.toInt() ??
         fare;
 
+    final clientFirstName = j['client_first_name']?.toString();
+    final clientPhone = j['client_phone']?.toString();
+    final clientAvatarUrl = j['client_avatar_url']?.toString();
+
     int? idx;
     final a = j['current_stop_index'];
     if (a is int) idx = a;
@@ -468,6 +481,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       stops: stops,
       fare: fare,
       income: income,
+      clientFirstName: clientFirstName,
+      clientPhone: clientPhone,
+      clientAvatarUrl: clientAvatarUrl,
     );
   }
 
@@ -669,6 +685,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _activeStops = parsed.stops;
         _activeFare = parsed.fare;
         _activeIncome = parsed.income;
+        _activeClientFirstName = parsed.clientFirstName;
+        _activeClientPhone = parsed.clientPhone;
+        _activeClientAvatarUrl = parsed.clientAvatarUrl;
         _nearby = const [];
         _nearbyIndex = 0;
         _stopNearbyPolling();
@@ -737,6 +756,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
         _activeIncome = parsed.income;
+        _activeClientFirstName = parsed.clientFirstName;
+        _activeClientPhone = parsed.clientPhone;
+        _activeClientAvatarUrl = parsed.clientAvatarUrl;
       });
       if (parsed.status == ShipmentStatus.canceled) {
         _stopActiveAndBackToWelcome(message: 'Заказ отменён');
@@ -793,6 +815,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       _activeStops = const [];
       _activeFare = 0;
       _activeIncome = 0;
+      _activeClientFirstName = null;
+      _activeClientPhone = null;
+      _activeClientAvatarUrl = null;
       _activeUiHash = null;
 
       _showWelcome = false;
@@ -824,6 +849,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       _activeStops = const [];
       _activeFare = 0;
       _activeIncome = 0;
+      _activeClientFirstName = null;
+      _activeClientPhone = null;
+      _activeClientAvatarUrl = null;
       _activeUiHash = null;
 
       _showWelcome = true;
@@ -862,6 +890,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _activePublicCode = parsed.publicCode;
         _activeFare = parsed.fare;
         _activeIncome = parsed.income;
+        _activeClientFirstName = parsed.clientFirstName;
+        _activeClientPhone = parsed.clientPhone;
+        _activeClientAvatarUrl = parsed.clientAvatarUrl;
         _showWelcome = false;
         _showEmptyOrders = false;
 
@@ -1546,6 +1577,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           stops: _activeStops,
           currentIndex: _activeCurrentStopIndex,
           onAdvance: _advance,
+          clientFirstName: _activeClientFirstName,
+          clientPhone: _activeClientPhone,
+          clientAvatarUrl: _activeClientAvatarUrl,
         );
       }
     } else {
@@ -2004,6 +2038,9 @@ class _ActiveProgressSheet extends StatelessWidget {
     required this.stops,
     required this.currentIndex,
     required this.onAdvance,
+    this.clientFirstName,
+    this.clientPhone,
+    this.clientAvatarUrl,
   });
 
   final Color accent;
@@ -2013,6 +2050,9 @@ class _ActiveProgressSheet extends StatelessWidget {
   final List<_StopUi> stops;
   final int currentIndex;
   final VoidCallback onAdvance;
+  final String? clientFirstName;
+  final String? clientPhone;
+  final String? clientAvatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -2102,7 +2142,7 @@ class _ActiveProgressSheet extends StatelessWidget {
                   ],
                 ),
               ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             const Center(
               child: Text(
                 'Направляйтесь к первой точке и нажмите «Начать» после получения груза.',
@@ -2116,7 +2156,7 @@ class _ActiveProgressSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ] else ...[
             if (stops.isNotEmpty) ...[
               Builder(
@@ -2136,8 +2176,16 @@ class _ActiveProgressSheet extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
             ],
+          ],
+          if (clientPhone != null && clientPhone!.trim().isNotEmpty) ...[
+            _ClientContactCard(
+              name: clientFirstName,
+              phone: clientPhone!.trim(),
+              avatarUrl: clientAvatarUrl,
+            ),
+            const SizedBox(height: 12),
           ],
           SizedBox(
             height: 52,
@@ -2160,6 +2208,181 @@ class _ActiveProgressSheet extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClientContactCard extends StatelessWidget {
+  const _ClientContactCard({
+    this.name,
+    required this.phone,
+    this.avatarUrl,
+  });
+
+  final String? name;
+  final String phone;
+  final String? avatarUrl;
+
+  Future<void> _makeCall(BuildContext context) async {
+    final clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (clean.isEmpty) return;
+    final uri = Uri.parse('tel:$clean');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось набрать номер $phone')),
+      );
+    }
+  }
+
+  Future<void> _openWhatsApp(BuildContext context) async {
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('https://wa.me/$digits');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось открыть WhatsApp для $phone')),
+      );
+    }
+  }
+
+  Widget _avatarFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF38BDF8), Color(0xFF0284C7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white, size: 22),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clientName = (name != null && name!.trim().isNotEmpty)
+        ? name!.trim()
+        : 'Клиент';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: avatarUrl!.trim(),
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => _avatarFallback(),
+                      placeholder: (_, __) => _avatarFallback(),
+                    )
+                  : _avatarFallback(),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        clientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Клиент',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatKgPhone(phone),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(36, 36),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.chat_bubble_rounded, size: 17),
+            tooltip: 'WhatsApp',
+            onPressed: () => _openWhatsApp(context),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(36, 36),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.phone_rounded, size: 18),
+            tooltip: 'Позвонить',
+            onPressed: () => _makeCall(context),
           ),
         ],
       ),
@@ -3007,6 +3230,9 @@ class _ActiveUi {
   final List<_StopUi> stops;
   final int fare;
   final int income;
+  final String? clientFirstName;
+  final String? clientPhone;
+  final String? clientAvatarUrl;
 
   _ActiveUi({
     required this.id,
@@ -3016,5 +3242,8 @@ class _ActiveUi {
     required this.stops,
     required this.fare,
     required this.income,
+    this.clientFirstName,
+    this.clientPhone,
+    this.clientAvatarUrl,
   });
 }

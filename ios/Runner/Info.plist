@@ -90,5 +90,23 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tg</string>
+		<string>telegram</string>
+		<string>whatsapp</string>
+		<string>tel</string>
+		<string>https</string>
+		<string>http</string>
+		<string>mbank</string>
+		<string>optima24</string>
+		<string>odengi</string>
+		<string>balance</string>
+		<string>megapay</string>
+		<string>kompanion</string>
+		<string>bakai</string>
+		<string>demirbank</string>
+		<string>finik</string>
+	</array>
 </dict>
 </plist>

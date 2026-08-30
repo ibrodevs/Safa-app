@@ -89,7 +89,7 @@ class _HistoryBodyState extends State<_HistoryBody> {
               child: CustomScrollView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 slivers: [
                   SliverPadding(

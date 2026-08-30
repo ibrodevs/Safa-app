@@ -93,7 +93,7 @@ class _HomeBodyState extends State<_HomeBody> {
           onRefresh: _refresh,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+              parent: ClampingScrollPhysics(),
             ),
             padding: EdgeInsets.fromLTRB(
               horizontal,

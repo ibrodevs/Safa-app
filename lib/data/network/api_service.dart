@@ -827,4 +827,20 @@ final class ApiService {
       throw ApiException('Непредвиденная ошибка');
     }
   }
+
+  Future<String> getPrivacyPolicy() async {
+    try {
+      final resp = await _dio.get('delivery/privacy/');
+      final map = _asMap(resp.data);
+      final content = map['content']?.toString();
+      if (content != null && content.trim().isNotEmpty) {
+        return content.trim();
+      }
+      throw ApiException('Пустой ответ');
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось загрузить политику конфиденциальности');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
 }

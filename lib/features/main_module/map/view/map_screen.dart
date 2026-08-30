@@ -106,6 +106,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
   String? _carrierAvatarUrl;
   String? _carrierSpecialistType;
   String? _shipmentUiSignature;
+  bool _orderPanelCollapsed = false;
   LatLng? _courierPosition;
   DateTime? _courierPositionUpdatedAt;
   bool _didFitCourierOnce = false;
@@ -1535,10 +1536,16 @@ class _OrderMapScreenState extends State<OrderMapScreen>
             ),
           ),
 
-          // Кнопка «моя геолокация» — над нижней панелью, доступна одной рукой.
-          Positioned(
+          // Кнопка «моя геолокация» — плавно следует за нижней панелью.
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOutCubic,
             right: horizontal,
-            bottom: _searchMode ? 320 + bottomInsets : 360 + bottomInsets,
+            bottom: _activeShipmentId != null
+                ? 300 + bottomInsets
+                : (_orderPanelCollapsed
+                    ? 86 + bottomInsets
+                    : (_searchMode ? 320 + bottomInsets : 360 + bottomInsets)),
             child: AppMapActionButton(
               icon: Icons.my_location_rounded,
               semanticLabel: 'Моё местоположение',
@@ -1853,6 +1860,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         descriptionController: _descriptionController,
         creating: _creatingShipment,
         errorMessage: _panelError,
+        onCollapseChanged: (c) {
+          if (_orderPanelCollapsed != c) {
+            setState(() => _orderPanelCollapsed = c);
+          }
+        },
         onEditFrom: () =>
             _editFromPoint(fromTitle: fromTitle, bazarTitle: bazarTitle),
         onEditDestination: _editDestination,

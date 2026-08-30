@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/design/app_design.dart';
+import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/kg_phone_format.dart';
+import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../data/network/api_service.dart';
 import '../../../../data/services/logout_service.dart';
 import '../provider/profile_provider.dart';
 
@@ -29,6 +35,47 @@ class _ProfileBody extends StatefulWidget {
 
 class _ProfileBodyState extends State<_ProfileBody> {
   bool _loggingOut = false;
+  bool _pickingAvatar = false;
+  bool _uploadingAvatar = false;
+
+  Future<void> _pickAndUploadAvatar() async {
+    if (_pickingAvatar || _uploadingAvatar) return;
+    _pickingAvatar = true;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      if (!mounted) return;
+
+      setState(() => _uploadingAvatar = true);
+      final file = File(picked.path);
+      await ApiService.instance.uploadAvatar(file: file);
+      if (!mounted) return;
+      await context.read<ProfileProvider>().loadProfile();
+      if (!mounted) return;
+      AppSnackBar.showSuccess(context, message: 'Фотография профиля обновлена');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(
+        context,
+        message: friendlyErrorMessage(
+          e,
+          fallback: 'Не удалось загрузить фотографию',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pickingAvatar = false;
+          _uploadingAvatar = false;
+        });
+      }
+    }
+  }
 
   String _roleLabel(String? role) {
     switch (role?.trim().toLowerCase()) {
@@ -40,7 +87,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
       case null:
         return 'Пользователь';
       default:
-        return 'Пользователь';
+        return role!.trim();
     }
   }
 
@@ -92,7 +139,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
           onRefresh: () => context.read<ProfileProvider>().loadProfile(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+              parent: ClampingScrollPhysics(),
             ),
             padding: EdgeInsets.fromLTRB(
               horizontal,
@@ -117,6 +164,8 @@ class _ProfileBodyState extends State<_ProfileBody> {
                     city: profile?.city,
                     role: _roleLabel(profile?.role),
                     avatarUrl: profile?.avatar,
+                    uploadingAvatar: _uploadingAvatar,
+                    onAvatarTap: _pickAndUploadAvatar,
                     onEdit: () => context.push('/profile/account'),
                   ),
                   if (state.error != null) ...[
@@ -205,6 +254,8 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.role,
     required this.city,
     required this.avatarUrl,
+    required this.uploadingAvatar,
+    required this.onAvatarTap,
     required this.onEdit,
   });
 
@@ -213,6 +264,8 @@ class _ProfileHeaderCard extends StatelessWidget {
   final String role;
   final String? city;
   final String? avatarUrl;
+  final bool uploadingAvatar;
+  final VoidCallback onAvatarTap;
   final VoidCallback onEdit;
 
   @override
@@ -224,7 +277,50 @@ class _ProfileHeaderCard extends StatelessWidget {
       semanticLabel: 'Профиль: $name, $phone, $role',
       child: Row(
         children: [
-          AppAvatar(url: avatarUrl, name: name, size: 56),
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: Stack(
+              children: [
+                AppAvatar(url: avatarUrl, name: name, size: 58),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x22000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: uploadingAvatar
+                          ? const SizedBox(
+                              width: 11,
+                              height: 11,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           AppSpacing.hGapSm,
           Expanded(
             child: Column(

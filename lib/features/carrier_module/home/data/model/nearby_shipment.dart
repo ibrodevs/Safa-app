@@ -25,6 +25,10 @@ class NearbyShipment {
   final bool isPaid;
   final DateTime? paidAt;
 
+  final String? clientFirstName;
+  final String? clientPhone;
+  final String? clientAvatarUrl;
+
   final int distanceM;
 
   const NearbyShipment({
@@ -49,6 +53,9 @@ class NearbyShipment {
     required this.isPaid,
     required this.paidAt,
     required this.distanceM,
+    this.clientFirstName,
+    this.clientPhone,
+    this.clientAvatarUrl,
   });
 
   int get displayFare => finalFare > 0 ? finalFare : (estimatedFare ?? 0);
@@ -130,6 +137,9 @@ class NearbyShipment {
       isPaid: json['is_paid'] == true,
       paidAt: _asNullableDateTime(json['paid_at']),
       distanceM: _asInt(json['distance_m']),
+      clientFirstName: json['client_first_name']?.toString(),
+      clientPhone: json['client_phone']?.toString(),
+      clientAvatarUrl: json['client_avatar_url']?.toString(),
     );
   }
 }

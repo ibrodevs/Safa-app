@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../core/design/app_design.dart';
 import '../../../../../core/utils/date_format_ru.dart';
+import '../../../../../core/utils/kg_phone_format.dart';
 import '../../../../../core/utils/order_status_view.dart';
 import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/shipment_detail_model.dart';
@@ -143,15 +145,17 @@ class _DetailContent extends StatelessWidget {
           ),
           AppSpacing.gapLg,
 
-          if (detail.carrierFirstName != null &&
-              detail.carrierFirstName!.isNotEmpty) ...[
+          if ((detail.carrierFirstName != null &&
+                  detail.carrierFirstName!.isNotEmpty) ||
+              (detail.carrierPhone != null &&
+                  detail.carrierPhone!.isNotEmpty)) ...[
             const AppSectionHeader(title: 'Специалист'),
             AppSpacing.gapXs,
             AppCard(
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     child: SizedBox(
                       width: 44,
                       height: 44,
@@ -183,10 +187,13 @@ class _DetailContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          detail.carrierFirstName!,
+                          detail.carrierFirstName?.trim().isNotEmpty == true
+                              ? detail.carrierFirstName!.trim()
+                              : 'Специалист',
                           style: AppTypography.cardTitle,
                         ),
-                        if (detail.carrierSpecialistType != null) ...[
+                        if (detail.carrierSpecialistType != null &&
+                            detail.carrierSpecialistType!.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
                             detail.carrierSpecialistType == 'cart'
@@ -195,9 +202,46 @@ class _DetailContent extends StatelessWidget {
                             style: AppTypography.captionMuted,
                           ),
                         ],
+                        if (detail.carrierPhone != null &&
+                            detail.carrierPhone!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            formatKgPhone(detail.carrierPhone!.trim()),
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4B5563),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  if (detail.carrierPhone != null &&
+                      detail.carrierPhone!.trim().isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(40, 40),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.phone_rounded, size: 20),
+                      onPressed: () {
+                        final raw = detail.carrierPhone!.replaceAll(RegExp(r'[^\d+]'), '');
+                        if (raw.isNotEmpty) {
+                          launchUrl(Uri.parse('tel:$raw'), mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

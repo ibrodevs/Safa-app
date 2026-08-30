@@ -304,38 +304,13 @@ class _PointPickerSheetState extends State<PointPickerSheet> {
             Text(widget.headlineSubtitle!, style: AppTypography.caption),
             AppSpacing.gapSm,
           ],
-          if (widget.addressOnly)
-            Row(
-              children: [
-                Expanded(
-                  child: AppSecondaryButton(
-                    label: 'Поиск адреса',
-                    accent: true,
-                    size: AppButtonSize.medium,
-                    onPressed: _submitting
-                        ? null
-                        : () => _openMapPicker(autofocusSearch: true),
-                  ),
-                ),
-                AppSpacing.hGapXs,
-                Expanded(
-                  child: AppSecondaryButton(
-                    label: 'Выбрать точку',
-                    accent: true,
-                    size: AppButtonSize.medium,
-                    onPressed: _submitting ? null : _openMapPicker,
-                  ),
-                ),
-              ],
-            )
-          else
-            AppSecondaryButton(
-              label: 'Выбрать на карте',
-              icon: Icons.map_outlined,
-              accent: true,
-              size: AppButtonSize.medium,
-              onPressed: _submitting ? null : _openMapPicker,
-            ),
+          AppSecondaryButton(
+            label: 'Указать на карте',
+            icon: Icons.map_outlined,
+            accent: true,
+            size: AppButtonSize.medium,
+            onPressed: _submitting ? null : _openMapPicker,
+          ),
           if (!widget.addressOnly) ...[
             AppSpacing.gapSm,
             RefSuggestField<BazarRef>(

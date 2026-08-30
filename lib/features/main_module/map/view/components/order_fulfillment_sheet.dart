@@ -44,9 +44,9 @@ class OrderFulfillmentSheet extends StatelessWidget {
   String _formatPhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
     if (digits.length == 12 && digits.startsWith('996')) {
-      return '+996 (${digits.substring(3, 6)}) ${digits.substring(6, 9)}-${digits.substring(9)}';
+      return '+996\u00A0(${digits.substring(3, 6)})\u00A0${digits.substring(6, 9)}-${digits.substring(9)}';
     }
-    return raw;
+    return raw.replaceAll(' ', '\u00A0');
   }
 
   Widget _buildAvatarFallback() {
@@ -183,13 +183,20 @@ class OrderFulfillmentSheet extends StatelessWidget {
                         ),
                         if (phone.isNotEmpty) ...[
                           const SizedBox(height: 3),
-                          Text(
-                            _formatPhone(phone),
-                            style: const TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF4B5563),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _formatPhone(phone),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF4B5563),
+                              ),
                             ),
                           ),
                         ],
