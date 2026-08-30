@@ -40,6 +40,36 @@ void main() {
     );
   });
 
+  test('district-only mode hides legacy market objects', () {
+    MarketMapFeature feature(String kind, String id) =>
+        MarketMapFeature.fromJson({
+          'type': 'Feature',
+          'id': id,
+          'properties': {'kind': kind, 'name': id, 'min_zoom': 10},
+          'geometry': {
+            'type': 'Polygon',
+            'coordinates': [
+              [
+                [74.60, 42.90],
+                [74.65, 42.90],
+                [74.65, 42.95],
+                [74.60, 42.95],
+                [74.60, 42.90],
+              ],
+            ],
+          },
+        });
+
+    final data = MarketMapRenderData.fromFeatures(
+      [feature('bazar', 'Старый базар'), feature('district', 'Район')],
+      zoom: 12,
+      districtsOnly: true,
+    );
+
+    expect(data.polygons, hasLength(1));
+    expect(data.markers, hasLength(1));
+  });
+
   test('container features render rectangles before labels', () {
     final feature = MarketMapFeature.fromJson({
       'type': 'Feature',

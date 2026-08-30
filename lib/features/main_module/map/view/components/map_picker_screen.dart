@@ -724,6 +724,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       center: _center,
       maxContainerFeatures: _maxRenderedPublishedContainers,
       showLabels: true,
+      districtsOnly: true,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;

@@ -1537,6 +1537,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
                   center: LatLng(_centerLat, _centerLon),
                   maxContainerFeatures: 48,
                   showLabels: true,
+                  districtsOnly: true,
                 ))
         : MarketMapRenderData.empty;
 

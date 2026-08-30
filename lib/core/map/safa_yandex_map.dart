@@ -20,10 +20,9 @@ abstract final class SafaMapKitConfig {
   static bool get isConfigured => apiKey.trim().isNotEmpty;
 }
 
-/// Backend-authored market geometry is intentionally hidden in the mobile
-/// apps. Orders, route stops and live courier markers remain visible.
+/// Published district polygons are displayed in the mobile applications.
 abstract final class SafaMobileMapFeatures {
-  static const backendDrawingLayersEnabled = false;
+  static const backendDrawingLayersEnabled = true;
 }
 
 final class SafaMapPosition {

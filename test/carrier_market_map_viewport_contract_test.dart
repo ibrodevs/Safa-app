@@ -18,6 +18,6 @@ void main() {
         'if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;',
       ),
     );
-    expect(mapConfig, contains('backendDrawingLayersEnabled = false'));
+    expect(mapConfig, contains('backendDrawingLayersEnabled = true'));
   });
 }

@@ -848,6 +848,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
       center: LatLng(_centerLat, _centerLon),
       maxContainerFeatures: _maxRenderedPublishedContainers,
       showLabels: true,
+      districtsOnly: true,
     );
     _marketMapRenderCache = next;
     _marketMapRenderZoomBucket = zoomBucket;

@@ -52,6 +52,7 @@ final class MarketMapRenderData {
     LatLng? center,
     int? maxContainerFeatures,
     bool showLabels = true,
+    bool districtsOnly = false,
   }) {
     final polygons = <Polygon>[];
     final polylines = <Polyline>[];
@@ -66,8 +67,11 @@ final class MarketMapRenderData {
         ? performanceLimit
         : requestedLimit.clamp(0, performanceLimit).toInt();
 
+    final visibleFeatures = districtsOnly
+        ? features.where((feature) => feature.kind == 'district')
+        : features;
     final sortedFeatures = _limitContainerFeatures(
-      features,
+      visibleFeatures,
       center: center,
       maxContainerFeatures: effectiveLimit,
     )..sort((a, b) => a.zIndex.compareTo(b.zIndex));
