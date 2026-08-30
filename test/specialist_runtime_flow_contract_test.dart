@@ -37,13 +37,18 @@ void main() {
     final source = File(
       'lib/features/carrier_module/home/carrier_home_screen.dart',
     ).readAsStringSync();
+    final routeService = File(
+      'lib/core/map/optimal_road_route_service.dart',
+    ).readAsStringSync();
 
     expect(source, contains('if (_hasActive || _acceptingOrder)'));
     expect(
       source,
       contains('_hasActive || _acceptingOrder ? null : _currentNearby'),
     );
-    expect(source, contains('radiuses'));
+    expect(source, contains('OptimalRoadRouteService'));
+    expect(routeService, contains("'radiuses'"));
+    expect(routeService, contains("'alternatives': '3'"));
     expect(source, contains('AppColors.primary'));
     expect(source, isNot(contains('color: Colors.white,\n                ),')));
   });

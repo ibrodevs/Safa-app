@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:dogo/core/utils/app_colors.dart';
 import 'package:dogo/features/carrier_module/home/view/comp/empty_orders_screen.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +17,7 @@ import '../../../core/services/order_alert_service.dart';
 import '../../../core/utils/kg_phone_format.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/map/safa_yandex_map.dart';
+import '../../../core/map/optimal_road_route_service.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
@@ -84,6 +84,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   late final ShipmentRealtimeService _shipmentRealtime;
 
   bool _loadingOnline = false;
+  bool _advancing = false;
   bool _showWelcome = true;
 
   List<NearbyShipment> _nearby = const [];
@@ -415,9 +416,20 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     return _asMap(resp.data);
   }
 
-  Future<Map<String, dynamic>> _advanceRaw(int id) async {
+  Future<Map<String, dynamic>> _advanceRaw(
+    int id, {
+    required ShipmentStatus expectedStatus,
+    required int expectedStopIndex,
+  }) async {
+    final expectedStatusCode = expectedStatus == ShipmentStatus.assigned
+        ? 'assigned'
+        : 'in_transit';
     final resp = await ApiService.instance.dio.post(
       'delivery/shipments/$id/advance/',
+      data: {
+        'expected_status': expectedStatusCode,
+        'expected_stop_index': expectedStopIndex,
+      },
     );
     return _asMap(resp.data);
   }
@@ -871,11 +883,17 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   }
 
   Future<void> _advance() async {
+    if (_advancing) return;
     final id = _activeId;
     if (id == null) return;
 
+    setState(() => _advancing = true);
     try {
-      final raw = await _advanceRaw(id);
+      final raw = await _advanceRaw(
+        id,
+        expectedStatus: _activeStatus,
+        expectedStopIndex: _activeCurrentStopIndex,
+      );
       final parsed = _parseActive(
         raw,
         fallbackIndex: _activeCurrentStopIndex + 1,
@@ -915,6 +933,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     } catch (e) {
       if (!mounted) return;
       AppSnackBar.showError(context, error: e);
+    } finally {
+      if (mounted) setState(() => _advancing = false);
     }
   }
 
@@ -977,53 +997,13 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         perm == LocationPermission.whileInUse;
   }
 
+  final _roadRouter = OptimalRoadRouteService();
+
   Future<List<LatLng>> _buildOsrmLegRoute({
     required LatLng a,
     required LatLng b,
   }) async {
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    final coords = '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
-
-    try {
-      final resp = await dio.get(
-        'https://router.project-osrm.org/route/v1/driving/$coords',
-        queryParameters: {
-          'overview': 'full',
-          'geometries': 'geojson',
-          'steps': 'false',
-          'alternatives': 'false',
-          'continue_straight': 'false',
-          'radiuses': 'unlimited;unlimited',
-        },
-      );
-
-      final data = resp.data;
-      final routes = (data is Map) ? data['routes'] : null;
-      if (routes is! List || routes.isEmpty) return const [];
-
-      final geom = routes.first['geometry'];
-      final coordsList = (geom is Map) ? geom['coordinates'] : null;
-      if (coordsList is! List) return const [];
-
-      final out = <LatLng>[];
-      for (final c in coordsList) {
-        if (c is! List || c.length < 2) continue;
-        final lon = (c[0] as num).toDouble();
-        final lat = (c[1] as num).toDouble();
-        out.add(LatLng(lat, lon));
-      }
-      if (out.length >= 2) return out;
-    } catch (_) {
-      // Не рисуем прямую линию через здания, если дорожный сервис недоступен.
-    }
-
-    return const [];
+    return _roadRouter.build([a, b]);
   }
 
   Future<void> _loadMarketMapForPoints(List<LatLng> pts) async {
@@ -1578,6 +1558,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           stops: _activeStops,
           currentIndex: _activeCurrentStopIndex,
           onAdvance: _advance,
+          advancing: _advancing,
           clientFirstName: _activeClientFirstName,
           clientPhone: _activeClientPhone,
           clientAvatarUrl: _activeClientAvatarUrl,
@@ -1623,7 +1604,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
                   _scheduleMarketMapViewportRefresh(immediate: true);
                 });
               }
-              if (oldZoomBucket != _zoom.floor()) {
+              if (!hasGesture && oldZoomBucket != _zoom.floor()) {
                 _marketMapRenderCache = null;
                 if (mounted) setState(() {});
               }
@@ -1997,7 +1978,7 @@ class _ShipmentSheet extends StatelessWidget {
                       ),
                     )
                   : const Text(
-                      'Забрать заказ',
+                      'Принять заказ',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
@@ -2039,6 +2020,7 @@ class _ActiveProgressSheet extends StatelessWidget {
     required this.stops,
     required this.currentIndex,
     required this.onAdvance,
+    required this.advancing,
     this.clientFirstName,
     this.clientPhone,
     this.clientAvatarUrl,
@@ -2051,6 +2033,7 @@ class _ActiveProgressSheet extends StatelessWidget {
   final List<_StopUi> stops;
   final int currentIndex;
   final VoidCallback onAdvance;
+  final bool advancing;
   final String? clientFirstName;
   final String? clientPhone;
   final String? clientAvatarUrl;
@@ -2065,11 +2048,11 @@ class _ActiveProgressSheet extends StatelessWidget {
 
     final String buttonText;
     if (status == ShipmentStatus.assigned) {
-      buttonText = 'Забрать заказ';
+      buttonText = 'Заказ забран';
     } else if (ci < stops.length - 1) {
       buttonText = 'Следующая точка';
     } else {
-      buttonText = 'Выполнено';
+      buttonText = 'Завершить заказ';
     }
 
     final items = <_StopUi>[];
@@ -2149,7 +2132,7 @@ class _ActiveProgressSheet extends StatelessWidget {
             const SizedBox(height: 8),
             const Center(
               child: Text(
-                'Направляйтесь к первой точке и нажмите «Начать» после получения груза.',
+                'Направляйтесь к первой точке и нажмите «Заказ забран» после получения груза.',
                 style: TextStyle(
                   fontSize: 15,
                   letterSpacing: -0.4,
@@ -2195,7 +2178,7 @@ class _ActiveProgressSheet extends StatelessWidget {
             height: 52,
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: onAdvance,
+              onPressed: advancing ? null : onAdvance,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accent,
                 foregroundColor: Colors.white,
@@ -2204,13 +2187,21 @@ class _ActiveProgressSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                 ),
               ),
-              child: Text(
-                buttonText,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: advancing
+                  ? const SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      buttonText,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -2220,11 +2211,7 @@ class _ActiveProgressSheet extends StatelessWidget {
 }
 
 class _ClientContactCard extends StatelessWidget {
-  const _ClientContactCard({
-    this.name,
-    required this.phone,
-    this.avatarUrl,
-  });
+  const _ClientContactCard({this.name, required this.phone, this.avatarUrl});
 
   final String? name;
   final String phone;
@@ -2279,10 +2266,7 @@ class _ClientContactCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
       ),
       child: Row(
         children: [
@@ -2323,7 +2307,10 @@ class _ClientContactCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE0F2FE),
                         borderRadius: BorderRadius.circular(6),

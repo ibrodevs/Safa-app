@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dogo/core/design/app_design.dart';
 import 'package:dogo/core/widgets/app_widgets.dart';
 import 'package:dogo/features/auth_module/login/widgets/auth_brand_header.dart';
@@ -21,6 +23,8 @@ class CarrierRegisterScreen extends StatefulWidget {
 }
 
 class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
+  static const int _maxImageBytes = 10 * 1024 * 1024; // 10 MB per photo
+
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _pass = TextEditingController();
@@ -75,6 +79,15 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
     );
     if (file == null || !mounted) return;
 
+    final bytes = await file.length();
+    if (bytes > _maxImageBytes) {
+      if (!mounted) return;
+      setState(() {
+        _formError = 'Размер фотографии не должен превышать 10 МБ';
+      });
+      return;
+    }
+
     setState(() {
       if (isFront) {
         _idFrontPath = file.path;
@@ -104,19 +117,34 @@ class _CarrierRegisterScreenState extends State<CarrierRegisterScreen> {
         ? 'Загрузите обе стороны документа'
         : null;
 
+    String? sizeError;
+    if (_idFrontPath != null) {
+      final frontFile = File(_idFrontPath!);
+      if (frontFile.existsSync() && frontFile.lengthSync() > _maxImageBytes) {
+        sizeError = 'Лицевая сторона документа превышает 10 МБ';
+      }
+    }
+    if (sizeError == null && _idBackPath != null) {
+      final backFile = File(_idBackPath!);
+      if (backFile.existsSync() && backFile.lengthSync() > _maxImageBytes) {
+        sizeError = 'Обратная сторона документа превышает 10 МБ';
+      }
+    }
+
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
       _passError = passError;
       _pass2Error = pass2Error;
-      _formError = documentsError;
+      _formError = sizeError ?? documentsError;
     });
 
     return nameError == null &&
         phoneError == null &&
         passError == null &&
         pass2Error == null &&
-        documentsError == null;
+        documentsError == null &&
+        sizeError == null;
   }
 
   Future<void> _onNext() async {

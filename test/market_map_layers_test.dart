@@ -5,7 +5,7 @@ import 'package:dogo/features/main_module/map/data/model/market_map_feature.dart
 import 'package:dogo/features/main_module/map/view/widgets/market_map_layers.dart';
 
 void main() {
-  test('district polygons render from mobile-friendly zoom', () {
+  test('district polygons and labels are hidden on mobile maps', () {
     final feature = MarketMapFeature.fromJson({
       'type': 'Feature',
       'id': 'district-1',
@@ -36,11 +36,11 @@ void main() {
     );
     expect(
       MarketMapRenderData.fromFeatures([feature], zoom: 12).polygons,
-      hasLength(1),
+      isEmpty,
     );
   });
 
-  test('district-only mode hides legacy market objects', () {
+  test('district-only mode or district features produce no visual map polygons', () {
     MarketMapFeature feature(String kind, String id) =>
         MarketMapFeature.fromJson({
           'type': 'Feature',
@@ -66,8 +66,8 @@ void main() {
       districtsOnly: true,
     );
 
-    expect(data.polygons, hasLength(1));
-    expect(data.markers, hasLength(1));
+    expect(data.polygons, isEmpty);
+    expect(data.markers, isEmpty);
   });
 
   test('container features render rectangles before labels', () {

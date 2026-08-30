@@ -569,11 +569,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
               if (hasGesture) {
                 FocusManager.instance.primaryFocus?.unfocus();
-                if (!_mapMoving && mounted) {
-                  setState(() => _mapMoving = true);
-                }
-                if (_selectedContainer != null) {
-                  setState(() => _selectedContainer = null);
+                if ((!_mapMoving || _selectedContainer != null) && mounted) {
+                  setState(() {
+                    _mapMoving = true;
+                    _selectedContainer = null;
+                  });
                 }
                 _scheduleMapIdle(position.center);
               }
@@ -583,7 +583,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               final oldZoomBucket = _zoom.floor();
               final newZoomBucket = position.zoom.floor();
               _zoom = position.zoom;
-              if ((wasLabelled != isLabelled ||
+              if (!hasGesture &&
+                  (wasLabelled != isLabelled ||
                       oldZoomBucket != newZoomBucket) &&
                   mounted) {
                 setState(() {});
@@ -613,10 +614,23 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   controller: _query,
                   hint: 'Поиск адреса',
                   focusNode: _focus,
-                  leading: AppMapActionButton(
-                    icon: Icons.arrow_back_ios_new_rounded,
-                    semanticLabel: 'Назад',
-                    onTap: () => Navigator.of(context).maybePop(),
+                  leading: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: AppRadius.allFull,
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: Center(
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 18,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   onChanged: (value) => context
                       .read<DeliveryAutocompleteProvider>()
@@ -638,24 +652,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                           .clearSuggestions();
                       final lat = (item.lat as num).toDouble();
                       final lon = (item.lon as num).toDouble();
-                      final addr = (item.address ?? item.title ?? '').toString().trim();
+                      final addr = (item.address ?? item.title ?? '')
+                          .toString()
+                          .trim();
                       _onSearchResultSelected(LatLng(lat, lon), addr);
                     },
                   ),
                 ],
-                AppSpacing.gapXs,
-                if (SafaMobileMapFeatures.backendDrawingLayersEnabled)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: AppMapStatusChip(
-                      label: _containersLoading
-                          ? 'Контейнеры…'
-                          : _marketMapLoading
-                          ? 'Карта базара…'
-                          : 'Контейнеры: ${_visibleContainers.length}',
-                      loading: _containersLoading || _marketMapLoading,
-                    ),
-                  ),
               ],
             ),
           ),

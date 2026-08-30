@@ -738,9 +738,20 @@ final class ApiService {
     }
   }
 
-  Future<ShipmentDetail> advanceShipment(int id) async {
+  Future<ShipmentDetail> advanceShipment(
+    int id, {
+    String? expectedStatus,
+    int? expectedStopIndex,
+  }) async {
     try {
-      final resp = await _dio.post('delivery/shipments/$id/advance/');
+      final resp = await _dio.post(
+        'delivery/shipments/$id/advance/',
+        data: {
+          if (expectedStatus != null) 'expected_status': expectedStatus,
+          if (expectedStopIndex != null)
+            'expected_stop_index': expectedStopIndex,
+        },
+      );
       final map = _asMap(resp.data);
       return ShipmentDetail.fromJson(map);
     } on DioException catch (e) {

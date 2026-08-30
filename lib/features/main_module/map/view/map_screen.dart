@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:dogo/features/main_module/map/provider/delivery_address_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -11,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/design/app_design.dart';
 import '../../../../core/map/safa_yandex_map.dart';
+import '../../../../core/map/optimal_road_route_service.dart';
 import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
@@ -163,74 +163,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     return pts.map((p) => '${f(p.latitude)},${f(p.longitude)}').join('|');
   }
 
-  Future<List<LatLng>> _buildOsrmRoute(List<LatLng> stops) async {
-    if (stops.length < 2) return const [];
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    // Один запрос сохраняет порядок всех остановок A → B → C. Отдельные
-    // запросы для каждого плеча чаще попадали под rate limit и оставляли на
-    // карте прямые сегменты вместо дороги.
-    final coords = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
-
-    try {
-      final resp = await dio.get(
-        'https://router.project-osrm.org/route/v1/driving/$coords',
-        queryParameters: {
-          'overview': 'full',
-          'geometries': 'geojson',
-          'steps': 'false',
-          'alternatives': 'false',
-          'continue_straight': 'false',
-          'radiuses': List.filled(stops.length, 'unlimited').join(';'),
-        },
-      );
-
-      final data = resp.data;
-      final routes = (data is Map) ? data['routes'] : null;
-      if (routes is! List || routes.isEmpty) return const [];
-
-      final geom = routes.first['geometry'];
-      final coordsList = (geom is Map) ? geom['coordinates'] : null;
-      if (coordsList is! List) return const [];
-
-      final out = <LatLng>[];
-      for (final c in coordsList) {
-        if (c is! List || c.length < 2) continue;
-        final lon = (c[0] as num).toDouble();
-        final lat = (c[1] as num).toDouble();
-        out.add(LatLng(lat, lon));
-      }
-
-      if (out.length >= 2) return _dedupeRoutePoints(out);
-    } catch (_) {
-      // При временной ошибке не показываем вводящую в заблуждение прямую.
-    }
-
-    return const [];
-  }
-
-  double _distanceMeters(LatLng a, LatLng b) {
-    return const Distance().as(LengthUnit.Meter, a, b);
-  }
-
-  List<LatLng> _dedupeRoutePoints(List<LatLng> points) {
-    final out = <LatLng>[];
-    for (final point in points) {
-      if (out.isEmpty || _distanceMeters(out.last, point) > 0.5) {
-        out.add(point);
-      }
-    }
-    return out;
-  }
+  final _roadRouter = OptimalRoadRouteService();
 
   Future<List<LatLng>> _buildRouteMultiLeg(List<LatLng> pts) async {
     if (pts.length < 2) return const [];
-    return _buildOsrmRoute(pts);
+    return _roadRouter.build(pts);
   }
 
   // --- Контейнеры -------------------------------------------------------
@@ -1533,7 +1470,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
               containersCount: _visibleContainers.length,
               onBack: () => context.go('/home'),
               onContainers: _focusContainers,
-              showContainers: SafaMobileMapFeatures.backendDrawingLayersEnabled,
+              showContainers: false,
             ),
           ),
 
@@ -1800,7 +1737,8 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         final isLabelled = pos.zoom >= _containerLabelMinZoom;
         final newZoomBucket = pos.zoom.floor();
         _zoom = pos.zoom;
-        if ((wasLabelled != isLabelled || oldZoomBucket != newZoomBucket) &&
+        if (!hasGesture &&
+            (wasLabelled != isLabelled || oldZoomBucket != newZoomBucket) &&
             mounted) {
           setState(() {});
         }

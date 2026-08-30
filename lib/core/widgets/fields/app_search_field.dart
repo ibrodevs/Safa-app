@@ -42,12 +42,13 @@ class AppSearchField extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: elevated ? AppShadows.raised : AppShadows.none,
       ),
-      padding: EdgeInsets.only(left: leading == null ? AppSpacing.sm : 0),
+      padding: EdgeInsets.only(left: leading == null ? AppSpacing.sm : AppSpacing.xs),
       child: Row(
         children: [
-          if (leading != null)
-            leading!
-          else ...[
+          if (leading != null) ...[
+            leading!,
+            AppSpacing.hGapXxs,
+          ] else ...[
             const Icon(
               Icons.search_rounded,
               size: 20,

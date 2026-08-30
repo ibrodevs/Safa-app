@@ -19,6 +19,8 @@ class SelfieCaptureScreen extends StatefulWidget {
 }
 
 class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
+  static const int _maxImageBytes = 10 * 1024 * 1024; // 10 MB per photo
+
   final ImagePicker _picker = ImagePicker();
   XFile? _selfie;
 
@@ -30,6 +32,16 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
     );
     if (!mounted) return;
     if (file != null) {
+      final bytes = await file.length();
+      if (bytes > _maxImageBytes) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Размер фотографии не должен превышать 10 МБ'),
+          ),
+        );
+        return;
+      }
       setState(() {
         _selfie = file;
       });
@@ -40,6 +52,16 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen> {
     final selfie = _selfie;
     if (selfie == null) {
       await _takeSelfie(context);
+      return;
+    }
+
+    final selfieFile = File(selfie.path);
+    if (selfieFile.existsSync() && selfieFile.lengthSync() > _maxImageBytes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Размер фотографии не должен превышать 10 МБ'),
+        ),
+      );
       return;
     }
 

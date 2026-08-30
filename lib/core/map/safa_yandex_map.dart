@@ -124,11 +124,16 @@ class SafaYandexMap extends StatefulWidget {
 }
 
 class _SafaYandexMapState extends State<SafaYandexMap> {
+  static const _cameraCallbackInterval = Duration(milliseconds: 80);
+
   ymk.MapWindow? _window;
   late final _CameraListener _cameraListener;
   late final _MapTapListener _mapTapListener;
   final List<_MarkerTapListener> _tapListeners = [];
   final List<yui.ViewProvider> _viewProviders = [];
+  final Stopwatch _cameraCallbackClock = Stopwatch()..start();
+  Duration? _lastCameraCallbackAt;
+  bool? _lastCameraCallbackWasGesture;
   int _renderSignature = 0;
 
   @override
@@ -278,12 +283,28 @@ class _SafaYandexMapState extends State<SafaYandexMap> {
     // consumed only after the gesture settles, so do not recalculate them on
     // every animation frame while the user pinches the map.
     if (finished) _updateVisibleBounds();
+
+    // MapKit сообщает позицию камеры почти на каждом кадре pinch-жеста.
+    // Передача каждого такого события в дерево Flutter заставляла экраны
+    // карты выполнять лишнюю работу и давала заметные рывки на слабых
+    // устройствах. Финальное событие никогда не пропускается.
+    final isGesture = reason == ymk.CameraUpdateReason.Gestures;
+    final now = _cameraCallbackClock.elapsed;
+    final last = _lastCameraCallbackAt;
+    if (!finished &&
+        last != null &&
+        isGesture == _lastCameraCallbackWasGesture &&
+        now - last < _cameraCallbackInterval) {
+      return;
+    }
+    _lastCameraCallbackAt = now;
+    _lastCameraCallbackWasGesture = isGesture;
     widget.onPositionChanged?.call(
       SafaMapPosition(
         center: LatLng(camera.target.latitude, camera.target.longitude),
         zoom: camera.zoom,
       ),
-      reason == ymk.CameraUpdateReason.Gestures,
+      isGesture,
     );
   }
 

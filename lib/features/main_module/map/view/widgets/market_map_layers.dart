@@ -68,8 +68,8 @@ final class MarketMapRenderData {
         : requestedLimit.clamp(0, performanceLimit).toInt();
 
     final visibleFeatures = districtsOnly
-        ? features.where((feature) => feature.kind == 'district')
-        : features;
+        ? const <MarketMapFeature>[]
+        : features.where((feature) => feature.kind != 'district');
     final sortedFeatures = _limitContainerFeatures(
       visibleFeatures,
       center: center,

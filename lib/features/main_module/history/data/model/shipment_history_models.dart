@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import 'shipment_detail_model.dart';
 
+export 'shipment_detail_model.dart' show ShipmentReview;
+
 int _asInt(dynamic v) {
   if (v is int) return v;
   if (v is num) return v.toInt();

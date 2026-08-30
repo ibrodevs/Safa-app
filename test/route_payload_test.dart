@@ -50,16 +50,20 @@ void main() {
     });
 
     test('весь порядок A-B-C уходит в один дорожный запрос', () {
-      final source = File(
+      final router = File(
+        'lib/core/map/optimal_road_route_service.dart',
+      ).readAsStringSync();
+      final map = File(
         'lib/features/main_module/map/view/map_screen.dart',
       ).readAsStringSync();
 
-      expect(source, contains(".join(';')"));
-      expect(source, contains('route/v1/driving/'));
-      expect(source, contains("List.filled(stops.length, 'unlimited')"));
-      expect(source, contains('return _buildOsrmRoute(pts);'));
-      expect(source, isNot(contains("['foot', 'walking', 'driving']")));
-      expect(source, isNot(contains('route.isNotEmpty ? route : pts')));
+      expect(router, contains(".join(';')"));
+      expect(router, contains('route/v1/driving/'));
+      expect(router, contains("List.filled(stops.length, 'unlimited')"));
+      expect(router, contains("'alternatives': '3'"));
+      expect(map, contains('return _roadRouter.build(pts);'));
+      expect(router, isNot(contains("['foot', 'walking', 'driving']")));
+      expect(map, isNot(contains('route.isNotEmpty ? route : pts')));
     });
 
     test('передают данные выбранного контейнера в заказ', () {

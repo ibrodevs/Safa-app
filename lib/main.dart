@@ -113,13 +113,13 @@ class _DoGoAppState extends State<DoGoApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!SafaMapKitConfig.isConfigured) return;
     if (state == AppLifecycleState.resumed) {
-      mapkit.onStart();
+      unawaited(PushService.instance.refreshRegistration());
+      if (SafaMapKitConfig.isConfigured) mapkit.onStart();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      mapkit.onStop();
+      if (SafaMapKitConfig.isConfigured) mapkit.onStop();
     }
   }
 

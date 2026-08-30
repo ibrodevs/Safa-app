@@ -296,6 +296,18 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
     return input.trim().startsWith('+') ? input.trim() : '+$digits';
   }
 
+  String _pluralClientReviews(int count) {
+    final mod10 = count % 10;
+    final mod100 = count % 100;
+    if (mod100 >= 11 && mod100 <= 19) {
+      return 'клиентов';
+    }
+    if (mod10 == 1) {
+      return 'клиента';
+    }
+    return 'клиентов';
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CarrierProfileProvider>();
@@ -434,50 +446,67 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
                     ],
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 18,
+                    horizontal: 16,
+                    vertical: 16,
                   ),
                   child: Row(
                     children: [
-                      Text(
-                        rate.toStringAsFixed(2),
-                        style: const TextStyle(
-                          fontSize: 40,
-                          height: 1.0,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black,
+                      Flexible(
+                        flex: 0,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              rate.toStringAsFixed(2),
+                              style: const TextStyle(
+                                fontSize: 32,
+                                height: 1.0,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/icons/ic_rait.svg',
+                                  width: 18,
+                                  height: 18,
+                                ),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'Рейтинг',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Row(
-                        children: [
-                          SvgPicture.asset('assets/icons/ic_rait.svg'),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Рейтинг',
-                            style: TextStyle(
-                              fontSize: 17,
-                              height: 1.1,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 26),
+                      const SizedBox(width: 12),
                       Container(
                         width: 1.5,
-                        height: 30,
-                        color: Color(0xFF424242),
+                        height: 28,
+                        color: const Color(0xFFD1D5DB),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'От $clientRateCount клиентов',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.1,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF54546c),
+                      Expanded(
+                        child: Text(
+                          'От $clientRateCount ${_pluralClientReviews(clientRateCount)}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.2,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF54546c),
+                          ),
                         ),
                       ),
                     ],
@@ -808,9 +837,12 @@ class _StatLine extends StatelessWidget {
           SizedBox(
             width: leftWidth,
             child: Align(
-              alignment: Alignment
-                  .centerLeft, // или centerRight если хочешь прижать числа к линии
-              child: Text(leftText, style: valueStyle, maxLines: 1),
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(leftText, style: valueStyle, maxLines: 1),
+              ),
             ),
           ),
           const SizedBox(width: 18),
