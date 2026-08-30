@@ -29,6 +29,27 @@ DateTime _asDateTime(dynamic v) {
 String _asString(dynamic v) => v?.toString() ?? '';
 
 @immutable
+class ShipmentReview {
+  final int rating;
+  final String comment;
+  final DateTime createdAt;
+
+  const ShipmentReview({
+    required this.rating,
+    required this.comment,
+    required this.createdAt,
+  });
+
+  factory ShipmentReview.fromJson(Map<String, dynamic> json) {
+    return ShipmentReview(
+      rating: _asInt(json['rating']),
+      comment: _asString(json['comment']),
+      createdAt: _asDateTime(json['created_at']),
+    );
+  }
+}
+
+@immutable
 class ShipmentStop {
   final int position;
   final String title;
@@ -76,12 +97,16 @@ class ShipmentStop {
     if (bazarValue.isNotEmpty) parts.add(bazarValue);
     if (passageValue.isNotEmpty) {
       final lower = passageValue.toLowerCase();
-      parts.add(lower.contains('проход') ? passageValue : 'Проход $passageValue');
+      parts.add(
+        lower.contains('проход') ? passageValue : 'Проход $passageValue',
+      );
     }
     if (containerValue.isNotEmpty) {
       final lower = containerValue.toLowerCase();
       parts.add(
-        lower.contains('контейнер') ? containerValue : 'Контейнер $containerValue',
+        lower.contains('контейнер')
+            ? containerValue
+            : 'Контейнер $containerValue',
       );
     }
 
@@ -121,6 +146,8 @@ class ShipmentDetail {
   final String? clientFirstName;
   final String? clientPhone;
   final String? clientAvatarUrl;
+  final ShipmentReview? review;
+  final bool canReview;
 
   const ShipmentDetail({
     required this.id,
@@ -148,6 +175,8 @@ class ShipmentDetail {
     this.clientFirstName,
     this.clientPhone,
     this.clientAvatarUrl,
+    this.review,
+    this.canReview = false,
   });
 
   factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
@@ -193,6 +222,12 @@ class ShipmentDetail {
       clientFirstName: json['client_first_name']?.toString(),
       clientPhone: json['client_phone']?.toString(),
       clientAvatarUrl: json['client_avatar_url']?.toString(),
+      review: json['review'] is Map
+          ? ShipmentReview.fromJson(
+              Map<String, dynamic>.from(json['review'] as Map),
+            )
+          : null,
+      canReview: json['can_review'] == true,
     );
   }
 }

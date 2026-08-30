@@ -966,7 +966,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
           _fromPoint = null;
           _intermediatePoints.clear();
           _descriptionController.clear();
-          _showOrderCompletedSheet();
+          _showOrderCompletedSheet(shipmentId);
         }
         return;
       }
@@ -1024,11 +1024,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     await _pollShipment(shipmentId);
   }
 
-  void _showOrderCompletedSheet() {
+  void _showOrderCompletedSheet(int shipmentId) {
     if (!mounted) return;
     showAppBottomSheet<void>(
       context: context,
-      builder: (_) => const OrderCompletedSheet(),
+      builder: (_) => OrderCompletedSheet(shipmentId: shipmentId),
     );
   }
 
@@ -1545,8 +1545,10 @@ class _OrderMapScreenState extends State<OrderMapScreen>
             bottom: _activeShipmentId != null
                 ? 300 + bottomInsets
                 : (_orderPanelCollapsed
-                    ? 86 + bottomInsets
-                    : (_searchMode ? 320 + bottomInsets : 360 + bottomInsets)),
+                      ? 86 + bottomInsets
+                      : (_searchMode
+                            ? 320 + bottomInsets
+                            : 360 + bottomInsets)),
             child: AppMapActionButton(
               icon: Icons.my_location_rounded,
               semanticLabel: 'Моё местоположение',
@@ -1684,8 +1686,9 @@ class _OrderMapScreenState extends State<OrderMapScreen>
         }
       }
       if (_deliveryPoint?.lat != null && _deliveryPoint?.lon != null) {
-        creationStopPoints
-            .add(LatLng(_deliveryPoint!.lat!, _deliveryPoint!.lon!));
+        creationStopPoints.add(
+          LatLng(_deliveryPoint!.lat!, _deliveryPoint!.lon!),
+        );
       }
 
       if (creationStopPoints.length >= 2) {

@@ -4,7 +4,7 @@ class CarrierProfileModel {
   final String firstName;
   final String? city;
   final String? avatar;
-  final int rate;
+  final double rate;
   final int clientRateCount;
   final DateTime createdAt;
 
@@ -26,6 +26,11 @@ class CarrierProfileModel {
       return int.tryParse(v?.toString() ?? '0') ?? 0;
     }
 
+    double asDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      return double.tryParse(v?.toString() ?? '0') ?? 0;
+    }
+
     DateTime asDate(dynamic v) {
       if (v == null) return DateTime.now();
       final s = v.toString();
@@ -41,7 +46,7 @@ class CarrierProfileModel {
       firstName: json['first_name']?.toString() ?? '',
       city: cityRaw?.toString(),
       avatar: avatarRaw?.toString(),
-      rate: asInt(json['rate']),
+      rate: asDouble(json['rate']),
       clientRateCount: asInt(json['client_rate_count']),
       createdAt: asDate(json['created_at']),
     );

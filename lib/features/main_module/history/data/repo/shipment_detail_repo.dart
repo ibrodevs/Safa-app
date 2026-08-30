@@ -9,4 +9,12 @@ class ShipmentDetailRepository {
   Future<ShipmentDetail> fetchDetail(int id) {
     return _api.getShipmentDetail(id);
   }
+
+  Future<void> submitReview(
+    int id, {
+    required int rating,
+    String comment = '',
+  }) {
+    return _api.submitShipmentReview(id, rating: rating, comment: comment);
+  }
 }

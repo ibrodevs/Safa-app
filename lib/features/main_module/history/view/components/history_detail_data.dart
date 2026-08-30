@@ -10,6 +10,7 @@ import '../../../../../core/widgets/app_widgets.dart';
 import '../../data/model/shipment_detail_model.dart';
 import '../../data/repo/shipment_detail_repo.dart';
 import '../../provider/shipment_detail_provider.dart';
+import 'shipment_review_sheet.dart';
 
 class HistoryDetailsScreen extends StatelessWidget {
   const HistoryDetailsScreen({super.key, required this.shipmentId});
@@ -99,7 +100,7 @@ class _DetailContent extends StatelessWidget {
       showBackButton: true,
       title: _numberLabel,
       // Действия показываются только те, что имеют смысл для текущего статуса.
-      footer: _Actions(status: status),
+      footer: _Actions(status: status, detail: detail),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -159,7 +160,8 @@ class _DetailContent extends StatelessWidget {
                     child: SizedBox(
                       width: 44,
                       height: 44,
-                      child: (detail.carrierAvatarUrl != null &&
+                      child:
+                          (detail.carrierAvatarUrl != null &&
                               detail.carrierAvatarUrl!.isNotEmpty)
                           ? Image.network(
                               detail.carrierAvatarUrl!,
@@ -235,13 +237,61 @@ class _DetailContent extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.phone_rounded, size: 20),
                       onPressed: () {
-                        final raw = detail.carrierPhone!.replaceAll(RegExp(r'[^\d+]'), '');
+                        final raw = detail.carrierPhone!.replaceAll(
+                          RegExp(r'[^\d+]'),
+                          '',
+                        );
                         if (raw.isNotEmpty) {
-                          launchUrl(Uri.parse('tel:$raw'), mode: LaunchMode.externalApplication);
+                          launchUrl(
+                            Uri.parse('tel:$raw'),
+                            mode: LaunchMode.externalApplication,
+                          );
                         }
                       },
                     ),
                   ],
+                ],
+              ),
+            ),
+            AppSpacing.gapLg,
+          ],
+
+          if (detail.review != null) ...[
+            const AppSectionHeader(title: 'Ваш отзыв'),
+            AppSpacing.gapXs,
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      for (var i = 1; i <= 5; i++)
+                        Icon(
+                          i <= detail.review!.rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 25,
+                          color: const Color(0xFFFFB020),
+                        ),
+                      AppSpacing.hGapXs,
+                      Text(
+                        '${detail.review!.rating}/5',
+                        style: AppTypography.cardTitle,
+                      ),
+                    ],
+                  ),
+                  if (detail.review!.comment.trim().isNotEmpty) ...[
+                    AppSpacing.gapSm,
+                    Text(
+                      detail.review!.comment.trim(),
+                      style: AppTypography.bodySecondary,
+                    ),
+                  ],
+                  AppSpacing.gapXs,
+                  Text(
+                    formatOrderDateTime(detail.review!.createdAt),
+                    style: AppTypography.captionMuted,
+                  ),
                 ],
               ),
             ),
@@ -364,14 +414,29 @@ class _DetailContent extends StatelessWidget {
 }
 
 class _Actions extends StatelessWidget {
-  const _Actions({required this.status});
+  const _Actions({required this.status, required this.detail});
 
   final OrderStatusView status;
+  final ShipmentDetail detail;
 
   @override
   Widget build(BuildContext context) {
-    // Для активного заказа есть смысл вернуться к карте и следить за статусом;
-    // для завершённого и отменённого доступных действий нет.
+    if (detail.canReview) {
+      return AppPrimaryButton(
+        label: 'Оставить отзыв',
+        icon: Icons.star_rounded,
+        onPressed: () async {
+          final submitted = await showAppBottomSheet<bool>(
+            context: context,
+            builder: (_) => ShipmentReviewSheet(shipmentId: detail.id),
+          );
+          if (submitted == true && context.mounted) {
+            await context.read<ShipmentDetailProvider>().load(detail.id);
+          }
+        },
+      );
+    }
+
     if (!status.isActive) return const SizedBox.shrink();
 
     return AppSecondaryButton(

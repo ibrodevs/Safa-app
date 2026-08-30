@@ -690,6 +690,23 @@ final class ApiService {
     }
   }
 
+  Future<void> submitShipmentReview(
+    int id, {
+    required int rating,
+    String comment = '',
+  }) async {
+    try {
+      await _dio.post(
+        'delivery/shipments/$id/review/',
+        data: {'rating': rating, 'comment': comment.trim()},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e, fallback: 'Не удалось оставить отзыв');
+    } catch (_) {
+      throw ApiException('Непредвиденная ошибка');
+    }
+  }
+
   Future<NearbyShipmentsPage> getNearbyShipments({
     required double lat,
     required double lon,
@@ -838,7 +855,10 @@ final class ApiService {
       }
       throw ApiException('Пустой ответ');
     } on DioException catch (e) {
-      throw _mapDioError(e, fallback: 'Не удалось загрузить политику конфиденциальности');
+      throw _mapDioError(
+        e,
+        fallback: 'Не удалось загрузить политику конфиденциальности',
+      );
     } catch (_) {
       throw ApiException('Непредвиденная ошибка');
     }

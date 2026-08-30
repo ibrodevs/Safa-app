@@ -440,7 +440,7 @@ class _CarrierProfileBodyState extends State<_CarrierProfileBody> {
                   child: Row(
                     children: [
                       Text(
-                        rate.toString(),
+                        rate.toStringAsFixed(2),
                         style: const TextStyle(
                           fontSize: 40,
                           height: 1.0,

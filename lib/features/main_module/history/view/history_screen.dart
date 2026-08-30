@@ -246,8 +246,14 @@ class _HistoryBodyState extends State<_HistoryBody> {
       title: item.title.isNotEmpty ? item.title : 'Без названия',
       status: OrderStatusView.of(item.status),
       date: formatOrderDate(item.createdAt),
-      serviceLabel: item.quantity > 0 ? 'Мест: ${item.quantity}' : null,
-      serviceIcon: Icons.inventory_2_outlined,
+      serviceLabel: item.review != null
+          ? 'Ваш отзыв: ${item.review!.rating}/5'
+          : item.quantity > 0
+          ? 'Мест: ${item.quantity}'
+          : null,
+      serviceIcon: item.review != null
+          ? Icons.star_rounded
+          : Icons.inventory_2_outlined,
       stopsCount: stopsCount,
       priceLabel: price,
       onTap: () => context.push('/history/detail', extra: item.id),

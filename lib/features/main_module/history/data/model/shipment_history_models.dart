@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'shipment_detail_model.dart';
+
 int _asInt(dynamic v) {
   if (v is int) return v;
   if (v is num) return v.toInt();
@@ -39,6 +41,8 @@ class ShipmentHistoryItem {
   final String? clientFirstName;
   final String? clientPhone;
   final String? clientAvatarUrl;
+  final ShipmentReview? review;
+  final bool canReview;
 
   const ShipmentHistoryItem({
     required this.id,
@@ -53,6 +57,8 @@ class ShipmentHistoryItem {
     this.clientFirstName,
     this.clientPhone,
     this.clientAvatarUrl,
+    this.review,
+    this.canReview = false,
   });
 
   factory ShipmentHistoryItem.fromJson(Map<String, dynamic> json) {
@@ -69,6 +75,12 @@ class ShipmentHistoryItem {
       clientFirstName: json['client_first_name']?.toString(),
       clientPhone: json['client_phone']?.toString(),
       clientAvatarUrl: json['client_avatar_url']?.toString(),
+      review: json['review'] is Map
+          ? ShipmentReview.fromJson(
+              Map<String, dynamic>.from(json['review'] as Map),
+            )
+          : null,
+      canReview: json['can_review'] == true,
     );
   }
 }
