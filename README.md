@@ -40,6 +40,23 @@ flutter run \
 Use a key created specifically for **MapKit — Mobile SDK**. The backend
 `YANDEX_API_KEY` used for geocoding is a separate configuration.
 
+For iOS, allow both bundle identifiers in the MapKit key restrictions, or pass
+a separate iOS key with `--dart-define=MAPKIT_API_KEY=...`:
+
+- Debug / Personal Team: `kg.ibroabdraimov.safa.dev`
+- Profile / Release: `kg.genesis.safa.app`
+
+## iOS signing
+
+Debug builds use `kg.ibroabdraimov.safa.dev` and an entitlement file without
+APNs so they can be installed with the free `Ibro Abdraimov` Personal Team.
+Apple does not support remote push notifications for Personal Teams; local
+notifications continue to work.
+
+Profile and Release builds keep `kg.genesis.safa.app` and the production APNs
+entitlement. Build those configurations with the paid Apple Developer team
+that owns this bundle identifier and has Push Notifications enabled.
+
 ## Build APK
 
 Use the guarded build script. It refuses to create an APK when the Finik key

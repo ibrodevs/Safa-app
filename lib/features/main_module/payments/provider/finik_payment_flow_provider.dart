@@ -173,6 +173,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
                 donationId: amanatDonationId!,
               );
         }
+        if (status != FinikFlowStatus.awaitingFinikUi) return;
         if (paid) {
           timer.cancel();
           _pollTimer?.cancel();
@@ -243,6 +244,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
               donationId: amanatDonationId!,
             );
       }
+      if (status != FinikFlowStatus.polling) return;
       if (paid) {
         _pollTimer?.cancel();
         status = FinikFlowStatus.succeeded;
@@ -254,6 +256,7 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      if (status != FinikFlowStatus.polling) return;
       if (_pollTicks >= maxTicks) {
         _pollTimer?.cancel();
         status = FinikFlowStatus.failed;
@@ -269,7 +272,10 @@ final class FinikPaymentFlowProvider extends ChangeNotifier {
   }
 
   void markFailed(String message) {
+    _qrBackgroundTimer?.cancel();
+    _qrBackgroundTimer = null;
     _pollTimer?.cancel();
+    _pollTimer = null;
     status = FinikFlowStatus.failed;
     errorText = message;
     notifyListeners();

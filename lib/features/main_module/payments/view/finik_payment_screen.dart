@@ -1,11 +1,12 @@
 import 'dart:async';
+import 'dart:ui';
+
 import 'package:finik_sdk/finik_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/config/finik_config.dart';
 import '../../../../core/utils/app_colors.dart';
-import 'dart:ui';
 import '../provider/finik_payment_flow_provider.dart';
 
 final class FinikPaymentScreen extends StatefulWidget {
@@ -19,24 +20,78 @@ final class FinikPaymentScreen extends StatefulWidget {
 
 class _FinikPaymentScreenState extends State<FinikPaymentScreen>
     with WidgetsBindingObserver {
+  FinikPaymentFlowProvider? _flow;
   Timer? _resumeDebounce;
+  Timer? _successCloseTimer;
+  bool _closing = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final flow = context.read<FinikPaymentFlowProvider>();
-      if (flow.status == FinikFlowStatus.awaitingFinikUi) {}
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextFlow = context.read<FinikPaymentFlowProvider>();
+    if (identical(_flow, nextFlow)) return;
+
+    _flow?.removeListener(_handleFlowStatusChanged);
+    _flow = nextFlow..addListener(_handleFlowStatusChanged);
+    _handleFlowStatusChanged();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _flow?.removeListener(_handleFlowStatusChanged);
     _resumeDebounce?.cancel();
+    _successCloseTimer?.cancel();
     super.dispose();
+  }
+
+  void _handleFlowStatusChanged() {
+    if (!mounted || _closing) return;
+
+    if (_flow?.status == FinikFlowStatus.succeeded) {
+      _successCloseTimer ??= Timer(
+        const Duration(milliseconds: 1400),
+        () => _finishPayment(true),
+      );
+      return;
+    }
+
+    _successCloseTimer?.cancel();
+    _successCloseTimer = null;
+  }
+
+  void _finishPayment(bool paid) {
+    if (!mounted || _closing) return;
+    _closing = true;
+    _resumeDebounce?.cancel();
+    _successCloseTimer?.cancel();
+
+    // FinikProvider is an InheritedWidget. Removing its route directly from a
+    // callback of one of its descendants can leave registered dependants in
+    // the tree until the current frame finishes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop(paid);
+    });
+  }
+
+  void _handleFinikBack() {
+    _flow?.markFailed('Оплата отменена');
+    _finishPayment(false);
+  }
+
+  void _handleFinikPayment(Map<String, dynamic>? data) {
+    // A rejected payment remains on this route so the error overlay can be
+    // rendered before the user returns. This also avoids popping the Finik
+    // inherited subtree from inside its notification callback.
+    _flow?.handlePaymentResult(data);
   }
 
   @override
@@ -46,7 +101,8 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
     _resumeDebounce?.cancel();
     _resumeDebounce = Timer(const Duration(milliseconds: 600), () {
       if (!mounted) return;
-      final flow = context.read<FinikPaymentFlowProvider>();
+      final flow = _flow;
+      if (flow == null) return;
 
       if (flow.status == FinikFlowStatus.succeeded ||
           flow.status == FinikFlowStatus.failed) {
@@ -59,7 +115,9 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
 
   @override
   Widget build(BuildContext context) {
-    final flow = context.watch<FinikPaymentFlowProvider>();
+    // Do not watch the flow here: status updates must rebuild only the overlay,
+    // not FinikProvider and the SDK subtree below it.
+    final flow = _flow ?? context.read<FinikPaymentFlowProvider>();
     final init = flow.init;
 
     if (init == null || !flow.hasPaymentTarget) {
@@ -116,23 +174,8 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
             enableShare: true,
             enableSupportButtons: true,
             tapableSupportButtons: true,
-            onBackPressed: () {
-              context.read<FinikPaymentFlowProvider>().markFailed(
-                'Оплата отменена',
-              );
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop(false);
-              }
-            },
-            onPayment: (data) {
-              final status = (data?['status'] ?? '').toString().toUpperCase();
-              flow.handlePaymentResult(data);
-              if (status == 'FAILED') {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop(false);
-                }
-              }
-            },
+            onBackPressed: _handleFinikBack,
+            onPayment: _handleFinikPayment,
             widget: CreateItemHandlerWidget(
               accountId: AccountId(init.accountId),
               nameEn: FinikConfig.itemNameEn,
@@ -146,7 +189,12 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
               onCreated: flow.recordCreatedItem,
             ),
           ),
-          const Positioned.fill(child: _FinikStatusOverlay()),
+          Positioned.fill(
+            child: _FinikStatusOverlay(
+              onDone: () => _finishPayment(true),
+              onBack: () => _finishPayment(false),
+            ),
+          ),
         ],
       ),
     );
@@ -154,7 +202,10 @@ class _FinikPaymentScreenState extends State<FinikPaymentScreen>
 }
 
 class _FinikStatusOverlay extends StatelessWidget {
-  const _FinikStatusOverlay();
+  const _FinikStatusOverlay({required this.onDone, required this.onBack});
+
+  final VoidCallback onDone;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -165,16 +216,6 @@ class _FinikStatusOverlay extends StatelessWidget {
         status != FinikFlowStatus.succeeded &&
         status != FinikFlowStatus.failed) {
       return const SizedBox.shrink();
-    }
-
-    if (status == FinikFlowStatus.succeeded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Timer(const Duration(milliseconds: 1400), () {
-          if (context.mounted && Navigator.of(context).canPop()) {
-            Navigator.of(context).pop(true);
-          }
-        });
-      });
     }
 
     return TweenAnimationBuilder<double>(
@@ -193,8 +234,8 @@ class _FinikStatusOverlay extends StatelessWidget {
                   child: status == FinikFlowStatus.polling
                       ? _buildPollingCard()
                       : status == FinikFlowStatus.succeeded
-                      ? _buildSuccessCard(context)
-                      : _buildFailedCard(context, flow.errorText),
+                      ? _buildSuccessCard(flow.successMessage)
+                      : _buildFailedCard(flow.errorText),
                 ),
               ),
             ),
@@ -256,7 +297,7 @@ class _FinikStatusOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildSuccessCard(BuildContext context) {
+  Widget _buildSuccessCard(String successMessage) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -285,14 +326,14 @@ class _FinikStatusOverlay extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            context.read<FinikPaymentFlowProvider>().successMessage,
+            successMessage,
             style: TextStyle(fontSize: 16, color: AppColors.grey2),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: onDone,
               child: const Text('Готово'),
             ),
           ),
@@ -301,7 +342,7 @@ class _FinikStatusOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildFailedCard(BuildContext context, String? error) {
+  Widget _buildFailedCard(String? error) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -336,7 +377,7 @@ class _FinikStatusOverlay extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: onBack,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,

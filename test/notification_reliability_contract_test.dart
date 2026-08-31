@@ -76,7 +76,7 @@ void main() {
     },
   );
 
-  test('iOS target has push entitlement for debug and production', () {
+  test('iOS debug supports Personal Team while release keeps push', () {
     final debug = File(
       'ios/Runner/RunnerDebug.entitlements',
     ).readAsStringSync();
@@ -87,11 +87,35 @@ void main() {
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsStringSync();
 
-    expect(debug, contains('<key>aps-environment</key>'));
-    expect(debug, contains('<string>development</string>'));
+    expect(debug, isNot(contains('<key>aps-environment</key>')));
     expect(release, contains('<string>production</string>'));
-    expect(project, contains('com.apple.Push'));
+    expect(
+      project,
+      contains('PRODUCT_BUNDLE_IDENTIFIER = kg.ibroabdraimov.safa.dev;'),
+    );
     expect(project, contains('CODE_SIGN_ENTITLEMENTS'));
+  });
+
+  test('iOS Firebase configuration matches the signed SAFA target', () {
+    final firebaseOptions = File(
+      'lib/firebase_options.dart',
+    ).readAsStringSync();
+    final googleServiceInfo = File(
+      'ios/Runner/GoogleService-Info.plist',
+    ).readAsStringSync();
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+
+    expect(firebaseOptions, contains("projectId: 'safa-app-87b24'"));
+    expect(firebaseOptions, contains("iosBundleId: 'kg.genesis.safa.app'"));
+    expect(googleServiceInfo, contains('<string>safa-app-87b24</string>'));
+    expect(googleServiceInfo, contains('<string>kg.genesis.safa.app</string>'));
+    expect(
+      project,
+      contains('PRODUCT_BUNDLE_IDENTIFIER = kg.genesis.safa.app;'),
+    );
+    expect(project, contains('GoogleService-Info.plist in Resources'));
   });
 
   test('token registration retries and refreshes when app resumes', () {

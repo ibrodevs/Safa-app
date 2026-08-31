@@ -1394,8 +1394,8 @@ Future<void> _showDonateSheet(
                               paymentError = null;
                             });
                             try {
-                              final flow =
-                                  context.read<FinikPaymentFlowProvider>();
+                              final flow = context
+                                  .read<FinikPaymentFlowProvider>();
                               flow.reset();
                               await flow.startAmanatDonationPayment(
                                 campaignId: campaign.id,
@@ -1403,17 +1403,24 @@ Future<void> _showDonateSheet(
                                 isAnonymous: isAnonymous,
                               );
                               if (!sheetContext.mounted) return;
-                              Navigator.of(sheetContext).pop();
-                              if (!context.mounted) return;
-                              final router = GoRouter.of(context);
-                              final paid = await router.pushNamed<bool>(
-                                'finik_pay',
-                              );
-                              if (paid == true && context.mounted) {
-                                final messenger = ScaffoldMessenger.of(context);
-                                await context
+                              // Keep the sheet mounted under the Finik route.
+                              // Closing it and pushing another route in the same
+                              // frame can deactivate inherited widgets while
+                              // their dependants are still registered.
+                              final paid = await GoRouter.of(
+                                sheetContext,
+                              ).pushNamed<bool>('finik_pay');
+                              if (!sheetContext.mounted) return;
+
+                              if (paid == true) {
+                                final messenger = ScaffoldMessenger.of(
+                                  sheetContext,
+                                );
+                                await sheetContext
                                     .read<AmanatProvider>()
                                     .refreshCampaign(campaign.id);
+                                if (!sheetContext.mounted) return;
+                                Navigator.of(sheetContext).pop();
                                 messenger.showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -1421,13 +1428,16 @@ Future<void> _showDonateSheet(
                                     ),
                                   ),
                                 );
+                              } else {
+                                setSheetState(() {
+                                  paymentStarting = false;
+                                });
                               }
                             } catch (e) {
                               if (sheetContext.mounted) {
                                 setSheetState(() {
                                   paymentStarting = false;
-                                  paymentError =
-                                      'Не удалось начать оплату: $e';
+                                  paymentError = 'Не удалось начать оплату: $e';
                                 });
                               }
                             }
