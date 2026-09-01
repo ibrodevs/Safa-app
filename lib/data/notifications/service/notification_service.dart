@@ -80,6 +80,8 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.high,
         icon: 'ic_stat_taxi',
+        playSound: true,
+        enableVibration: true,
         styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(

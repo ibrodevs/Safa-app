@@ -168,8 +168,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   void _handlePushEvent(Map<String, dynamic> data) {
     final type = data['type']?.toString();
     final eventShipmentId = int.tryParse(data['shipment_id']?.toString() ?? '');
-    if (type == 'shipment_offer' && !_hasActive && !_showWelcome) {
+    if (type == 'shipment_offer' && !_hasActive) {
+      if (_showWelcome) {
+        setState(() => _showWelcome = false);
+      }
       unawaited(_refreshNearbySilently());
+      if (eventShipmentId != null) {
+        unawaited(OrderAlertService.instance.start(eventShipmentId));
+      }
     } else if (type == 'shipment_status' && eventShipmentId == _activeId) {
       unawaited(_poll(eventShipmentId!));
     }
@@ -1019,10 +1025,14 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       }
     }
 
+    // Always build pedestrian route along market passages and aisles to the exact point
+    const routeType = NavigationRouteType.pedestrian;
+
     final result = await NavigationService.instance.openYandexNavigator(
       destination: destination,
       origin: origin,
       stops: remainingStops,
+      routeType: routeType,
     );
 
     if (!mounted) return;
@@ -1407,15 +1417,86 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
       final snapB = _nearestPassageSnap(b, passages);
       var leg = <LatLng>[];
 
-      if (snapA != null && snapB != null && snapA.line.id == snapB.line.id) {
-        final passage = _passageSegmentBetween(snapA, snapB);
-        if (passage.length >= 2) {
-          leg = _dedupeRoutePoints([a, ...passage, b]);
+      if (snapA != null && snapB != null) {
+        if (snapA.line.id == snapB.line.id) {
+          final passage = _passageSegmentBetween(snapA, snapB);
+          if (passage.length >= 2) {
+            leg = _dedupeRoutePoints([a, ...passage, b]);
+          }
+        } else {
+          // Cross-passage connection across market aisles
+          final lineA = snapA.line.points;
+          final lineB = snapB.line.points;
+          LatLng? bestEndA;
+          LatLng? bestEndB;
+          double minTransDist = double.infinity;
+          for (final pA in [lineA.first, lineA.last, snapA.point]) {
+            for (final pB in [lineB.first, lineB.last, snapB.point]) {
+              final d = _distanceMeters(pA, pB);
+              if (d < minTransDist) {
+                minTransDist = d;
+                bestEndA = pA;
+                bestEndB = pB;
+              }
+            }
+          }
+          if (minTransDist < 200 && bestEndA != null && bestEndB != null) {
+            final legA = _passageSegmentBetween(
+              snapA,
+              _CarrierPassageSnap(
+                line: snapA.line,
+                point: bestEndA,
+                segmentIndex: 0,
+                distanceM: 0,
+              ),
+            );
+            final legB = _passageSegmentBetween(
+              _CarrierPassageSnap(
+                line: snapB.line,
+                point: bestEndB,
+                segmentIndex: 0,
+                distanceM: 0,
+              ),
+              snapB,
+            );
+            leg = _dedupeRoutePoints([a, ...legA, bestEndB, ...legB, b]);
+          }
         }
       }
 
       if (leg.isEmpty) {
         leg = await _buildOsrmLegRoute(a: a, b: b);
+        if (leg.isNotEmpty) {
+          final extended = <LatLng>[];
+          if (_distanceMeters(a, leg.first) > 1.5) {
+            extended.add(a);
+            if (snapA != null && _distanceMeters(snapA.point, a) < 60) {
+              extended.add(snapA.point);
+            }
+          }
+          extended.addAll(leg);
+          if (_distanceMeters(leg.last, b) > 1.5) {
+            if (snapB != null && _distanceMeters(snapB.point, b) < 60) {
+              extended.add(snapB.point);
+            }
+            extended.add(b);
+          }
+          leg = _dedupeRoutePoints(extended);
+        }
+      }
+
+      if (leg.isEmpty) {
+        final points = <LatLng>[a];
+        if (snapA != null && _distanceMeters(snapA.point, a) < 80) {
+          points.add(snapA.point);
+        }
+        if (snapB != null &&
+            snapB.line.id != snapA?.line.id &&
+            _distanceMeters(snapB.point, b) < 80) {
+          points.add(snapB.point);
+        }
+        points.add(b);
+        leg = _dedupeRoutePoints(points);
       }
       if (leg.isEmpty) return const [];
 

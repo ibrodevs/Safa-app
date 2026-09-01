@@ -57,28 +57,62 @@ class OrderAlertService {
       (_) => unawaited(_vibrate(key, generation)),
     );
 
+    // Гарантированный системный звуковой сигнал
+    try {
+      unawaited(SystemSound.play(SystemSoundType.alert));
+    } catch (_) {}
+
     try {
       final player = _player ??= AudioPlayer();
-      await player.setAudioContext(
-        AudioContext(
-          android: const AudioContextAndroid(
-            contentType: AndroidContentType.sonification,
-            usageType: AndroidUsageType.notificationEvent,
-            audioFocus: AndroidAudioFocus.gainTransient,
+
+      // Настройка аудио контекста для максимальной громкости и воспроизведения
+      // даже при включённом беззвучном режиме на iOS / фоне.
+      try {
+        await player.setAudioContext(
+          AudioContext(
+            android: const AudioContextAndroid(
+              isSpeakerphoneOn: true,
+              stayAwake: true,
+              contentType: AndroidContentType.sonification,
+              usageType: AndroidUsageType.notificationEvent,
+              audioFocus: AndroidAudioFocus.gainTransient,
+            ),
+            iOS: AudioContextIOS(
+              category: AVAudioSessionCategory.playback,
+              options: const {
+                AVAudioSessionOptions.mixWithOthers,
+                AVAudioSessionOptions.duckOthers,
+              },
+            ),
           ),
-        ),
-      );
-      await player.setReleaseMode(ReleaseMode.loop);
-      await player.setVolume(1);
-      await player.stop();
+        );
+      } catch (e) {
+        if (kDebugMode) debugPrint('AudioContext config failed: $e');
+      }
+
+      try {
+        await player.setReleaseMode(ReleaseMode.loop);
+        await player.setVolume(1.0);
+      } catch (_) {}
+
+      try {
+        await player.stop();
+      } catch (_) {}
+
       if (_activeKey != key || generation != _generation) return;
-      await player.play(AssetSource(_assetPath));
-      if (_activeKey != key || generation != _generation) {
+
+      try {
+        await player.play(AssetSource(_assetPath), volume: 1.0);
+      } catch (e) {
+        // Запасной путь к ассету
+        if (kDebugMode) debugPrint('AssetSource($_assetPath) failed: $e, trying fallback');
+        await player.play(AssetSource('assets/$_assetPath'), volume: 1.0);
+      }
+
+      if (_activeKey != key || _generation != generation) {
         await player.stop();
       }
     } catch (error, stackTrace) {
-      // Тишина не должна ломать приём заказа: вибрация уже идёт, а карточка
-      // заказа видна на экране.
       if (kDebugMode) {
         debugPrint('OrderAlertService.start failed: $error\n$stackTrace');
       }
