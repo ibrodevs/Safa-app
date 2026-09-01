@@ -13,6 +13,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/services/navigation_service.dart';
 import '../../../core/services/order_alert_service.dart';
 import '../../../core/utils/kg_phone_format.dart';
 import '../../../core/utils/snackbar_utils.dart';
@@ -938,6 +939,154 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     }
   }
 
+  Future<void> _openRouteInYandexNavigator() async {
+    if (_activeStops.isEmpty) {
+      AppSnackBar.showInfo(context, message: 'У заказа нет точек маршрута.');
+      return;
+    }
+
+    final ci = _activeCurrentStopIndex.clamp(0, _activeStops.length - 1);
+    final _StopUi targetStop = (_activeStatus == ShipmentStatus.assigned)
+        ? _activeStops.first
+        : _activeStops[ci];
+
+    final targetLat = targetStop.lat;
+    final targetLon = targetStop.lon;
+
+    if (targetLat == null ||
+        targetLon == null ||
+        targetLat == 0 ||
+        targetLon == 0 ||
+        !targetLat.isFinite ||
+        !targetLon.isFinite) {
+      AppSnackBar.showInfo(
+        context,
+        message: 'Не удалось определить координаты точки заказа. Проверьте адрес.',
+      );
+      return;
+    }
+
+    // Check GPS service and permissions
+    final locationEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!locationEnabled && mounted) {
+      AppSnackBar.showInfo(
+        context,
+        message: 'Включите геолокацию на устройстве, чтобы построить маршрут от вашего местоположения.',
+        actionLabel: 'Включить',
+        onAction: () => Geolocator.openLocationSettings(),
+      );
+    }
+
+    // Determine current specialist location
+    LatLng? origin;
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.always ||
+          perm == LocationPermission.whileInUse) {
+        try {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 4),
+            ),
+          );
+          origin = LatLng(pos.latitude, pos.longitude);
+          _myLat = pos.latitude;
+          _myLon = pos.longitude;
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    if (origin == null && _myLat != 0 && _myLon != 0 && _myLat != 42.8746) {
+      origin = LatLng(_myLat, _myLon);
+    }
+
+    final destination = LatLng(targetLat, targetLon);
+
+    // Collect subsequent stops if in multi-stop mode
+    List<LatLng>? remainingStops;
+    if (_activeStatus != ShipmentStatus.assigned &&
+        _activeStops.length > ci + 1) {
+      remainingStops = [];
+      for (int i = ci + 1; i < _activeStops.length; i++) {
+        final s = _activeStops[i];
+        if (s.lat != null && s.lon != null && s.lat != 0 && s.lon != 0) {
+          remainingStops.add(LatLng(s.lat!, s.lon!));
+        }
+      }
+    }
+
+    final result = await NavigationService.instance.openYandexNavigator(
+      destination: destination,
+      origin: origin,
+      stops: remainingStops,
+    );
+
+    if (!mounted) return;
+
+    if (result == NavigationLaunchResult.notInstalled) {
+      _showInstallNavigatorDialog();
+    } else if (result == NavigationLaunchResult.invalidCoordinates) {
+      AppSnackBar.showInfo(
+        context,
+        message: 'Не удалось определить координаты точки заказа.',
+      );
+    } else if (result == NavigationLaunchResult.error) {
+      AppSnackBar.showInfo(
+        context,
+        message: 'Не удалось открыть Яндекс Навигатор. Попробуйте ещё раз.',
+      );
+    }
+  }
+
+  void _showInstallNavigatorDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.navigation_rounded, color: Color(0xFFFF3333), size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Яндекс Навигатор',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Яндекс Навигатор не найден на устройстве. Вы можете установить его для удобной автомобильной навигации или открыть маршрут на карте.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена', style: TextStyle(color: AppColors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              NavigationService.instance.openStorePage();
+            },
+            child: const Text('Установить'),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<LatLng> _pointsFromStops(List<_StopUi> stops) {
     final out = <LatLng>[];
     for (final s in stops) {
@@ -1559,6 +1708,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
           currentIndex: _activeCurrentStopIndex,
           onAdvance: _advance,
           advancing: _advancing,
+          onOpenNavigator: _openRouteInYandexNavigator,
           clientFirstName: _activeClientFirstName,
           clientPhone: _activeClientPhone,
           clientAvatarUrl: _activeClientAvatarUrl,
@@ -2021,6 +2171,7 @@ class _ActiveProgressSheet extends StatelessWidget {
     required this.currentIndex,
     required this.onAdvance,
     required this.advancing,
+    required this.onOpenNavigator,
     this.clientFirstName,
     this.clientPhone,
     this.clientAvatarUrl,
@@ -2034,6 +2185,7 @@ class _ActiveProgressSheet extends StatelessWidget {
   final int currentIndex;
   final VoidCallback onAdvance;
   final bool advancing;
+  final VoidCallback onOpenNavigator;
   final String? clientFirstName;
   final String? clientPhone;
   final String? clientAvatarUrl;
@@ -2174,6 +2326,35 @@ class _ActiveProgressSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
+          SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onOpenNavigator,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0F172A),
+                side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+                backgroundColor: const Color(0xFFF8FAFC),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              icon: const Icon(
+                Icons.navigation_rounded,
+                size: 20,
+                color: Color(0xFFFF3333),
+              ),
+              label: const Text(
+                'Построить маршрут в Навигаторе',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             height: 52,
             width: double.infinity,

@@ -92,6 +92,8 @@
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>yandexnavi</string>
+		<string>yandexmaps</string>
 		<string>tg</string>
 		<string>telegram</string>
 		<string>whatsapp</string>
