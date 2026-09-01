@@ -37,7 +37,7 @@ dependencies:
   hive_flutter: ^1.1.0
   permission_handler: ^11.3.1
   flutter_map: ^7.0.2
-  yandex_maps_mapkit_lite: ^4.42.0
+  yandex_maps_mapkit: ^4.42.0
   latlong2: ^0.9.1
   firebase_messaging: 15.2.10
   firebase_core: 3.15.2

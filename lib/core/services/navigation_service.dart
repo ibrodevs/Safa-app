@@ -41,10 +41,7 @@ class NavigationService {
   }
 
   /// Builds the deep link URI for Yandex Navigator.
-  Uri buildYandexNavigatorUri({
-    required LatLng destination,
-    LatLng? origin,
-  }) {
+  Uri buildYandexNavigatorUri({required LatLng destination, LatLng? origin}) {
     final queryParams = <String, String>{
       'lat_to': destination.latitude.toString(),
       'lon_to': destination.longitude.toString(),
@@ -190,20 +187,23 @@ class NavigationService {
         }
       }
 
-      // 2. Yandex Navigator app (for driving/automotive)
-      final navigatorUri = buildYandexNavigatorUri(
-        destination: destination,
-        origin: origin,
-      );
-
-      final canOpenNavigator = await canLaunchUrl(navigatorUri);
-      if (canOpenNavigator) {
-        final launched = await launchUrl(
-          navigatorUri,
-          mode: LaunchMode.externalApplication,
+      // Yandex Navigator only builds automotive routes. Never silently switch
+      // a specialist from walking to driving when Maps is unavailable.
+      if (routeType == NavigationRouteType.auto) {
+        final navigatorUri = buildYandexNavigatorUri(
+          destination: destination,
+          origin: origin,
         );
-        if (launched) {
-          return NavigationLaunchResult.launchedNavigator;
+
+        final canOpenNavigator = await canLaunchUrl(navigatorUri);
+        if (canOpenNavigator) {
+          final launched = await launchUrl(
+            navigatorUri,
+            mode: LaunchMode.externalApplication,
+          );
+          if (launched) {
+            return NavigationLaunchResult.launchedNavigator;
+          }
         }
       }
 

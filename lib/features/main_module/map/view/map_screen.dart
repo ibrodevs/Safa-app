@@ -10,7 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/design/app_design.dart';
 import '../../../../core/map/safa_yandex_map.dart';
-import '../../../../core/map/optimal_road_route_service.dart';
+import '../../../../core/map/yandex_pedestrian_route_service.dart';
 import '../../../../core/utils/friendly_error.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../../../../core/widgets/app_widgets.dart';
@@ -163,11 +163,11 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     return pts.map((p) => '${f(p.latitude)},${f(p.longitude)}').join('|');
   }
 
-  final _roadRouter = OptimalRoadRouteService();
+  final _pedestrianRouter = YandexPedestrianRouteService();
 
   Future<List<LatLng>> _buildRouteMultiLeg(List<LatLng> pts) async {
     if (pts.length < 2) return const [];
-    return _roadRouter.build(pts);
+    return _pedestrianRouter.build(pts);
   }
 
   // --- Контейнеры -------------------------------------------------------
@@ -626,6 +626,7 @@ class _OrderMapScreenState extends State<OrderMapScreen>
     _marketMapDebounce?.cancel();
     _mapIdleDebounce?.cancel();
     _routeRetryTimer?.cancel();
+    _pedestrianRouter.dispose();
     _descriptionController.dispose();
     _stopShipmentPolling();
     super.dispose();

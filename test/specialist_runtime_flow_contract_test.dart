@@ -38,7 +38,7 @@ void main() {
       'lib/features/carrier_module/home/carrier_home_screen.dart',
     ).readAsStringSync();
     final routeService = File(
-      'lib/core/map/optimal_road_route_service.dart',
+      'lib/core/map/yandex_pedestrian_route_service.dart',
     ).readAsStringSync();
 
     expect(source, contains('if (_hasActive || _acceptingOrder)'));
@@ -46,9 +46,9 @@ void main() {
       source,
       contains('_hasActive || _acceptingOrder ? null : _currentNearby'),
     );
-    expect(source, contains('OptimalRoadRouteService'));
-    expect(routeService, contains("'radiuses'"));
-    expect(routeService, contains("'alternatives': '3'"));
+    expect(source, contains('YandexPedestrianRouteService'));
+    expect(routeService, contains('createPedestrianRouter()'));
+    expect(routeService, isNot(contains('driving')));
     expect(source, contains('AppColors.primary'));
     expect(source, isNot(contains('color: Colors.white,\n                ),')));
   });

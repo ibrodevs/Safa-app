@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart'
     show LatLngBounds, Polygon, Polyline;
 import 'package:latlong2/latlong.dart';
-import 'package:yandex_maps_mapkit_lite/mapkit.dart' as ymk;
-import 'package:yandex_maps_mapkit_lite/ui_view.dart' as yui;
-import 'package:yandex_maps_mapkit_lite/yandex_map.dart';
+import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
+import 'package:yandex_maps_mapkit/ui_view.dart' as yui;
+import 'package:yandex_maps_mapkit/yandex_map.dart';
 
 /// MapKit configuration for the Safa mobile applications.
 ///

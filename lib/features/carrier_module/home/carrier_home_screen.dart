@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dogo/core/utils/app_colors.dart';
@@ -18,7 +17,7 @@ import '../../../core/services/order_alert_service.dart';
 import '../../../core/utils/kg_phone_format.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/map/safa_yandex_map.dart';
-import '../../../core/map/optimal_road_route_service.dart';
+import '../../../core/map/yandex_pedestrian_route_service.dart';
 import '../../../data/network/api_service.dart';
 import '../../../data/network/model/api_exeptions_model.dart';
 import '../../../data/notifications/service/push_service.dart';
@@ -135,10 +134,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
   bool _activePollInFlight = false;
   DateTime? _lastPositionSentAt;
   bool _sendingPosition = false;
-  bool _marketMapLoading = false;
   bool _marketMapViewportLoading = false;
   bool _marketMapViewportRefreshPending = false;
-  int? _marketMapPointsHash;
   List<MarketMapFeature> _marketMapFeatures = const [];
   MarketMapRenderData? _marketMapRenderCache;
   Timer? _marketMapViewportDebounce;
@@ -256,6 +253,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     _posSub?.cancel();
     _pushSub?.cancel();
     _shipmentRealtime.dispose();
+    _pedestrianRouter.dispose();
     unawaited(OrderAlertService.instance.stop());
     super.dispose();
   }
@@ -337,9 +335,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
-        accuracy: LocationAccuracy.medium,
-        distanceFilter: 10,
-        intervalDuration: Duration(seconds: 5),
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+        intervalDuration: Duration(seconds: 3),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'SAFA — заказ выполняется',
           notificationText:
@@ -352,9 +350,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
-        accuracy: LocationAccuracy.medium,
-        activityType: ActivityType.automotiveNavigation,
-        distanceFilter: 10,
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.fitness,
+        distanceFilter: 5,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
         allowBackgroundLocationUpdates: true,
@@ -390,7 +388,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     if (_sendingPosition) return;
     final now = DateTime.now();
     final last = _lastPositionSentAt;
-    if (!force && last != null && now.difference(last).inSeconds < 5) {
+    if (!force && last != null && now.difference(last).inSeconds < 3) {
       return;
     }
 
@@ -967,7 +965,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         !targetLon.isFinite) {
       AppSnackBar.showInfo(
         context,
-        message: 'Не удалось определить координаты точки заказа. Проверьте адрес.',
+        message:
+            'Не удалось определить координаты точки заказа. Проверьте адрес.',
       );
       return;
     }
@@ -977,7 +976,8 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     if (!locationEnabled && mounted) {
       AppSnackBar.showInfo(
         context,
-        message: 'Включите геолокацию на устройстве, чтобы построить маршрут от вашего местоположения.',
+        message:
+            'Включите геолокацию на устройстве, чтобы построить маршрут от вашего местоположения.',
         actionLabel: 'Включить',
         onAction: () => Geolocator.openLocationSettings(),
       );
@@ -1047,7 +1047,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     } else if (result == NavigationLaunchResult.error) {
       AppSnackBar.showInfo(
         context,
-        message: 'Не удалось открыть Яндекс Навигатор. Попробуйте ещё раз.',
+        message: 'Не удалось открыть пешеходный маршрут в Яндекс Картах.',
       );
     }
   }
@@ -1063,20 +1063,23 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Яндекс Навигатор',
+                'Яндекс Карты',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
           ],
         ),
         content: const Text(
-          'Яндекс Навигатор не найден на устройстве. Вы можете установить его для удобной автомобильной навигации или открыть маршрут на карте.',
+          'Для пешеходного маршрута установите Яндекс Карты или откройте маршрут в браузере.',
           style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена', style: TextStyle(color: AppColors.grey)),
+            child: const Text(
+              'Отмена',
+              style: TextStyle(color: AppColors.grey),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1156,63 +1159,7 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         perm == LocationPermission.whileInUse;
   }
 
-  final _roadRouter = OptimalRoadRouteService();
-
-  Future<List<LatLng>> _buildOsrmLegRoute({
-    required LatLng a,
-    required LatLng b,
-  }) async {
-    return _roadRouter.build([a, b]);
-  }
-
-  Future<void> _loadMarketMapForPoints(List<LatLng> pts) async {
-    if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
-    if (_marketMapLoading || pts.isEmpty) return;
-    final hash = Object.hashAll(
-      pts.map(
-        (p) =>
-            '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}',
-      ),
-    );
-    if (_marketMapPointsHash == hash && _marketMapFeatures.isNotEmpty) return;
-
-    var minLat = pts.first.latitude;
-    var maxLat = pts.first.latitude;
-    var minLon = pts.first.longitude;
-    var maxLon = pts.first.longitude;
-    for (final p in pts.skip(1)) {
-      minLat = math.min(minLat, p.latitude);
-      maxLat = math.max(maxLat, p.latitude);
-      minLon = math.min(minLon, p.longitude);
-      maxLon = math.max(maxLon, p.longitude);
-    }
-
-    const padding = 0.004;
-    _marketMapLoading = true;
-    try {
-      final collection = await _marketMapRepository.loadPublished(
-        zoom: 16,
-        minLat: minLat - padding,
-        maxLat: maxLat + padding,
-        minLon: minLon - padding,
-        maxLon: maxLon + padding,
-        centerLat: (minLat + maxLat) / 2,
-        centerLon: (minLon + maxLon) / 2,
-        maxContainers: 260,
-      );
-      if (!mounted) return;
-      setState(() {
-        _marketMapFeatures = collection.features;
-        _marketMapRenderCache = null;
-        _marketMapPointsHash = hash;
-        _routeSignature = null;
-      });
-    } catch (_) {
-      // Маршрут всё равно построится через OSRM.
-    } finally {
-      _marketMapLoading = false;
-    }
-  }
+  final _pedestrianRouter = YandexPedestrianRouteService();
 
   void _scheduleMarketMapViewportRefresh({bool immediate = false}) {
     if (!SafaMobileMapFeatures.backendDrawingLayersEnabled) return;
@@ -1277,7 +1224,6 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
         _marketMapRenderCache = null;
         _lastMarketMapViewportBounds = bounds;
         _lastMarketMapViewportZoomBucket = zoomBucket;
-        _marketMapPointsHash = null;
       });
     } catch (_) {
       // Keep last map snapshot on transient network errors.
@@ -1290,228 +1236,9 @@ class _CarrierHomeScreenState extends State<CarrierHomeScreen>
     }
   }
 
-  List<_CarrierPassageLine> _passageLines() {
-    final lines = <_CarrierPassageLine>[];
-    for (final feature in _marketMapFeatures) {
-      if (feature.kind != 'passage' || feature.geometryType != 'LineString') {
-        continue;
-      }
-      final points = _linePointsFromCoordinates(feature.coordinates);
-      if (points.length >= 2) {
-        lines.add(_CarrierPassageLine(id: feature.id, points: points));
-      }
-    }
-    return lines;
-  }
-
-  List<LatLng> _linePointsFromCoordinates(dynamic raw) {
-    if (raw is! List) return const [];
-    final points = <LatLng>[];
-    for (final item in raw) {
-      if (item is! List || item.length < 2) continue;
-      final lon = _asDouble(item[0]);
-      final lat = _asDouble(item[1]);
-      if (lat == null || lon == null) continue;
-      points.add(LatLng(lat, lon));
-    }
-    return points;
-  }
-
-  double? _asDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString() ?? '');
-  }
-
-  _CarrierPassageSnap? _nearestPassageSnap(
-    LatLng point,
-    List<_CarrierPassageLine> lines, {
-    double maxDistanceM = 90,
-  }) {
-    _CarrierPassageSnap? best;
-    for (final line in lines) {
-      for (var i = 0; i < line.points.length - 1; i++) {
-        final projected = _projectToSegment(
-          point,
-          line.points[i],
-          line.points[i + 1],
-        );
-        final distanceM = _distanceMeters(point, projected.point);
-        if (distanceM > maxDistanceM) continue;
-        if (best == null || distanceM < best.distanceM) {
-          best = _CarrierPassageSnap(
-            line: line,
-            point: projected.point,
-            segmentIndex: i,
-            distanceM: distanceM,
-          );
-        }
-      }
-    }
-    return best;
-  }
-
-  _CarrierProjectedPoint _projectToSegment(LatLng p, LatLng a, LatLng b) {
-    final latScale = 111320.0;
-    final lonScale = latScale * math.cos(p.latitude * math.pi / 180);
-    final ax = (a.longitude - p.longitude) * lonScale;
-    final ay = (a.latitude - p.latitude) * latScale;
-    final bx = (b.longitude - p.longitude) * lonScale;
-    final by = (b.latitude - p.latitude) * latScale;
-    final dx = bx - ax;
-    final dy = by - ay;
-    final len2 = dx * dx + dy * dy;
-    final rawT = len2 <= 0 ? 0.0 : (-(ax * dx + ay * dy) / len2);
-    final t = rawT.clamp(0.0, 1.0);
-    return _CarrierProjectedPoint(
-      LatLng(
-        a.latitude + (b.latitude - a.latitude) * t,
-        a.longitude + (b.longitude - a.longitude) * t,
-      ),
-    );
-  }
-
-  double _distanceMeters(LatLng a, LatLng b) {
-    return const Distance().as(LengthUnit.Meter, a, b);
-  }
-
-  List<LatLng> _passageSegmentBetween(
-    _CarrierPassageSnap a,
-    _CarrierPassageSnap b,
-  ) {
-    final points = a.line.points;
-    if (a.line.id != b.line.id || points.length < 2) return const [];
-    final route = <LatLng>[a.point];
-    if (a.segmentIndex <= b.segmentIndex) {
-      for (var i = a.segmentIndex + 1; i <= b.segmentIndex; i++) {
-        if (i >= 0 && i < points.length) route.add(points[i]);
-      }
-    } else {
-      for (var i = a.segmentIndex; i > b.segmentIndex; i--) {
-        if (i >= 0 && i < points.length) route.add(points[i]);
-      }
-    }
-    route.add(b.point);
-    return _dedupeRoutePoints(route);
-  }
-
-  List<LatLng> _dedupeRoutePoints(List<LatLng> points) {
-    final out = <LatLng>[];
-    for (final point in points) {
-      if (out.isEmpty || _distanceMeters(out.last, point) > 0.5) {
-        out.add(point);
-      }
-    }
-    return out;
-  }
-
   Future<List<LatLng>> _buildRouteMultiLeg(List<LatLng> pts) async {
     if (pts.length < 2) return const [];
-    await _loadMarketMapForPoints(pts);
-    final passages = _passageLines();
-    final full = <LatLng>[];
-
-    for (var i = 0; i < pts.length - 1; i++) {
-      final a = pts[i];
-      final b = pts[i + 1];
-      final snapA = _nearestPassageSnap(a, passages);
-      final snapB = _nearestPassageSnap(b, passages);
-      var leg = <LatLng>[];
-
-      if (snapA != null && snapB != null) {
-        if (snapA.line.id == snapB.line.id) {
-          final passage = _passageSegmentBetween(snapA, snapB);
-          if (passage.length >= 2) {
-            leg = _dedupeRoutePoints([a, ...passage, b]);
-          }
-        } else {
-          // Cross-passage connection across market aisles
-          final lineA = snapA.line.points;
-          final lineB = snapB.line.points;
-          LatLng? bestEndA;
-          LatLng? bestEndB;
-          double minTransDist = double.infinity;
-          for (final pA in [lineA.first, lineA.last, snapA.point]) {
-            for (final pB in [lineB.first, lineB.last, snapB.point]) {
-              final d = _distanceMeters(pA, pB);
-              if (d < minTransDist) {
-                minTransDist = d;
-                bestEndA = pA;
-                bestEndB = pB;
-              }
-            }
-          }
-          if (minTransDist < 200 && bestEndA != null && bestEndB != null) {
-            final legA = _passageSegmentBetween(
-              snapA,
-              _CarrierPassageSnap(
-                line: snapA.line,
-                point: bestEndA,
-                segmentIndex: 0,
-                distanceM: 0,
-              ),
-            );
-            final legB = _passageSegmentBetween(
-              _CarrierPassageSnap(
-                line: snapB.line,
-                point: bestEndB,
-                segmentIndex: 0,
-                distanceM: 0,
-              ),
-              snapB,
-            );
-            leg = _dedupeRoutePoints([a, ...legA, bestEndB, ...legB, b]);
-          }
-        }
-      }
-
-      if (leg.isEmpty) {
-        leg = await _buildOsrmLegRoute(a: a, b: b);
-        if (leg.isNotEmpty) {
-          final extended = <LatLng>[];
-          if (_distanceMeters(a, leg.first) > 1.5) {
-            extended.add(a);
-            if (snapA != null && _distanceMeters(snapA.point, a) < 60) {
-              extended.add(snapA.point);
-            }
-          }
-          extended.addAll(leg);
-          if (_distanceMeters(leg.last, b) > 1.5) {
-            if (snapB != null && _distanceMeters(snapB.point, b) < 60) {
-              extended.add(snapB.point);
-            }
-            extended.add(b);
-          }
-          leg = _dedupeRoutePoints(extended);
-        }
-      }
-
-      if (leg.isEmpty) {
-        final points = <LatLng>[a];
-        if (snapA != null && _distanceMeters(snapA.point, a) < 80) {
-          points.add(snapA.point);
-        }
-        if (snapB != null &&
-            snapB.line.id != snapA?.line.id &&
-            _distanceMeters(snapB.point, b) < 80) {
-          points.add(snapB.point);
-        }
-        points.add(b);
-        leg = _dedupeRoutePoints(points);
-      }
-      if (leg.isEmpty) return const [];
-
-      if (full.isEmpty) {
-        full.addAll(leg);
-      } else {
-        full.addAll(leg.skip(1));
-      }
-
-      if (leg.length <= 2 && i != pts.length - 2) {
-        await Future.delayed(const Duration(milliseconds: 1100));
-      }
-    }
-
-    return _dedupeRoutePoints(full);
+    return _pedestrianRouter.build(pts);
   }
 
   void _fitToPoints(List<LatLng> pts) {
@@ -1945,33 +1672,6 @@ class _MeDot extends StatelessWidget {
       ),
     );
   }
-}
-
-final class _CarrierPassageLine {
-  const _CarrierPassageLine({required this.id, required this.points});
-
-  final String id;
-  final List<LatLng> points;
-}
-
-final class _CarrierPassageSnap {
-  const _CarrierPassageSnap({
-    required this.line,
-    required this.point,
-    required this.segmentIndex,
-    required this.distanceM,
-  });
-
-  final _CarrierPassageLine line;
-  final LatLng point;
-  final int segmentIndex;
-  final double distanceM;
-}
-
-final class _CarrierProjectedPoint {
-  const _CarrierProjectedPoint(this.point);
-
-  final LatLng point;
 }
 
 class _WelcomeCard extends StatelessWidget {

@@ -44,7 +44,7 @@ void main() {
     expect(map, contains('ShipmentCourierTelemetry.tryParse(event)'));
     expect(map, contains('_CourierTrackingMarker'));
     expect(map, contains('point: courierPosition'));
-    expect(carrier, contains('now.difference(last).inSeconds < 5'));
+    expect(carrier, contains('now.difference(last).inSeconds < 3'));
   });
 
   test('numeric backend fallback is not accepted as a readable address', () {

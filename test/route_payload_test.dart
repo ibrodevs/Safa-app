@@ -49,20 +49,18 @@ void main() {
       expect(payload.every((point) => point['lon'] != null), isTrue);
     });
 
-    test('весь порядок A-B-C уходит в один дорожный запрос', () {
+    test('весь порядок A-B-C уходит в пешеходный маршрутизатор Яндекса', () {
       final router = File(
-        'lib/core/map/optimal_road_route_service.dart',
+        'lib/core/map/yandex_pedestrian_route_service.dart',
       ).readAsStringSync();
       final map = File(
         'lib/features/main_module/map/view/map_screen.dart',
       ).readAsStringSync();
 
-      expect(router, contains(".join(';')"));
-      expect(router, contains('route/v1/driving/'));
-      expect(router, contains("List.filled(stops.length, 'unlimited')"));
-      expect(router, contains("'alternatives': '3'"));
-      expect(map, contains('return _roadRouter.build(pts);'));
-      expect(router, isNot(contains("['foot', 'walking', 'driving']")));
+      expect(router, contains('createPedestrianRouter()'));
+      expect(router, contains('_pedestrianRouter.requestRoutes('));
+      expect(router, isNot(contains('route/v1/driving/')));
+      expect(map, contains('return _pedestrianRouter.build(pts);'));
       expect(map, isNot(contains('route.isNotEmpty ? route : pts')));
     });
 
