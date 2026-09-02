@@ -95,5 +95,5 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/images/safa.png
+  image_path: assets/images/Safa-new-logo.jpg
   remove_alpha_ios: true

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/design/app_design.dart';
 
@@ -32,18 +31,18 @@ class AuthBrandHeader extends StatelessWidget {
               borderRadius: AppRadius.allMd,
             ),
             alignment: Alignment.center,
-            child: SvgPicture.asset(
-              AppIcons.logo,
-              width: 28,
-              height: 28,
-              colorFilter: const ColorFilter.mode(
-                AppColors.primary,
-                BlendMode.srcIn,
-              ),
-              placeholderBuilder: (_) => const Icon(
-                Icons.local_shipping_rounded,
-                size: 26,
-                color: AppColors.primary,
+            child: ClipRRect(
+              borderRadius: AppRadius.allSm,
+              child: Image.asset(
+                AppImages.logo,
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.local_shipping_rounded,
+                  size: 26,
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ),

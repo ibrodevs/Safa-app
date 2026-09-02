@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/design/app_design.dart';
 import '../register/data/models/register_request_model.dart';
 import '../register/provider/auth_provider.dart';
 
@@ -110,10 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: SizedBox(
                     width: 110,
                     height: 110,
-                    child: Image.asset(
-                      'assets/images/safa.png',
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.asset(AppImages.logo, fit: BoxFit.contain),
                   ),
                 ),
                 const SizedBox(height: 16),

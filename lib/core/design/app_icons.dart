@@ -20,7 +20,6 @@ class AppIcons {
   static const String weight = '$_base/ic_weight.svg';
   static const String arrow = '$_base/ic_arrow.svg';
   static const String arrowLong = '$_base/ic_arrow_long.svg';
-  static const String logo = '$_base/ic_logo.svg';
   static const String rating = '$_base/ic_rait.svg';
 }
 
@@ -30,6 +29,7 @@ class AppImages {
 
   static const String _base = 'assets/images';
 
+  static const String logo = '$_base/Safa-new-logo.jpg';
   static const String avatarPlaceholder = '$_base/img_placeholder.png';
   static const String serviceDelivery = '$_base/boxes2.png';
   static const String serviceCars = '$_base/img_home_car2.png';
