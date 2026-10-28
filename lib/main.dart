@@ -28,43 +28,120 @@ import 'features/main_module/profile/provider/support_provider.dart';
 import 'features/main_module/payments/data/repo/finik_payments_repository.dart';
 import 'features/main_module/payments/provider/finik_payment_flow_provider.dart';
 
+bool _firebaseReady = false;
+bool _mapKitReady = false;
+
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
   await firebaseMessagingBackgroundHandler(message);
 }
 
+Future<void> _safeConfigureOrientation() async {
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]).timeout(const Duration(seconds: 3));
+  } catch (error, stackTrace) {
+    debugPrint('Startup: orientation configuration failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _safeInitFirebase() async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 10));
+    FirebaseMessaging.onBackgroundMessage(_bgHandler);
+    _firebaseReady = true;
+    debugPrint('Startup: Firebase initialized');
+  } catch (error, stackTrace) {
+    debugPrint('Startup: Firebase initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _safeInitMapKit() async {
+  if (!SafaMapKitConfig.isConfigured) {
+    debugPrint('Startup: MapKit key is not configured');
+    return;
+  }
+
+  try {
+    await yandex_init.initMapkit(
+      apiKey: SafaMapKitConfig.apiKey,
+      locale: 'ru_RU',
+    ).timeout(const Duration(seconds: 10));
+
+    _mapKitReady = true;
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      mapkit.onStart();
+    }
+    debugPrint('Startup: MapKit initialized');
+  } catch (error, stackTrace) {
+    debugPrint('Startup: MapKit initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
 Future<void> _safeInitServices() async {
+  if (!_firebaseReady) return;
+
   try {
     await NotificationService.instance.init().timeout(
       const Duration(seconds: 5),
     );
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    debugPrint('Startup: notification service initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
   try {
     await PushService.instance.init().timeout(const Duration(seconds: 5));
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    debugPrint('Startup: push service initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _safeRefreshPushRegistration() async {
+  if (!_firebaseReady) return;
+
+  try {
+    await PushService.instance.refreshRegistration().timeout(
+      const Duration(seconds: 5),
+    );
+  } catch (error, stackTrace) {
+    debugPrint('Lifecycle: push registration refresh failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _initializeAfterFirstFrame() async {
+  // None of these integrations are allowed to block the first Flutter frame.
+  // App Review must always get a usable UI even if a third-party SDK is slow,
+  // unavailable, or incompatible with a newly released iOS version.
+  await _safeConfigureOrientation();
+  await _safeInitFirebase();
+
+  // Keep independent integrations isolated from each other. A MapKit failure
+  // must not prevent notifications from initializing, and vice versa.
+  unawaited(_safeInitServices());
+  unawaited(_safeInitMapKit());
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  if (SafaMapKitConfig.isConfigured) {
-    debugPrint('MAPKIT DEBUG: key=${SafaMapKitConfig.apiKey}');
-    await yandex_init.initMapkit(
-      apiKey: SafaMapKitConfig.apiKey,
-      locale: 'ru_RU',
-    );
-    mapkit.onStart();
-  }
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  FirebaseMessaging.onBackgroundMessage(_bgHandler);
 
   final api = ApiService();
   final authRepo = AuthRepository(api);
   final geoRepo = DeliveryGeoRepository(api);
   final profileRepo = ProfileRepository(api);
   final shipRepo = ShipmentsRepository();
+
+  // Render the application before initializing optional third-party services.
+  // Previously MapKit and Firebase were awaited here; any startup failure left
+  // iOS displaying the white launch screen indefinitely.
   runApp(
     MultiProvider(
       providers: [
@@ -94,7 +171,9 @@ Future<void> main() async {
     ),
   );
 
-  unawaited(_safeInitServices());
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_initializeAfterFirstFrame());
+  });
 }
 
 class DoGoApp extends StatefulWidget {
@@ -114,19 +193,19 @@ class _DoGoAppState extends State<DoGoApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(PushService.instance.refreshRegistration());
-      if (SafaMapKitConfig.isConfigured) mapkit.onStart();
+      unawaited(_safeRefreshPushRegistration());
+      if (_mapKitReady) mapkit.onStart();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      if (SafaMapKitConfig.isConfigured) mapkit.onStop();
+      if (_mapKitReady) mapkit.onStop();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (SafaMapKitConfig.isConfigured) mapkit.onTerminate();
+    if (_mapKitReady) mapkit.onTerminate();
     super.dispose();
   }
 
