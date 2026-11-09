@@ -30,6 +30,7 @@ import 'features/main_module/payments/provider/finik_payment_flow_provider.dart'
 
 bool _firebaseReady = false;
 bool _mapKitReady = false;
+bool _mapKitStarted = false;
 
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
@@ -61,9 +62,40 @@ Future<void> _safeInitFirebase() async {
   }
 }
 
+void _startMapKitIfPossible() {
+  if (!_mapKitReady || _mapKitStarted) return;
+  final lifecycle = WidgetsBinding.instance.lifecycleState;
+  // Do not start native rendering while iOS is backgrounded or inactive.
+  if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+
+  try {
+    mapkit.onStart();
+    _mapKitStarted = true;
+    // This notification is the only permission to mount a native map view.
+    SafaMapKitRuntime.status.value = SafaMapKitStatus.ready;
+  } catch (error, stackTrace) {
+    debugPrint('MapKit: onStart failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    SafaMapKitRuntime.status.value = SafaMapKitStatus.failed;
+  }
+}
+
+void _stopMapKitIfNeeded() {
+  if (!_mapKitStarted) return;
+  try {
+    mapkit.onStop();
+  } catch (error, stackTrace) {
+    debugPrint('MapKit: onStop failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  } finally {
+    _mapKitStarted = false;
+  }
+}
+
 Future<void> _safeInitMapKit() async {
   if (!SafaMapKitConfig.isConfigured) {
     debugPrint('Startup: MapKit key is not configured');
+    SafaMapKitRuntime.status.value = SafaMapKitStatus.failed;
     return;
   }
 
@@ -74,13 +106,12 @@ Future<void> _safeInitMapKit() async {
     ).timeout(const Duration(seconds: 10));
 
     _mapKitReady = true;
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      mapkit.onStart();
-    }
+    _startMapKitIfPossible();
     debugPrint('Startup: MapKit initialized');
   } catch (error, stackTrace) {
     debugPrint('Startup: MapKit initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
+    SafaMapKitRuntime.status.value = SafaMapKitStatus.failed;
   }
 }
 
@@ -121,13 +152,15 @@ Future<void> _initializeAfterFirstFrame() async {
   // None of these integrations are allowed to block the first Flutter frame.
   // App Review must always get a usable UI even if a third-party SDK is slow,
   // unavailable, or incompatible with a newly released iOS version.
+  // Start MapKit independently of Firebase (which can take up to 10 seconds).
+  // Native map widgets are guarded until initialization and onStart finish.
+  unawaited(_safeInitMapKit());
   await _safeConfigureOrientation();
   await _safeInitFirebase();
 
   // Keep independent integrations isolated from each other. A MapKit failure
   // must not prevent notifications from initializing, and vice versa.
   unawaited(_safeInitServices());
-  unawaited(_safeInitMapKit());
 }
 
 Future<void> main() async {
@@ -194,11 +227,11 @@ class _DoGoAppState extends State<DoGoApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_safeRefreshPushRegistration());
-      if (_mapKitReady) mapkit.onStart();
+      _startMapKitIfPossible();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      if (_mapKitReady) mapkit.onStop();
+      _stopMapKitIfNeeded();
     }
   }
 
