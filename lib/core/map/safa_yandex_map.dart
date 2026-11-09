@@ -20,6 +20,15 @@ abstract final class SafaMapKitConfig {
   static bool get isConfigured => apiKey.trim().isNotEmpty;
 }
 
+/// Never mount the native YandexMap view until initMapkit AND onStart succeed.
+/// This is important on iOS, where creating the native view too early can crash.
+enum SafaMapKitStatus { initializing, ready, failed }
+
+abstract final class SafaMapKitRuntime {
+  static final ValueNotifier<SafaMapKitStatus> status =
+      ValueNotifier<SafaMapKitStatus>(SafaMapKitStatus.initializing);
+}
+
 /// Published district polygons are displayed in the mobile applications.
 abstract final class SafaMobileMapFeatures {
   static const backendDrawingLayersEnabled = true;
@@ -181,7 +190,35 @@ class _SafaYandexMapState extends State<SafaYandexMap> {
         ),
       );
     }
-    return YandexMap(onMapCreated: _onMapCreated);
+    return ValueListenableBuilder<SafaMapKitStatus>(
+      valueListenable: SafaMapKitRuntime.status,
+      builder: (context, status, _) {
+        switch (status) {
+          case SafaMapKitStatus.initializing:
+            return const ColoredBox(
+              color: Color(0xFFF2F4F7),
+              child: Center(
+                child: CircularProgressIndicator.adaptive(),
+              ),
+            );
+          case SafaMapKitStatus.failed:
+            return const ColoredBox(
+              color: Color(0xFFF2F4F7),
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Не удалось запустить карту. Закройте и откройте приложение повторно.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            );
+          case SafaMapKitStatus.ready:
+            return YandexMap(onMapCreated: _onMapCreated);
+        }
+      },
+    );
   }
 
   void _onMapCreated(ymk.MapWindow window) {
