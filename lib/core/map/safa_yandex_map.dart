@@ -7,18 +7,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
 import 'package:yandex_maps_mapkit/ui_view.dart' as yui;
 import 'package:yandex_maps_mapkit/yandex_map.dart';
+import 'safa_mapkit_runtime.dart';
 
-/// MapKit configuration for the Safa mobile applications.
-///
-/// The bundled key keeps normal Android builds reproducible. A dart define can
-/// still override it for a separate Yandex environment when needed.
-abstract final class SafaMapKitConfig {
-  static const apiKey = String.fromEnvironment(
-    'MAPKIT_API_KEY',
-    defaultValue: '49a7f194-1555-4fb0-b929-8db57956ba1d',
-  );
-  static bool get isConfigured => apiKey.trim().isNotEmpty;
-}
+export 'safa_mapkit_runtime.dart' show SafaMapKitConfig;
 
 /// Published district polygons are displayed in the mobile applications.
 abstract final class SafaMobileMapFeatures {
@@ -181,7 +172,9 @@ class _SafaYandexMapState extends State<SafaYandexMap> {
         ),
       );
     }
-    return YandexMap(onMapCreated: _onMapCreated);
+    return SafaMapKitGate(
+      builder: (_) => YandexMap(onMapCreated: _onMapCreated),
+    );
   }
 
   void _onMapCreated(ymk.MapWindow window) {

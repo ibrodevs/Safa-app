@@ -46,6 +46,17 @@ a separate iOS key with `--dart-define=MAPKIT_API_KEY=...`:
 - Debug / Personal Team: `kg.ibroabdraimov.safa.dev`
 - Profile / Release: `kg.genesis.safa.app`
 
+MapKit starts after the first Flutter frame, independently of Firebase. All
+map screens share one initialization future and create the native map only
+after it succeeds. While initialization is pending they show a loading indicator;
+an SDK error or timeout shows a fallback instead of creating an unsafe iOS view.
+
+Before releasing an iOS map fix, run `flutter pub get` and `pod install` in
+`ios/`, then test a release build on an iPhone: open the map immediately after
+launch, select an address, open the carrier map, and background/foreground the
+app. Repeat with location permission denied and slow connectivity. A visible
+map also requires the release bundle identifier to be allowed by the API key.
+
 ## iOS signing
 
 Debug builds use `kg.ibroabdraimov.safa.dev` and an entitlement file without

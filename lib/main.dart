@@ -4,9 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:yandex_maps_mapkit/init.dart' as yandex_init;
 import 'package:yandex_maps_mapkit/mapkit_factory.dart';
-import 'core/map/safa_yandex_map.dart';
+import 'core/map/safa_mapkit_runtime.dart';
 import 'core/design/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
@@ -29,7 +28,6 @@ import 'features/main_module/payments/data/repo/finik_payments_repository.dart';
 import 'features/main_module/payments/provider/finik_payment_flow_provider.dart';
 
 bool _firebaseReady = false;
-bool _mapKitReady = false;
 
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
@@ -57,29 +55,6 @@ Future<void> _safeInitFirebase() async {
     debugPrint('Startup: Firebase initialized');
   } catch (error, stackTrace) {
     debugPrint('Startup: Firebase initialization failed: $error');
-    debugPrintStack(stackTrace: stackTrace);
-  }
-}
-
-Future<void> _safeInitMapKit() async {
-  if (!SafaMapKitConfig.isConfigured) {
-    debugPrint('Startup: MapKit key is not configured');
-    return;
-  }
-
-  try {
-    await yandex_init.initMapkit(
-      apiKey: SafaMapKitConfig.apiKey,
-      locale: 'ru_RU',
-    ).timeout(const Duration(seconds: 10));
-
-    _mapKitReady = true;
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      mapkit.onStart();
-    }
-    debugPrint('Startup: MapKit initialized');
-  } catch (error, stackTrace) {
-    debugPrint('Startup: MapKit initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
 }
@@ -121,13 +96,15 @@ Future<void> _initializeAfterFirstFrame() async {
   // None of these integrations are allowed to block the first Flutter frame.
   // App Review must always get a usable UI even if a third-party SDK is slow,
   // unavailable, or incompatible with a newly released iOS version.
+  // Start independently of Firebase; map widgets await this same future before
+  // creating a native view, even when navigation happens during startup.
+  unawaited(safaMapKitRuntime.ensureInitialized());
   await _safeConfigureOrientation();
   await _safeInitFirebase();
 
   // Keep independent integrations isolated from each other. A MapKit failure
   // must not prevent notifications from initializing, and vice versa.
   unawaited(_safeInitServices());
-  unawaited(_safeInitMapKit());
 }
 
 Future<void> main() async {
@@ -194,18 +171,18 @@ class _DoGoAppState extends State<DoGoApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_safeRefreshPushRegistration());
-      if (_mapKitReady) mapkit.onStart();
+      if (safaMapKitRuntime.isReady) mapkit.onStart();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      if (_mapKitReady) mapkit.onStop();
+      if (safaMapKitRuntime.isReady) mapkit.onStop();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (_mapKitReady) mapkit.onTerminate();
+    if (safaMapKitRuntime.isReady) mapkit.onTerminate();
     super.dispose();
   }
 
